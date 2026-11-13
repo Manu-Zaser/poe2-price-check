@@ -88,12 +88,19 @@ function round(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-/** Standard-Mindestwert: etwa 85 % des Wertes, damit ähnliche Items gefunden werden. */
+/**
+ * Standard-Mindestwert = der Wert des Items selbst, auf eine Nachkommastelle abgerundet
+ * (ganze Zahlen bleiben ganz): 30 → 30, 3.44 → 3.4, 7.05 → 7.
+ */
 export function defaultMin(value: number | null): number | undefined {
   if (value === null || value <= 0) return undefined;
-  if (value <= 3) return value;
-  const min = value * 0.85;
-  return Number.isInteger(value) ? Math.floor(min) : Math.floor(min * 10) / 10;
+  return floorOneDecimal(value);
+}
+
+export function floorOneDecimal(value: number): number {
+  if (Number.isInteger(value)) return value;
+  // kleiner Zuschlag gegen Gleitkomma-Fehler (z. B. 0.7 * 10 = 6.9999…)
+  return Math.floor(value * 10 + 1e-9) / 10;
 }
 
 /** Erzeugt die Mod-Liste, die im Overlay angezeigt und für die Suche verwendet wird. */
@@ -114,6 +121,7 @@ export function buildTradeMods(item: ParsedItem, stats: StatIndex): TradeMod[] {
       same.min = defaultMin(same.value);
       same.text = line.template.replace('#', amountText(same.value));
       same.combined = true;
+      if (line.tier !== undefined) same.tiers = [...(same.tiers ?? []), { affix: line.affix ?? 'other', tier: line.tier }];
       return;
     }
 
@@ -127,6 +135,7 @@ export function buildTradeMods(item: ParsedItem, stats: StatIndex): TradeMod[] {
       value,
       min: defaultMin(value),
       enabled: m !== null && selectable && (value === null || value > 0),
+      ...(line.tier !== undefined ? { tiers: [{ affix: line.affix ?? 'other', tier: line.tier }] } : {}),
     };
     if (m) byStat.set(m.id, mod);
     mods.push(mod);

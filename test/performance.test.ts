@@ -82,7 +82,7 @@ describe('Overlay-Auswahl', () => {
     const get = (k: string) => next.mods.find((m) => m.key === k)!;
     expect(get(life.key)).toMatchObject({ enabled: true, min: 5 });
     expect(get(dex.key)).toMatchObject({ enabled: true, min: undefined });
-    expect(get(rarity.key)).toMatchObject({ enabled: false, min: 12 }); // unverändert, nur abgewählt
+    expect(get(rarity.key)).toMatchObject({ enabled: false, min: 15 }); // unverändert, nur abgewählt
     expect(next).toMatchObject({ useBaseType: false, matchAll: true, id: req.id });
   });
 });

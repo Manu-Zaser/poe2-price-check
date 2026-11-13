@@ -1,4 +1,4 @@
-import type { ParsedItem } from './types';
+import type { ModMeta, ParsedItem } from './types';
 
 /** Herkunft eines Mods – entspricht den Gruppen in /api/trade2/data/stats. */
 export type ModKind = 'explicit' | 'implicit' | 'rune' | 'enchant' | 'crafted' | 'fractured' | 'desecrated';
@@ -11,6 +11,9 @@ export interface ModLine {
   template: string;
   /** Alle Zahlen der Zeile in Reihenfolge. */
   values: number[];
+  /** Aus der Kopfzeile des erweiterten Kopierens (falls vorhanden). */
+  affix?: ModMeta['affix'];
+  tier?: number;
 }
 
 const MARKERS: Record<string, ModKind> = {
@@ -62,8 +65,17 @@ export function extractModLines(item: ParsedItem, isModText: (line: ModLine) => 
   const candidates = item.sections.slice(ilvlIndex + 1);
 
   // Abschnitt → geparste Zeilen; nur Abschnitte, in denen mindestens eine Zeile als Mod erkannt wird.
+  const meta = new Map((item.modMeta ?? []).map((m) => [m.line, m]));
+  const withMeta = (raw: string): ModLine => {
+    const line = parseModLine(raw);
+    const m = meta.get(raw);
+    if (!m) return line;
+    // Die Kopfzeile weiß sicher, ob es ein Implicit ist – zuverlässiger als die Abschnitts-Heuristik.
+    const kind = m.affix === 'implicit' && line.kind === 'explicit' ? 'implicit' : line.kind;
+    return { ...line, kind, affix: m.affix, ...(m.tier !== undefined ? { tier: m.tier } : {}) };
+  };
   const sections = candidates
-    .map((lines) => lines.filter((l) => !NOT_A_MOD.test(l)).map((l) => parseModLine(l)))
+    .map((lines) => lines.filter((l) => !NOT_A_MOD.test(l)).map(withMeta))
     .filter((lines) => lines.length > 0 && lines.some(isModText));
 
   const unmarkedIdx = sections
@@ -75,7 +87,9 @@ export function extractModLines(item: ParsedItem, isModText: (line: ModLine) => 
   const result: ModLine[] = [];
   sections.forEach((lines, i) => {
     for (const line of lines) {
-      const unmarked = line.kind === 'explicit';
+      // Präfix/Suffix laut Kopfzeile ist immer explizit, auch im vorletzten Abschnitt.
+      const knownAffix = line.affix === 'prefix' || line.affix === 'suffix';
+      const unmarked = line.kind === 'explicit' && !knownAffix;
       result.push(unmarked && i !== lastUnmarked ? { ...line, kind: 'implicit' } : line);
     }
   });

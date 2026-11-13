@@ -1,4 +1,4 @@
-import type { ParsedItem, Rarity } from './types';
+import type { ModMeta, ParsedItem, Rarity } from './types';
 
 const SEPARATOR = '--------';
 
@@ -42,6 +42,26 @@ function headerValue(line: string | undefined): string | null {
 }
 
 /**
+ * Kopfzeile eines Mods aus dem erweiterten Kopieren, z. B.
+ * `{ Prefix Modifier "Humming" (Tier: 9) — Damage, Elemental, Lightning, Caster }`.
+ * In PoE2 ist eine HÖHERE Tier-Zahl besser (umgekehrt zu PoE1).
+ */
+export function parseModHeader(line: string): Omit<ModMeta, 'line'> {
+  const inner = line.replace(/^\{\s*/, '').replace(/\s*\}$/, '');
+  const kindText = inner.match(/^(.*?)\s*Modifier\b/i)?.[1]?.toLowerCase() ?? '';
+  const affix: ModMeta['affix'] = /prefix/.test(kindText)
+    ? 'prefix'
+    : /suffix/.test(kindText)
+      ? 'suffix'
+      : /implicit/.test(kindText)
+        ? 'implicit'
+        : 'other';
+  const tier = inner.match(/\((?:Tier|Rank):\s*(\d+)\)/i);
+  const name = inner.match(/"([^"]+)"/);
+  return { affix, ...(tier ? { tier: Number(tier[1]) } : {}), ...(name ? { name: name[1] } : {}) };
+}
+
+/**
  * Parst den Text, den PoE2 bei Strg+C (oder Strg+Alt+C) in die Zwischenablage legt.
  * Gibt null zurück, wenn der Text nicht wie ein Item aussieht.
  */
@@ -50,13 +70,24 @@ export function parseItemText(text: string): ParsedItem | null {
     .replace(/\r\n?/g, '\n')
     .split('\n')
     .map((l) => l.trim())
-    // Strg+Alt+C fügt Mod-Beschreibungen in { } ein – für den Preischeck irrelevant.
-    .filter((l) => l.length > 0 && !l.startsWith('{'));
+    .filter((l) => l.length > 0);
 
+  // Erweitertes Kopieren (Strg+Alt+C) schreibt vor jeden Mod eine Kopfzeile in { }.
+  // Die Kopfzeilen selbst kommen nicht in die Abschnitte, ihre Infos (Tier, Präfix/Suffix)
+  // werden den folgenden Mod-Zeilen zugeordnet.
   const blocks: string[][] = [[]];
+  const modMeta: ModMeta[] = [];
+  let current: Omit<ModMeta, 'line'> | null = null;
   for (const line of lines) {
-    if (line === SEPARATOR) blocks.push([]);
-    else blocks[blocks.length - 1].push(line);
+    if (line === SEPARATOR) {
+      blocks.push([]);
+      current = null;
+    } else if (line.startsWith('{')) {
+      current = parseModHeader(line);
+    } else {
+      blocks[blocks.length - 1].push(line);
+      if (current) modMeta.push({ line, ...current });
+    }
   }
 
   const header = blocks[0];
@@ -90,6 +121,7 @@ export function parseItemText(text: string): ParsedItem | null {
     corrupted: find(PATTERNS.corrupted) !== null,
     unidentified,
     sections,
+    modMeta,
   };
 
   const ilvl = find(PATTERNS.itemLevel);

@@ -14,6 +14,17 @@ export interface ParsedItem {
   unidentified: boolean;
   /** Textblöcke zwischen den "--------"-Trennern (ohne Kopfblock). */
   sections: string[][];
+  /** Tier/Präfix-Infos je Mod-Zeile (nur beim erweiterten Kopieren vorhanden). */
+  modMeta?: ModMeta[];
+}
+
+export interface ModMeta {
+  /** Mod-Zeile genau wie im Kopiertext (inkl. Wertebereich). */
+  line: string;
+  affix: 'prefix' | 'suffix' | 'implicit' | 'other';
+  /** Tier laut Spiel; in PoE2 ist höher = besser. */
+  tier?: number;
+  name?: string;
 }
 
 export interface PriceMatch {
@@ -47,6 +58,8 @@ export interface TradeMod {
   filter?: 'dps' | 'pdps' | 'edps' | 'ilvl' | 'sockets';
   /** Abgewählt, weil schon in einer Summe bzw. den DPS enthalten. */
   coveredBy?: 'Summe' | 'DPS';
+  /** Tier(s) laut Spiel (bei zusammengefassten Mods mehrere). In PoE2: höher = besser. */
+  tiers?: { affix: ModMeta['affix']; tier: number }[];
 }
 
 /** Auswahl aus dem Overlay für "Neu suchen". */

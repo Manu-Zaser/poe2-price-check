@@ -38,7 +38,7 @@ describe('buildTradeMods – Handschuhe (Grim Claw)', () => {
     // Leben ist jetzt in der Summe "Leben gesamt" enthalten und deshalb abgewählt.
     expect(byText('maximum Life')).toMatchObject({ statId: 'explicit.stat_3299347043', value: 10, enabled: false, coveredBy: 'Summe' });
     expect(byText('Cold damage to Attacks')).toMatchObject({ statId: 'explicit.stat_4067062424', value: 18 });
-    expect(byText('Dexterity')).toMatchObject({ statId: 'explicit.stat_3261801346', value: 30, min: 25 });
+    expect(byText('Dexterity')).toMatchObject({ statId: 'explicit.stat_3261801346', value: 30, min: 30 });
     expect(byText('Fire Resistance')).toMatchObject({ kind: 'rune', statId: 'rune.stat_3372524247', enabled: false });
   });
 });
@@ -64,14 +64,14 @@ describe('buildTradeMods – Bogen (Morbid Stinger)', () => {
   it('fasst gleiche Stats zusammen (144 % + 63 % increased Physical Damage)', () => {
     const phys = mods.filter((m) => m.statId === 'explicit.stat_1509134228');
     expect(phys).toHaveLength(1);
-    expect(phys[0]).toMatchObject({ value: 207, min: 175, combined: true, text: '207% increased Physical Damage' });
+    expect(phys[0]).toMatchObject({ value: 207, min: 207, combined: true, text: '207% increased Physical Damage' });
     // Die Rune mit demselben Text bleibt eigenständig (andere Gruppe).
     expect(mods.find((m) => m.statId === 'rune.stat_1509134228')).toBeDefined();
   });
 
   it('übernimmt Dezimalwerte', () => {
-    expect(byText('to Critical Hit Chance')).toMatchObject({ statId: 'explicit.stat_518292764', value: 3.44, min: 2.9 });
-    expect(byText('Leeches')).toMatchObject({ value: 7.05, min: 5.9 });
+    expect(byText('to Critical Hit Chance')).toMatchObject({ statId: 'explicit.stat_518292764', value: 3.44, min: 3.4 });
+    expect(byText('Leeches')).toMatchObject({ value: 7.05, min: 7 });
   });
 });
 
@@ -82,7 +82,7 @@ describe('buildSearchQuery', () => {
     expect(q.query.type).toBe('Barbed Bracers');
     // 4 explizite Mods + 3 Summen (Elementar-Resistenzen, Leben, Geschick)
     expect(q.query.stats[0].filters).toHaveLength(7);
-    expect(q.query.stats[0].filters).toContainEqual({ id: 'pseudo.pseudo_total_life', value: { min: 8 } });
+    expect(q.query.stats[0].filters).toContainEqual({ id: 'pseudo.pseudo_total_life', value: { min: 10 } });
     expect(q.query.stats[0].filters).not.toContainEqual(expect.objectContaining({ id: 'explicit.stat_3299347043' }));
     expect(q.sort).toEqual({ price: 'asc' });
   });
@@ -106,10 +106,28 @@ describe('buildSearchQuery', () => {
 });
 
 describe('defaultMin', () => {
-  it('rundet sinnvoll ab', () => {
-    expect(defaultMin(100)).toBe(85);
+  it('nimmt den eigenen Wert, auf eine Nachkommastelle abgerundet', () => {
+    expect(defaultMin(100)).toBe(100);
     expect(defaultMin(2)).toBe(2);
+    expect(defaultMin(3.44)).toBe(3.4);
+    expect(defaultMin(7.05)).toBe(7);
+    expect(defaultMin(24.5)).toBe(24.5);
+    expect(defaultMin(0.7)).toBe(0.7);
     expect(defaultMin(-50)).toBeUndefined();
     expect(defaultMin(null)).toBeUndefined();
+  });
+});
+
+describe('Tiers im Overlay', () => {
+  it('übernimmt Tier und Präfix/Suffix in die Mod-Zeilen', () => {
+    const item = parseItemText(fixture('rare-gloves-advanced.txt'))!;
+    const mods = buildTradeMods(item, stats);
+    expect(mods.find((m) => m.text.includes('maximum Life'))?.tiers).toEqual([{ affix: 'prefix', tier: 2 }]);
+    expect(mods.find((m) => m.text.includes('Dexterity') && m.kind === 'explicit')?.tiers).toEqual([{ affix: 'suffix', tier: 8 }]);
+    // Rune ohne Kopfzeile → kein Tier
+    expect(mods.find((m) => m.kind === 'rune')?.tiers).toBeUndefined();
+    // Gleiches Ergebnis wie ohne Kopfzeilen (nur die Tiers kommen dazu)
+    const plain = buildTradeMods(parseItemText(fixture('rare-gloves-grim-claw.txt'))!, stats);
+    expect(mods.map((m) => [m.key, m.statId, m.min, m.enabled])).toEqual(plain.map((m) => [m.key, m.statId, m.min, m.enabled]));
   });
 });

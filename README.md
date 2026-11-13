@@ -24,7 +24,9 @@ PoE2 im Modus **Fenster/Vollbild-Fenster** spielen, sonst liegt das Overlay unte
 - **Rares und Magic-Items** → Suche auf der offiziellen Trade-Seite:
   - Mods werden automatisch den Stat-IDs der Trade-Suche zugeordnet (inkl. Runen, Implicits, lokaler Waffen-Stats;
     gleiche Stats aus mehreren Zeilen werden addiert).
-  - Standard: explizite Mods mit ca. 85 % des Wertes, davon müssen die meisten passen (z. B. 4 von 6).
+  - Standard-Mindestwerte = die Werte des eigenen Items (auf eine Nachkommastelle abgerundet); von den Mods müssen
+    die meisten passen (z. B. 4 von 6).
+  - **Tiers:** Jeder Mod zeigt Präfix/Suffix und Tier (z. B. „P T7“). In PoE2 gilt: höhere Tier-Zahl = besser.
   - Im Overlay Mods an-/abhaken (auch Klick auf den Text), Mindestwerte per **Mausrad** ändern oder anklicken und
     eintippen (leer = ohne Minimum). Gesucht wird erst mit Klick auf **Suchen** (leuchtet auf, sobald etwas geändert wurde).
     Die Schalter „Nur Sofortkauf“, „Alle Mods müssen passen“ und „Nur Basis“ suchen sofort neu.
@@ -53,7 +55,8 @@ Preischeck-Tools nutzen sie; GGG kann das jederzeit ändern.
 
 ## Regeln (GGG Developer Docs)
 
-- Ein Hotkey-Druck = **eine** Aktion im Spiel (ein Strg+C), Zwischenablage wird pro Druck einmal gelesen.
+- Ein Hotkey-Druck = **eine** Aktion im Spiel (ein Strg+Alt+C = erweitertes Kopieren inkl. Tiers), Zwischenablage
+  wird pro Druck einmal gelesen.
 - Strg+C wird nur gesendet, wenn das Fenster „Path of Exile 2“ im Vordergrund ist. Sonst wird nur die aktuelle
   Zwischenablage geprüft (praktisch zum Testen).
 - Kein Speicherlesen, keine Client-Änderung, keine Automatisierung.

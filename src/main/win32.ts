@@ -1,7 +1,7 @@
 /**
  * Minimale Win32-Anbindung über koffi (FFI, keine nativen Builds nötig).
  *
- * Regelkonformität: Pro Hotkey-Druck wird GENAU EIN Strg+C ans Spiel gesendet
+ * Regelkonformität: Pro Hotkey-Druck wird GENAU EIN Strg+Alt+C (Item kopieren) ans Spiel gesendet
  * (eine Aktion pro Tastendruck). Es wird kein Speicher gelesen und nichts injiziert.
  */
 import koffi from 'koffi';
@@ -26,6 +26,7 @@ const GetWindowTextW = user32.func('int __stdcall GetWindowTextW(void* hWnd, _Ou
 const INPUT_KEYBOARD = 1;
 const KEYEVENTF_KEYUP = 0x0002;
 const VK_CONTROL = 0x11;
+const VK_MENU = 0x12; // Alt
 const VK_C = 0x43;
 
 function key(vk: number, up: boolean) {
@@ -39,10 +40,15 @@ function isDown(vk: number): boolean {
 
 /** Sendet ein einzelnes Strg+C an das Vordergrundfenster. */
 export function sendCopy(): void {
+  // Strg+Alt+C = erweitertes Kopieren: wie Strg+C, aber mit Tier/Präfix/Suffix je Mod.
+  // Weiterhin genau EINE Aktion im Spiel (Item-Text kopieren).
   const ctrlHeld = isDown(VK_CONTROL);
+  const altHeld = isDown(VK_MENU);
   if (!ctrlHeld) key(VK_CONTROL, false);
+  if (!altHeld) key(VK_MENU, false);
   key(VK_C, false);
   key(VK_C, true);
+  if (!altHeld) key(VK_MENU, true);
   if (!ctrlHeld) key(VK_CONTROL, true);
 }
 

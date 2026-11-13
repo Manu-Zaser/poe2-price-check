@@ -208,6 +208,21 @@ function suggestionRow(sg: PriceSuggestion): HTMLElement {
   );
 }
 
+const AFFIX: Record<string, { short: string; long: string }> = {
+  prefix: { short: 'P', long: 'Präfix' },
+  suffix: { short: 'S', long: 'Suffix' },
+  implicit: { short: 'I', long: 'Implicit' },
+  other: { short: '', long: 'Mod' },
+};
+
+/** "P T9" = Präfix, Tier 9. In PoE2 ist eine höhere Tier-Zahl besser. */
+function tierBadge(t: NonNullable<TradeMod['tiers']>[number]): HTMLElement {
+  const a = AFFIX[t.affix] ?? AFFIX.other;
+  const badge = el('span', `tier tier-${t.affix}`, a.short ? el('span', 'tier-affix', a.short) : null, `T${t.tier}`);
+  badge.title = `${a.long}, Tier ${t.tier} – in PoE2 gilt: höher = besser`;
+  return badge;
+}
+
 function modRow(m: TradeMod, onChange: () => void): HTMLElement {
   const searchable = m.statId !== null || !!m.filter;
   const row = el('div', `mod ${searchable ? '' : 'mod-off'} mod-${m.kind}`);
@@ -230,6 +245,7 @@ function modRow(m: TradeMod, onChange: () => void): HTMLElement {
   }
 
   const side = el('span', 'mod-side');
+  for (const t of m.tiers ?? []) side.append(tierBadge(t));
   if (KIND_LABEL[m.kind]) side.append(el('span', 'mod-kind', KIND_LABEL[m.kind]!));
   if (m.combined) {
     side.append(el('span', 'mod-kind', 'addiert'));

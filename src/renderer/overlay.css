@@ -199,3 +199,14 @@ input[type="checkbox"]:disabled { opacity: .35; cursor: default; }
 }
 .btn-xs:hover { border-color: var(--gold-deep); background: var(--surface-3); }
 .btn-xs.done { color: var(--ok); border-color: rgba(127,176,105,.5); }
+
+/* ---------- Tier-Abzeichen (aus dem erweiterten Kopieren) ---------- */
+.tier {
+  display: inline-flex; align-items: center; gap: 3px;
+  font: 600 10.5px var(--font); font-variant-numeric: tabular-nums;
+  padding: 1px 5px; border-radius: 4px;
+  color: var(--gold-bright); background: rgba(201,168,92,.12); border: 1px solid rgba(201,168,92,.3);
+}
+.tier-affix { color: var(--muted); font-weight: 700; }
+.tier-suffix { color: #b9c8ff; background: rgba(140,150,255,.1); border-color: rgba(140,150,255,.3); }
+.tier-implicit { color: var(--muted); background: var(--surface-3); border-color: var(--line-strong); }

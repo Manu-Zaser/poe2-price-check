@@ -90,9 +90,10 @@ export function coveredByDps(template: string): boolean {
 
 // ---------- Zusatz-Kriterien ----------
 
+/** Mindestwert = eigener Wert, auf eine Nachkommastelle abgerundet. */
 function minOf(value: number): number {
-  if (value <= 3) return value;
-  return Number.isInteger(value) ? Math.floor(value * 0.85) : Math.floor(value * 0.85 * 10) / 10;
+  if (Number.isInteger(value)) return value;
+  return Math.floor(value * 10 + 1e-9) / 10;
 }
 
 /**
@@ -129,7 +130,7 @@ export function buildExtraMods(item: ParsedItem, lines: ModLine[], mods: TradeMo
     ];
     for (const [filter, text, value] of rows) {
       if (value <= 0) continue;
-      extras.push({ key: `w:${filter}`, text, kind: 'weapon', statId: null, filter, value, min: Math.floor(value * 0.85), enabled: filter === main });
+      extras.push({ key: `w:${filter}`, text, kind: 'weapon', statId: null, filter, value, min: minOf(value), enabled: filter === main });
     }
   }
 

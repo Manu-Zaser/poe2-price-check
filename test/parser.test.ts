@@ -61,3 +61,15 @@ describe('parseItemText', () => {
     expect(parseItemText(text)!.stackSize).toBe(1234);
   });
 });
+
+describe('erweitertes Kopieren (Strg+Alt+C)', () => {
+  // Nachgebaut nach dem offiziellen Format: { Prefix Modifier "Name" (Tier: N) — Tags }
+  const item = parseItemText(fixture('rare-gloves-advanced.txt'))!;
+
+  it('liest Tier und Präfix/Suffix je Mod, Kopfzeilen landen nicht in den Abschnitten', () => {
+    expect(item.sections.flat().some((l) => l.startsWith('{'))).toBe(false);
+    expect(item.modMeta).toContainEqual({ line: '+10(10-19) to maximum Life', affix: 'prefix', tier: 2, name: 'Healthy' });
+    expect(item.modMeta).toContainEqual({ line: '+30(28-30) to Dexterity', affix: 'suffix', tier: 8, name: 'of the Phantom' });
+    expect(item.modMeta?.find((m) => m.line.includes('Rarity'))).toMatchObject({ affix: 'suffix', tier: 4 });
+  });
+});
