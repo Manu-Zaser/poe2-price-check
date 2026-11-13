@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { mapLimit, type PriceIndex } from '../src/main/ninja';
-import { applySelection, newRareRequest, pendingRareResult, runRareSearch } from '../src/main/rare';
+import { applySelection, idleRareResult, newRareRequest, runRareSearch } from '../src/main/rare';
 import { parseMin } from '../src/renderer/format';
 import type { TradeClient } from '../src/main/trade';
 import { parseItemText } from '../src/shared/parser';
@@ -38,10 +38,12 @@ describe('Rare-Suche', () => {
     return { client, calls };
   }
 
-  it('liefert sofort einen Zwischenstand mit den Mods', () => {
+  it('shows the mods right away without searching, with "all stats must match" on', () => {
     const req = newRareRequest(parseItemText(fixture('rare-gloves-grim-claw.txt'))!, stats);
-    const p = pendingRareResult(index, req);
-    expect(p).toMatchObject({ kind: 'trade', pending: true, search: null });
+    const p = idleRareResult(index, req);
+    // No request to pathofexile.com until "Search" is clicked
+    expect(p).toMatchObject({ kind: 'trade', search: null, matchAll: true });
+    expect(p).not.toHaveProperty('pending');
     expect(p.kind === 'trade' && p.mods.filter((m) => m.kind !== 'pseudo' && m.kind !== 'defence' && m.kind !== 'misc').length).toBe(7);
   });
 
@@ -58,7 +60,7 @@ describe('Rare-Suche', () => {
   it('fragt bei geänderter Auswahl neu an', async () => {
     const { client, calls } = fakeClient();
     const req = newRareRequest(parseItemText(fixture('rare-bow-morbid-stinger.txt'))!, stats);
-    await runRareSearch(client, index, { ...req, matchAll: true, useBaseType: false });
+    await runRareSearch(client, index, { ...req, matchAll: false, useBaseType: true });
     expect(calls.search).toBe(1);
   });
 });

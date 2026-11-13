@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseModLine } from '../src/shared/mods';
 import { parseItemText } from '../src/shared/parser';
-import { buildSearchQuery, buildTradeMods, defaultMatchCount, defaultMin, StatIndex, type StatsData } from '../src/shared/stats';
+import { buildSearchQuery, buildTradeMods, defaultMatchCount, defaultMin, isNamedUnique, normalDefaults, StatIndex, statRange, uniqueDefaults, type StatsData } from '../src/shared/stats';
 
 // Echte Items aus dem Spiel; die Stat-Liste ist ein gekürzter Auszug aus /api/trade2/data/stats.
 const fixture = (name: string) => readFileSync(join(__dirname, 'fixtures', name), 'utf8');
@@ -51,7 +51,7 @@ describe('buildTradeMods – Bogen (Morbid Stinger)', () => {
   const byText = (t: string) => mods.find((m) => m.kind !== 'pseudo' && m.text.includes(t))!;
 
   it('erkennt den Implicit ohne Marker und negiert "reduced"', () => {
-    expect(byText('Projectile Range')).toMatchObject({ kind: 'implicit', statId: 'implicit.stat_3398402065', value: -50, enabled: false });
+    expect(byText('Projectile Range')).toMatchObject({ kind: 'implicit', statId: 'implicit.stat_3398402065', value: 50, min: 50, invert: true, enabled: false });
   });
 
   it('bevorzugt lokale Stats auf Waffen', () => {
@@ -131,5 +131,105 @@ describe('Tiers im Overlay', () => {
     // Gleiches Ergebnis wie ohne Kopfzeilen (nur die Tiers kommen dazu)
     const plain = buildTradeMods(parseItemText(fixture('rare-gloves-grim-claw.txt'))!, stats);
     expect(mods.map((m) => [m.key, m.statId, m.min, m.enabled])).toEqual(plain.map((m) => [m.key, m.statId, m.min, m.enabled]));
+  });
+});
+
+describe('uniques via trade search', () => {
+  const item = parseItemText(fixture('unique-temporalis.txt'))!;
+  const mods = uniqueDefaults(buildTradeMods(item, stats));
+
+  it('treats only identified uniques as searchable', () => {
+    expect(isNamedUnique(item)).toBe(true);
+    expect(isNamedUnique(parseItemText(fixture('unique-unidentified.txt'))!)).toBe(false);
+    expect(isNamedUnique(parseItemText(fixture('rare-ring.txt'))!)).toBe(false);
+  });
+
+  it('lists the mods but only ticks the corrupted filter by default', () => {
+    const es = mods.find((m) => m.kind === 'explicit' && m.text.includes('maximum Energy Shield'))!;
+    expect(es).toMatchObject({ value: 137, min: 137, enabled: false });
+    expect(mods.filter((m) => m.enabled).map((m) => m.filter)).toEqual(['corrupted']);
+  });
+
+  it('searches by name and base with rarity unique', () => {
+    const q = buildSearchQuery(item, mods, { useBaseType: false, matchAll: true });
+    expect(q.query).toMatchObject({ name: 'Temporalis', type: 'Silk Robe' });
+    expect(q.query.filters.type_filters.filters).toEqual({ rarity: { option: 'unique' } });
+    expect(q.query.stats).toEqual([{ type: 'and', filters: [] }]);
+    expect(q.query.filters.misc_filters?.filters).toEqual({ corrupted: { option: 'true' } });
+  });
+
+  it('adds ticked rolls with the item value as minimum', () => {
+    const ticked = mods.map((m) => (m.kind === 'explicit' && m.statId ? { ...m, enabled: true } : m));
+    const q = buildSearchQuery(item, ticked, { useBaseType: true, matchAll: true });
+    expect(q.query.stats[0].filters).toEqual([expect.objectContaining({ value: { min: 137 } })]);
+  });
+});
+
+describe('plural quantities', () => {
+  it('matches "Has 3 Charm Slots" against the singular stat text', () => {
+    const item = parseItemText(['Item Class: Belts', 'Rarity: Unique', 'Headhunter', 'Heavy Belt', '--------', 'Item Level: 79', '--------',
+      '26% increased Stun Threshold (implicit)', 'Has 3 Charm Slots (implicit)', '--------', '+40 to Dexterity'].join('\n'))!;
+    const slots = buildTradeMods(item, stats).find((m) => m.text.includes('Charm Slots'))!;
+    expect(slots).toMatchObject({ statId: 'implicit.stat_1416292992', value: 3, min: 3 });
+  });
+});
+
+describe('min/max and "reduced" mods', () => {
+  it('passes min and max through for normal stats', () => {
+    expect(statRange({ min: 10, max: 20 })).toEqual({ min: 10, max: 20 });
+    expect(statRange({ max: 20 })).toEqual({ max: 20 });
+    expect(statRange({})).toBeNull();
+  });
+
+  it('negates and swaps the range for inverted ("reduced") stats', () => {
+    // "at least 50% reduced" = increased ≤ -50; "50–60% reduced" = increased between -60 and -50
+    expect(statRange({ min: 50, invert: true })).toEqual({ max: -50 });
+    expect(statRange({ min: 50, max: 60, invert: true })).toEqual({ min: -60, max: -50 });
+  });
+
+  it('uses the range in the search query', () => {
+    const item = parseItemText(fixture('rare-bow-morbid-stinger.txt'))!;
+    const mods = buildTradeMods(item, stats).map((m) =>
+      m.text.includes('Projectile Range') ? { ...m, enabled: true, max: 60 } : { ...m, enabled: false });
+    const q = buildSearchQuery(item, mods, { useBaseType: true, matchAll: true });
+    expect(q.query.stats[0].filters).toEqual([{ id: 'implicit.stat_3398402065', value: { min: -60, max: -50 } }]);
+  });
+});
+
+describe('category vs. base type', () => {
+  it('searches the whole category by default and falls back to the base for unknown classes', () => {
+    const bow = parseItemText(fixture('rare-bow-morbid-stinger.txt'))!;
+    const q = buildSearchQuery(bow, [], { useBaseType: false, matchAll: true });
+    expect(q.query).not.toHaveProperty('type');
+    expect(q.query.filters.type_filters.filters).toMatchObject({ category: { option: 'weapon.bow' } });
+
+    const odd = { ...bow, itemClass: 'Something New' };
+    const q2 = buildSearchQuery(odd, [], { useBaseType: false, matchAll: true });
+    expect(q2.query).toMatchObject({ type: 'Obliterator Bow' });
+    expect(q2.query.filters.type_filters.filters).not.toHaveProperty('category');
+  });
+});
+
+describe('normal (white) items', () => {
+  const item = parseItemText([
+    'Item Class: Body Armours', 'Rarity: Normal', 'Corsair Coat', '--------',
+    'Evasion Rating: 412', '--------', 'Requires: Level 65', '--------', 'Item Level: 82',
+  ].join('\n'))!;
+  const mods = normalDefaults(buildTradeMods(item, stats));
+
+  it('parses the base without a name', () => {
+    expect(item).toMatchObject({ rarity: 'Normal', baseType: 'Corsair Coat', itemLevel: 82 });
+    expect(item.name).toBeUndefined();
+  });
+
+  it('only ticks item level and corrupted state by default', () => {
+    expect(mods.filter((m) => m.enabled).map((m) => m.filter).sort()).toEqual(['corrupted', 'ilvl']);
+    expect(mods.find((m) => m.key === 'd:ev')).toMatchObject({ value: 412, enabled: false });
+  });
+
+  it('searches white bases of this base type with at least this item level', () => {
+    const q = buildSearchQuery(item, mods, { useBaseType: true, matchAll: true });
+    expect(q.query).toMatchObject({ type: 'Corsair Coat' });
+    expect(q.query.filters.type_filters.filters).toEqual({ rarity: { option: 'normal' }, ilvl: { min: 82 } });
   });
 });

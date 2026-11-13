@@ -3,13 +3,13 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { validateHotkey } from '../shared/hotkey';
 import { parseItemText } from '../shared/parser';
-import type { StatIndex } from '../shared/stats';
+import { isNamedUnique, type StatIndex } from '../shared/stats';
 import type { AppState, AppStatus, HistoryEntry, PriceResult, SaveResult, Settings, TradeSelection } from '../shared/types';
 import { log, logFile } from './log';
 import { buildPriceIndex, CACHE_TTL_MS, fetchLeagues, lookupPrice, makeFetchJson, type PriceIndex } from './ninja';
-import { applySelection, loadStatIndex, newRareRequest, pendingRareResult, runRareSearch, type RareRequest } from './rare';
+import { applySelection, idleRareResult, loadStatIndex, newRareRequest, runRareSearch, type RareRequest } from './rare';
 import { TradeClient } from './trade';
-import { foregroundWindowTitle, isLeftButtonDown, sendCopy } from './win32';
+import { focusWindowByTitle, foregroundWindowHandle, foregroundWindowTitle, sendCopy } from './win32';
 
 // Fester Datenordner (%APPDATA%\poe2-pricecheck), egal ob per `npm start` oder als gebaute .exe
 // mit anderem Produktnamen gestartet – so bleiben Einstellungen und Overlay-Position erhalten.
@@ -56,6 +56,7 @@ const DEFAULT_CONFIG: Config = {
   contact: '',
   gpuAcceleration: false,
   overlayScale: 1.15,
+  overlayOpacity: 0.96,
   overlayPosition: null,
 };
 
@@ -92,6 +93,15 @@ try {
 } catch {
   app.disableHardwareAcceleration(); // Standard: aus
 }
+
+/**
+ * Chromium prüft unter Windows, ob ein Fenster von anderen verdeckt ist, und stellt verdeckte
+ * Fenster ruhig (kein Zeichnen, keine Eingaben). Holt man das Spiel per Alt+Tab zurück, hält es das
+ * Overlay fälschlich für verdeckt – es bleibt sichtbar, reagiert aber nicht mehr auf Klicks.
+ * Für ein Overlay über einem Vollbild-Spiel daher abschalten (muss vor "ready" passieren).
+ */
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 
 // ---------- Zustand ----------
 
@@ -133,10 +143,10 @@ function status(): AppStatus {
 }
 
 function state(): AppState {
-  const { league, hotkey, gpuAcceleration, overlayScale } = config;
+  const { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity } = config;
   return {
     status: status(),
-    settings: { league, hotkey, gpuAcceleration, overlayScale },
+    settings: { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity },
     overlayPositionSaved: config.overlayPosition !== null,
     logFile: logFile(),
     leagues,
@@ -231,6 +241,11 @@ async function saveSettings(patch: Partial<Settings>): Promise<SaveResult> {
     applyOverlayScale();
   }
 
+  if (patch.overlayOpacity !== undefined && Number.isFinite(patch.overlayOpacity)) {
+    config.overlayOpacity = clampOpacity(patch.overlayOpacity);
+    applyOverlayOpacity();
+  }
+
   if (patch.league !== undefined && patch.league !== config.league) {
     config.league = patch.league;
     index = null;
@@ -251,9 +266,31 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * Sonst (z. B. zum Testen) wird nur die aktuelle Zwischenablage gelesen.
  * Der vorherige Inhalt der Zwischenablage wird danach wiederhergestellt.
  */
+/** Ist gerade eines unserer eigenen Fenster (Overlay, Hauptfenster) vorne? */
+function ownWindowInFront(): boolean {
+  const fg = foregroundWindowHandle();
+  if (!fg) return false;
+  return [overlayWin, mainWin].some((w) => alive(w) && w.getNativeWindowHandle().readBigUInt64LE(0) === fg);
+}
+
 async function readItemText(): Promise<string> {
-  const inGame = foregroundWindowTitle() === config.gameWindowTitle;
-  if (!inGame) return clipboard.readText();
+  let inGame = foregroundWindowTitle() === config.gameWindowTitle;
+  // Hat gerade unser Overlay (oder das Hauptfenster) den Fokus – z. B. nach einem Klick ins Overlay –
+  // oder ist gar kein Fenster vorne, erst das Spiel nach vorne holen. Sonst würde nur die alte
+  // Zwischenablage gelesen.
+  const noForeground = foregroundWindowHandle() === 0n;
+  if (!inGame && (noForeground || ownWindowInFront()) && focusWindowByTitle(config.gameWindowTitle)) {
+    for (let waited = 0; waited < 300 && !inGame; waited += 20) {
+      await sleep(20);
+      inGame = foregroundWindowTitle() === config.gameWindowTitle;
+    }
+    log('info', `Hotkey while ${noForeground ? 'no window' : 'our window'} was in front – game brought back${inGame ? '' : ' (failed)'}`);
+  }
+  if (!inGame) {
+    // Spiel nicht vorne: nur die aktuelle Zwischenablage prüfen (praktisch zum Testen).
+    log('info', `Hotkey without the game in front ("${foregroundWindowTitle()}") – reading the current clipboard`);
+    return clipboard.readText();
+  }
 
   const previous = await clipboard.readText();
   await clipboard.writeText('');
@@ -316,7 +353,10 @@ function createOverlayWindow() {
     transparent: true,
     resizable: false,
     skipTaskbar: true,
-    focusable: false,
+    // Fokussierbar, damit ein Klick das Overlay sicher erreicht (bei nicht fokussierbaren Fenstern geht
+    // er über einem Vollbild-Spiel gelegentlich verloren). Beim Erscheinen nimmt es den Fokus trotzdem
+    // nicht (showInactive) – erst ein Klick hinein; danach geht der Fokus ans Spiel zurück.
+    focusable: true,
     alwaysOnTop: true,
     // Das Overlay rendert, während es versteckt ist – nicht drosseln.
     webPreferences: { preload: join(__dirname, 'preload.js'), backgroundThrottling: false },
@@ -324,7 +364,12 @@ function createOverlayWindow() {
   overlayWin = win;
   win.setAlwaysOnTop(true, 'screen-saver');
   void win.loadFile(join(__dirname, 'overlay.html'));
-  win.webContents.on('did-finish-load', () => win.webContents.setZoomFactor(config.overlayScale));
+  win.webContents.on('did-finish-load', () => {
+    win.webContents.setZoomFactor(config.overlayScale);
+    win.webContents.send('opacity', clampOpacity(config.overlayOpacity));
+  });
+
+  win.on('focus', () => log('info', 'Overlay got focus'));
 
   // Vom Nutzer verschoben (Ziehen an der Kopfzeile) → Position für künftige Preischecks merken.
   win.on('moved', () => {
@@ -385,6 +430,18 @@ function applyOverlayScale() {
   overlayWin.webContents.send('remeasure');
 }
 
+/** 40 % ist die Untergrenze – darunter ist der Text über dem Spiel kaum noch lesbar. */
+function clampOpacity(v: number): number {
+  if (!Number.isFinite(v)) return DEFAULT_CONFIG.overlayOpacity;
+  return Math.min(1, Math.max(0.4, Math.round(v * 100) / 100));
+}
+
+/** Hintergrund-Deckkraft sofort im offenen Overlay übernehmen. */
+function applyOverlayOpacity() {
+  if (!alive(overlayWin)) return;
+  overlayWin.webContents.send('opacity', config.overlayOpacity);
+}
+
 function placeOverlay(size: { width: number; height: number }) {
   if (!alive(overlayWin)) return;
   // Das Overlay misst in CSS-Pixeln; mit Zoom ist das Fenster entsprechend größer.
@@ -402,39 +459,84 @@ function placeOverlay(size: { width: number; height: number }) {
   } finally {
     setTimeout(() => (placing = false), 50);
   }
-  if (!overlayWin.isVisible()) overlayWin.showInactive(); // Spiel behält den Fokus
+  if (!overlayWin.isVisible()) {
+    overlayWin.showInactive(); // Spiel behält den Fokus
+    log('info', `Overlay shown at ${Math.round(origin.x)},${Math.round(y)} (${width}×${height})`);
+  }
+  // Über dem Spiel bleiben, auch wenn das Spiel sich zwischendurch nach vorne geholt hat.
+  overlayWin.setAlwaysOnTop(true, 'screen-saver');
+  overlayWin.moveTop();
+  startOverlayWatch();
+}
+
+// ---------- Overlay nach Alt+Tab ----------
+
+let overlayWatch: NodeJS.Timeout | null = null;
+let gameWasForeground = true;
+
+/**
+ * Solange das Overlay offen ist: Kommt das Spiel (z. B. nach Alt+Tab) wieder nach vorne, das
+ * Overlay erneut ganz nach oben holen und neu zeichnen lassen. Windows nimmt Fenstern beim
+ * Wechsel sonst gelegentlich den "immer oben"-Status, und das Overlay nimmt keine Klicks mehr an.
+ * Eine Abfrage pro Sekunde – nur ein Fenstertitel, keine Eingaben ans Spiel.
+ */
+function startOverlayWatch() {
+  if (overlayWatch) return;
+  gameWasForeground = foregroundWindowTitle() === config.gameWindowTitle;
+  overlayWatch = setInterval(() => {
+    if (!alive(overlayWin) || !overlayWin.isVisible()) return stopOverlayWatch();
+    const gameNow = foregroundWindowTitle() === config.gameWindowTitle;
+    if (gameNow && !gameWasForeground && !drag) raiseOverlay();
+    gameWasForeground = gameNow;
+  }, 1000);
+}
+
+function stopOverlayWatch() {
+  if (!overlayWatch) return;
+  clearInterval(overlayWatch);
+  overlayWatch = null;
+}
+
+function raiseOverlay() {
+  if (!alive(overlayWin)) return;
+  // Aus- und wieder einschalten setzt den Status bei Windows zuverlässig neu.
+  overlayWin.setAlwaysOnTop(false);
+  overlayWin.setAlwaysOnTop(true, 'screen-saver');
+  overlayWin.moveTop();
+  overlayWin.webContents.invalidate();
+  log('info', 'Game back in foreground – overlay brought to front again');
 }
 
 // ---------- Verschieben ----------
 
-let drag: { cursor: Electron.Point; bounds: Electron.Rectangle; timer: NodeJS.Timeout } | null = null;
+let drag: { cursor: Electron.Point; bounds: Electron.Rectangle } | null = null;
 
 /**
- * Overlay folgt dem Mauszeiger, bis die linke Maustaste losgelassen wird. Die Taste wird direkt
- * abgefragt – so endet das Ziehen auch dann sauber, wenn die Maus beim Loslassen außerhalb liegt.
+ * Verschieben wird vom Overlay gesteuert: Es meldet Start, jede Bewegung und das Ende (dank
+ * Pointer-Capture auch, wenn die Maus beim Loslassen außerhalb liegt). Hier wird nur dem echten
+ * Mauszeiger gefolgt. Bewusst ohne Abfrage der Maustaste über Windows (GetAsyncKeyState) – die
+ * meldete bei aktivem Spiel teils "nicht gedrückt" und beendete das Ziehen sofort.
  */
 function startDrag() {
-  if (!alive(overlayWin) || drag) return;
-  const win = overlayWin;
-  drag = {
-    cursor: screen.getCursorScreenPoint(),
-    bounds: win.getBounds(),
-    timer: setInterval(() => {
-      if (!drag || !alive(win) || !isLeftButtonDown()) return endDrag();
-      const p = screen.getCursorScreenPoint();
-      placing = true;
-      win.setPosition(drag.bounds.x + p.x - drag.cursor.x, drag.bounds.y + p.y - drag.cursor.y);
-      placing = false;
-    }, 16),
-  };
+  if (!alive(overlayWin)) return;
+  drag = { cursor: screen.getCursorScreenPoint(), bounds: overlayWin.getBounds() };
+  log('info', `Overlay drag started at ${drag.bounds.x},${drag.bounds.y}`);
+}
+
+function moveDrag() {
+  if (!drag || !alive(overlayWin)) return;
+  const p = screen.getCursorScreenPoint();
+  placing = true;
+  overlayWin.setPosition(drag.bounds.x + p.x - drag.cursor.x, drag.bounds.y + p.y - drag.cursor.y);
+  placing = false;
 }
 
 function endDrag() {
   if (!drag) return;
-  clearInterval(drag.timer);
   drag = null;
   if (!alive(overlayWin)) return;
   const { x, y } = overlayWin.getBounds();
+  log('info', `Overlay moved to ${x},${y}`);
   config.overlayPosition = { x, y };
   saveConfig(config);
   pushState();
@@ -443,8 +545,30 @@ function endDrag() {
 /** Das Overlay bleibt offen, bis man es schließt (× oder Esc). */
 function hideOverlay() {
   if (!alive(overlayWin)) return;
+  endDrag(); // ein laufendes Verschieben endet spätestens hier
+  stopOverlayWatch();
+  log('info', 'Overlay closed');
+  returnFocusToGame('overlay closed'); // erst Fokus ans Spiel, dann ausblenden
   overlayWin.hide();
-  overlayWin.setFocusable(false); // Spiel bekommt den Fokus zurück, nächstes Overlay stiehlt ihn nicht
+}
+
+// ---------- Fokus ----------
+//
+// Klickt man ins Overlay, wird es aktiv (sonst gehen Klicks über dem Vollbild-Spiel gelegentlich
+// verloren). Verlässt die Maus das Overlay oder wird es geschlossen, bekommt das Spiel den Fokus
+// zurück – wichtig, denn Strg+D kopiert das Item nur, wenn das Spiel vorne ist.
+// Bewusst ohne setFocusable(false): Das deaktiviert das Fenster und hinterlässt bei Windows
+// gar kein Vordergrundfenster – dann bekommt auch das Spiel den Fokus nicht zurück.
+
+function returnFocusToGame(reason: string) {
+  if (!alive(overlayWin) || !overlayWin.isFocused()) return;
+  const ok = focusWindowByTitle(config.gameWindowTitle);
+  log('info', `Focus back to the game (${reason})${ok ? '' : ' – failed'}`);
+  // Zur Kontrolle im Log: Was ist danach wirklich vorne?
+  setTimeout(() => {
+    const title = foregroundWindowTitle();
+    if (title !== config.gameWindowTitle) log('warn', `After focus switch the foreground is "${title}", not the game`);
+  }, 150);
 }
 
 // ---------- Trade-Suche (Rares) ----------
@@ -468,12 +592,13 @@ function getStatIndex(): Promise<StatIndex> {
  */
 async function rareCheck(item: NonNullable<ReturnType<typeof parseItemText>>): Promise<PriceResult> {
   const [idx, stats] = await Promise.all([getIndex(), getStatIndex()]);
-  const req = newRareRequest(item, stats);
+  // Uniques: poe.ninja-Preis als Vergleich mitgeben (falls gelistet).
+  const ninja = item.rarity === 'Unique' ? lookupPrice(idx, item) : null;
+  const req = newRareRequest(item, stats, ninja?.kind === 'priced' ? ninja.matches[0] : undefined);
   rareRequest = req;
-  showOverlay(pendingRareResult(idx, req));
-  const result = await runRareSearch(tradeClient(), idx, req);
-  // Wurde inzwischen "Suchen" gedrückt, gehört das Overlay schon der neueren Suche.
-  if (rareRequest === req) showOverlay(result);
+  // Keine automatische Suche – erst der Klick auf "Search" fragt pathofexile.com an.
+  const result = idleRareResult(idx, req);
+  showOverlay(result);
   return result;
 }
 
@@ -495,7 +620,10 @@ async function rareResearch(selection: TradeSelection) {
       rareRequest = applySelection(rareRequest, next);
       const result = await runRareSearch(tradeClient(), await getIndex(), rareRequest);
       next = queuedSelection;
-      if (!next) showOverlay(result);
+      if (!next) {
+        showOverlay(result);
+        updateHistory(result);
+      }
     }
   } finally {
     researching = false;
@@ -511,6 +639,15 @@ function addHistory(result: PriceResult) {
   pushState();
 }
 
+/** Ergebnis einer Suche im Verlauf beim zugehörigen Preischeck eintragen (gleiche requestId). */
+function updateHistory(result: PriceResult) {
+  if (result.kind !== 'trade' || result.pending) return;
+  const entry = history.find((h) => h.result.kind === 'trade' && h.result.requestId === result.requestId);
+  if (!entry) return;
+  entry.result = result;
+  pushState();
+}
+
 async function priceCheck() {
   if (busy) return; // ein Tastendruck = ein Durchlauf
   busy = true;
@@ -521,13 +658,16 @@ async function priceCheck() {
       showOverlay({ kind: 'error', message: 'No item in the clipboard. Hover over an item and press the hotkey again.' });
       return;
     }
-    const isRareLike = item.rarity === 'Rare' || item.rarity === 'Magic';
-    if (isRareLike) {
-      addHistory(await rareCheck(item)); // rareCheck zeigt das Overlay selbst (zweistufig)
-    } else {
-      const result = lookupPrice(await getIndex(), item);
-      showOverlay(result);
-      addHistory(result);
+    // Rares, Magic-Items und identifizierte Uniques laufen über die Trade-Suche (Mod-Liste im Overlay).
+    const isRareLike = item.rarity === 'Rare' || item.rarity === 'Magic' || isNamedUnique(item);
+    // Weiße Items: was poe.ninja kennt (z. B. Währung mit "Rarity: Normal"), bleibt dort,
+    // alles andere (Basen, Waystones …) geht wie Rares über die Trade-Suche.
+    const ninja = isRareLike ? null : lookupPrice(await getIndex(), item);
+    if (isRareLike || (item.rarity === 'Normal' && ninja?.kind !== 'priced')) {
+      addHistory(await rareCheck(item)); // rareCheck zeigt das Overlay selbst
+    } else if (ninja) {
+      showOverlay(ninja);
+      addHistory(ninja);
     }
   } catch (e) {
     log('error', 'Price check failed', e);
@@ -593,11 +733,12 @@ app.whenReady().then(() => {
   // Nur wenn man in ein Eingabefeld klickt, bekommt es kurz den Fokus zum Tippen.
   ipcMain.on('overlay:focus', safe('overlay:focus', () => {
     if (!alive(overlayWin)) return;
-    overlayWin.setFocusable(true);
     overlayWin.focus();
   }));
+  ipcMain.on('overlay:leave', safe('overlay:leave', () => returnFocusToGame('mouse left the overlay')));
   // Verschieben: Der Renderer meldet nur Start/Ende, die Bewegung folgt dem echten Mauszeiger.
   ipcMain.on('overlay:drag-start', safe('overlay:drag-start', () => startDrag()));
+  ipcMain.on('overlay:drag-move', safe('overlay:drag-move', () => moveDrag()));
   ipcMain.on('overlay:drag-end', safe('overlay:drag-end', () => endDrag()));
   ipcMain.on('overlay:ready', safe('overlay:ready', (_e, size: { width: number; height: number }) => placeOverlay(size)));
   ipcMain.on('trade:search', safe('trade:search', (_e, selection: TradeSelection) => rareResearch(selection)));

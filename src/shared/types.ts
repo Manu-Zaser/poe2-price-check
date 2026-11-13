@@ -51,13 +51,22 @@ export interface TradeMod {
   statId: string | null;
   value: number | null;
   min?: number;
+  /** Höchstwert (wie auf der Trade-Seite); meist leer. */
+  max?: number;
+  /**
+   * "reduced"/"less"-Mods stehen in der Stat-Liste als "increased"/"more" mit negativem Wert.
+   * value/min/max sind dann so angegeben, wie es auf dem Item steht (positiv); die Suche negiert sie.
+   */
+  invert?: boolean;
   enabled: boolean;
+  /** Mod-Text mit "#" statt Zahlen (z. B. "# to Evasion Rating"); bleibt auch beim Zusammenfassen gleich. */
+  template?: string;
   /** Aus mehreren Zeilen mit derselben Stat-ID zusammengefasst. */
   combined?: boolean;
   /** Kein Stat, sondern ein Item-Filter der Trade-Suche. */
-  filter?: 'dps' | 'pdps' | 'edps' | 'ar' | 'ev' | 'es' | 'block' | 'spirit' | 'ilvl' | 'sockets' | 'corrupted';
+  filter?: 'dps' | 'pdps' | 'edps' | 'crit' | 'ar' | 'ev' | 'es' | 'block' | 'spirit' | 'ilvl' | 'sockets' | 'corrupted';
   /** Abgewählt, weil schon in einer Summe bzw. den DPS enthalten. */
-  coveredBy?: 'total' | 'DPS' | 'defence';
+  coveredBy?: 'total' | 'DPS' | 'crit' | 'defence';
   /** Tier(s) laut Spiel (bei zusammengefassten Mods mehrere). In PoE2: höher = besser. */
   tiers?: { affix: ModMeta['affix']; tier: number }[];
 }
@@ -69,6 +78,8 @@ export interface TradeSelection {
   instantOnly: boolean;
   /** Mod-Key → Mindestwert; null = ohne Mindestwert. Fehlende Keys behalten ihren Wert. */
   mins: Record<string, number | null>;
+  /** Mod-Key → Höchstwert; null = ohne Höchstwert. Fehlende Keys behalten ihren Wert. */
+  maxs?: Record<string, number | null>;
   useBaseType: boolean;
   matchAll: boolean;
 }
@@ -91,6 +102,10 @@ export interface TradeSearch {
   listings: Listing[];
   icon?: string;
   suggestion?: import('./extras').PriceSuggestion | null;
+  /** Typischer Preis (Median der günstigsten aktuellen Angebote). */
+  market?: import('./extras').MarketPrice | null;
+  /** Hinweise zur Verlässlichkeit (wenig Treffer, nur alte Angebote). */
+  warnings?: string[];
 }
 
 export type PriceResult =
@@ -110,6 +125,10 @@ export type PriceResult =
       error?: string;
       /** true = Suche läuft noch; Overlay zeigt die Mods schon an. */
       pending?: boolean;
+      /** Uniques: Preis laut poe.ninja als Vergleich zu den Trade-Angeboten. */
+      reference?: PriceMatch;
+      /** Kurs zum Zeitpunkt der Suche (für die Anzeige "1 Div = 640 Ex"). */
+      exaltedPerDivine?: number;
     }
   | { kind: 'not-found'; item: ParsedItem; league: string; reason: string }
   | { kind: 'unsupported'; item: ParsedItem; reason: string }
@@ -125,6 +144,8 @@ export interface Settings {
   gpuAcceleration: boolean;
   /** Skalierung des Overlays (1 = 100 %). */
   overlayScale: number;
+  /** Deckkraft des Overlay-Hintergrunds (0.4–1; 1 = undurchsichtig). Text bleibt immer voll sichtbar. */
+  overlayOpacity: number;
 }
 
 export interface AppStatus {

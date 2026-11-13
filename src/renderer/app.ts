@@ -170,7 +170,7 @@ function historyRow(h: HistoryEntry): HTMLElement {
   const name = el('span', `h-name rarity-${item.rarity.toLowerCase()}`, item.name ?? item.baseType);
   if (r.kind === 'trade') {
     const cheapest = r.search?.listings[0];
-    const sub = r.search ? `${item.baseType} · ${r.search.total} results` : (r.error ?? item.baseType);
+    const sub = r.search ? `${item.baseType} · ${r.search.total} results` : (r.error ?? `${item.baseType} · not searched`);
     const price = cheapest
       ? el('div', 'h-price', el('span', 'h-value', `from ${amount(cheapest.amount)}`), el('span', `unit unit-${currencyShort(cheapest.currency).toLowerCase()}`, currencyShort(cheapest.currency)))
       : el('div', 'h-price muted', '–');
@@ -238,6 +238,10 @@ function renderSettings(s: AppState) {
   if (document.activeElement !== scale) scale.value = String(Math.round(s.settings.overlayScale * 100));
   $('scale-out').textContent = `${scale.value}%`;
 
+  const opacity = $<HTMLInputElement>('opacity');
+  if (document.activeElement !== opacity) opacity.value = String(Math.round(s.settings.overlayOpacity * 100));
+  $('opacity-out').textContent = `${opacity.value}%`;
+
   $('pos-out').textContent = s.overlayPositionSaved ? 'saved' : 'at mouse cursor';
   ($('pos-reset') as HTMLButtonElement).disabled = !s.overlayPositionSaved;
   $('log-path').textContent = s.logFile;
@@ -252,6 +256,12 @@ $<HTMLInputElement>('scale').addEventListener('input', (e) => {
 });
 $<HTMLInputElement>('scale').addEventListener('change', (e) => {
   void api.saveSettings({ overlayScale: Number((e.target as HTMLInputElement).value) / 100 });
+});
+// Deckkraft schon beim Ziehen übernehmen, damit man die Wirkung im offenen Overlay direkt sieht.
+$<HTMLInputElement>('opacity').addEventListener('input', (e) => {
+  const value = (e.target as HTMLInputElement).value;
+  $('opacity-out').textContent = `${value}%`;
+  void api.saveSettings({ overlayOpacity: Number(value) / 100 });
 });
 $('overlay-test').addEventListener('click', () => api.testOverlay());
 

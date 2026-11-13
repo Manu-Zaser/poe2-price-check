@@ -87,6 +87,12 @@
       </div>
 
       <div class="field">
+        <label for="opacity">Overlay background <output id="opacity-out"></output></label>
+        <p class="help">How opaque the background of the price overlay is – lower values let the game show through. Text stays fully visible. Check it right away with "Show test overlay" below.</p>
+        <input type="range" id="opacity" min="40" max="100" step="5" />
+      </div>
+
+      <div class="field">
         <label>Overlay position <output id="pos-out"></output></label>
         <p class="help">The price window stays open until you close it with × (or Esc). Drag it anywhere on the overlay to move it – the position is remembered for all further price checks.</p>
         <button class="btn" id="pos-reset">Reset position (back next to the mouse cursor)</button>

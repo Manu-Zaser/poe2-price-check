@@ -1,5 +1,5 @@
-import { defaultMatchCount } from '../shared/stats';
-import type { PriceSuggestion } from '../shared/extras';
+import { categoryFor, defaultMatchCount } from '../shared/stats';
+import { isStale, STALE_DAYS, type PriceSuggestion } from '../shared/extras';
 import type { Listing, PriceMatch, PriceResult, TradeMod, TradeSelection } from '../shared/types';
 import { api, el, itemIcon } from './api';
 import { ageFromIso, amount, currencyShort, parseMin, priceParts, priceText } from './format';
@@ -50,7 +50,7 @@ function closeButton(): HTMLElement {
  * Kopfzeile = Griff zum Verschieben (-webkit-app-region: drag). Das Fenster merkt sich die
  * neue Position für alle weiteren Preischecks. Der Schließen-Knopf liegt mit darin.
  */
-function header(r: Result | null, icon?: string, title?: string): HTMLElement {
+function header(r: Result | null, icon?: string, title?: string, showTags = true): HTMLElement {
   const text = el('div', 'head-text');
   if (r) {
     const item = r.item;
@@ -65,13 +65,40 @@ function header(r: Result | null, icon?: string, title?: string): HTMLElement {
       el('div', `title rarity-${item.rarity.toLowerCase()}`, item.name ?? item.baseType),
       el('div', 'sub', item.name ? item.baseType : item.itemClass),
     );
-    if (tags.length) text.append(el('div', 'tags', ...tags.map((t) => el('span', `tag ${t === 'Corrupted' ? 'tag-bad' : t === 'Not corrupted' ? 'tag-ok' : ''}`, t))));
+    if (showTags && tags.length) text.append(el('div', 'tags', ...tags.map((t) => el('span', `tag ${t === 'Corrupted' ? 'tag-bad' : t === 'Not corrupted' ? 'tag-ok' : ''}`, t))));
   } else {
     text.append(el('div', 'title', title ?? ''));
   }
   const grip = el('span', 'grip', '⠿');
   grip.title = 'Drag anywhere on the overlay to move it';
   return el('div', 'head', icon ? itemIcon(icon, 'head-icon') : null, text, grip, closeButton());
+}
+
+// ---------- Gemerkte Ansicht ----------
+
+/** Ansicht, die für alle weiteren Preischecks gilt (Stat-Liste eingeklappt, versteckte Stats sichtbar). */
+const PREF_DEFAULTS: Record<string, boolean> = { 'stats-collapsed': false, 'show-hidden': false };
+/** Fallback, falls localStorage nicht verfügbar ist – gilt dann nur bis zum Neustart. */
+const prefMemory = new Map<string, boolean>();
+
+function pref(id: string): boolean {
+  if (prefMemory.has(id)) return prefMemory.get(id)!;
+  try {
+    const v = localStorage.getItem(`pref:${id}`);
+    if (v !== null) return v === '1';
+  } catch {
+    // kein Speicher – Standard verwenden
+  }
+  return PREF_DEFAULTS[id] ?? false;
+}
+
+function setPref(id: string, value: boolean) {
+  prefMemory.set(id, value);
+  try {
+    localStorage.setItem(`pref:${id}`, value ? '1' : '0');
+  } catch {
+    // egal – Zustand bleibt im Speicher
+  }
 }
 
 // ---------- poe.ninja (Währung, Uniques) ----------
@@ -99,31 +126,22 @@ function renderNinja(r: Extract<PriceResult, { kind: 'priced' }>): HTMLElement {
   return card;
 }
 
-// ---------- Trade-Suche (Rares) ----------
+// ---------- Trade-Suche (Rares, Uniques) ----------
+//
+// Aufbau wie die Trade-Seite bzw. Exiled Exchange:
+//   Chips (Kategorie/Basis, Corrupted, Item-Level, Sockel, Mod-Abgleich)
+//   Stat-Zeilen mit Min/Max und Herkunft darunter (Explicit, Implicit, Augment …)
+//   Ergebnisleiste (Treffer, Sofortkauf, Suchen, Trade-Seite)
+//   Kurzfassung (typischer Preis, Verkaufsvorschlag) und Angebotstabelle.
+// Gesucht wird nur mit Klick auf "Search" – Änderungen werden bis dahin gesammelt.
 
-function listingRow(l: Listing): HTMLElement {
-  return el(
-    'div', 'lst',
-    el('span', 'lst-price', `${amount(l.amount)} `, el('span', `unit unit-${currencyShort(l.currency).toLowerCase()}`, currencyShort(l.currency))),
-    el('span', 'lst-ilvl', l.itemLevel ? `iLvl ${l.itemLevel}` : ''),
-    el('span', 'lst-age', ageFromIso(l.indexed)),
-  );
-}
-
-/** Durchschnitt der günstigsten Angebote (in Divine), sofern umrechenbar. */
-function averageOfCheapest(listings: Listing[], n = 5): { divine: number; exalted: number } | null {
-  const conv = listings.slice(0, n).filter((l) => l.divine !== null && l.exalted !== null);
-  if (conv.length < Math.min(3, listings.length) || conv.length === 0) return null;
-  const divine = conv.reduce((a, l) => a + l.divine!, 0) / conv.length;
-  const exalted = conv.reduce((a, l) => a + l.exalted!, 0) / conv.length;
-  return { divine, exalted };
-}
-
+/** Herkunft wie auf der Trade-Seite ("Augment" = Rune/Seelenkern im Sockel). */
 const KIND_LABEL: Partial<Record<TradeMod['kind'], string>> = {
-  implicit: 'Implicit', rune: 'Rune', enchant: 'Enchant', crafted: 'Crafted', fractured: 'Fractured', desecrated: 'Desecrated',
+  explicit: 'Explicit', implicit: 'Implicit', rune: 'Augment', enchant: 'Enchant', crafted: 'Crafted',
+  fractured: 'Fractured', desecrated: 'Desecrated', pseudo: 'Total',
 };
 
-function formatMin(n: number | undefined): string {
+function formatNum(n: number | undefined): string {
   if (n === undefined) return '';
   return Number.isInteger(n) ? String(n) : n.toLocaleString('en-US', { maximumFractionDigits: 2 });
 }
@@ -137,78 +155,14 @@ function wheelStep(original: number | null, current: number): number {
   return 5;
 }
 
-/** Alles, was zu einer offenen Rare-Ansicht gehört; nach "Suchen" wird nur "results" ersetzt. */
-interface TradeView {
-  requestId: number;
-  card: HTMLElement;
-  head: HTMLElement;
-  results: HTMLElement;
-  searchBtn: HTMLButtonElement;
-  openBtn: HTMLButtonElement;
-  url: string | null;
-  /** Auswahl seit der letzten Suche geändert? */
-  dirty: boolean;
-  searching: boolean;
-  refresh: () => void;
-}
-
-let view: TradeView | null = null;
-
-function resultsContent(r: TradeResult): HTMLElement[] {
-  const s = r.search;
-  const out: HTMLElement[] = [];
-  if (r.pending) {
-    // Platzhalter in Größe des späteren Ergebnisses, damit das Overlay beim Nachladen kaum springt.
-    out.push(
-      el('div', 'loading', el('span', 'spinner'), el('span', '', 'Searching pathofexile.com …')),
-      el('div', 'lsts skeleton', ...Array.from({ length: 4 }, () => el('div', 'lst', el('span', 'bar w40'), el('span', 'bar w20'), el('span', 'bar w30')))),
-    );
-  } else if (s && s.listings.length > 0) {
-    const cheapest = s.listings[0];
-    const avg = averageOfCheapest(s.listings);
-    const meta = el('div', 'price-meta');
-    if (cheapest.divine !== null && cheapest.exalted !== null) {
-      const conv = priceParts(cheapest.divine, cheapest.exalted);
-      if (conv.unit !== currencyShort(cheapest.currency)) meta.append(el('span', '', `≈ ${conv.value} ${conv.unit}`));
-    }
-    if (avg) {
-      const p = priceParts(avg.divine, avg.exalted);
-      meta.append(el('span', '', `avg of ${Math.min(5, s.listings.length)} cheapest ≈ ${p.value} ${p.unit}`));
-    }
-    meta.append(el('span', 'faint', `${s.total} results`));
-    out.push(bigPrice(amount(cheapest.amount), currencyShort(cheapest.currency), 'from', meta));
-    if (s.suggestion) out.push(suggestionRow(s.suggestion));
-    out.push(el('div', 'lsts', ...s.listings.slice(0, 6).map(listingRow)));
-  } else if (s) {
-    out.push(el('div', 'empty-result', 'No listings with these mods. Tick fewer mods, lower values or untick the base type.'));
-  }
-  if (r.error) out.push(el('div', 'alert', r.error));
-  return out;
-}
-
-/** Verkaufspreis-Vorschlag mit Kopier-Button für die Stash-Notiz. */
-function suggestionRow(sg: PriceSuggestion): HTMLElement {
-  const btn = el('button', 'btn-xs', 'Copy');
-  btn.title = 'Copy as a stash tab note to the clipboard';
-  btn.addEventListener('click', () => {
-    api.copyText(sg.note);
-    btn.textContent = 'Copied ✓';
-    btn.classList.add('done');
-    setTimeout(() => {
-      btn.textContent = 'Copy';
-      btn.classList.remove('done');
-    }, 1500);
-  });
-  const unit = sg.currency === 'divine' ? 'Div' : 'Ex';
-  const hint = sg.basedOn < 3 ? ' · little data' : '';
-  return el(
-    'div', 'suggest',
-    el('span', 'suggest-label', 'Sell for'),
-    el('strong', 'suggest-value', `${amount(sg.amount)} `, el('span', `unit unit-${unit.toLowerCase()}`, unit)),
-    el('code', 'suggest-note', sg.note),
-    btn,
-    el('span', 'suggest-hint', `just below the median of the ${sg.basedOn} cheapest${hint}`),
-  );
+/** Warum ein Stat standardmäßig ausgeblendet ist; null = sichtbar. */
+function hiddenReason(m: TradeMod): string | null {
+  if (m.statId === null && !m.filter) return 'Not found in the trade search – cannot be searched.';
+  if (m.coveredBy === 'total') return 'Already counted in a total above – tick it only to search for this mod on its own.';
+  if (m.coveredBy === 'DPS') return 'Already counted in the DPS above – tick it only to search for this mod on its own.';
+  if (m.coveredBy === 'crit') return "Already counted in the weapon's critical hit chance above – tick it only when price-checking a crafting base.";
+  if (m.coveredBy === 'defence') return 'Already counted in the defences above – tick it only to search for this mod on its own.';
+  return null;
 }
 
 const AFFIX: Record<string, { short: string; long: string }> = {
@@ -226,183 +180,405 @@ function tierBadge(t: NonNullable<TradeMod['tiers']>[number]): HTMLElement {
   return badge;
 }
 
-function modRow(m: TradeMod, onChange: () => void): HTMLElement {
+/**
+ * Min- oder Max-Feld: Mausrad ändert den Wert ohne Fokuswechsel (das Spiel behält die Tastatur),
+ * Klick erlaubt Eintippen, leer = ohne Grenze.
+ */
+function numInput(m: TradeMod, which: 'min' | 'max', onCommit: () => void): HTMLInputElement {
+  const input = el('input', `num-input num-${which}`);
+  input.type = 'text';
+  input.inputMode = 'decimal';
+  input.dataset.which = which;
+  input.value = formatNum(which === 'min' ? m.min : m.max);
+  input.placeholder = which;
+  input.title = `${which === 'min' ? 'Minimum' : 'Maximum'} – scroll to change, click to type, empty = no limit`;
+  let committed = input.value;
+
+  const commit = () => {
+    const n = parseMin(input.value);
+    input.classList.toggle('invalid', Number.isNaN(n));
+    if (Number.isNaN(n) || input.value === committed) return;
+    committed = input.value;
+    onCommit();
+  };
+
+  input.addEventListener(
+    'wheel',
+    (e) => {
+      e.preventDefault();
+      const current = parseMin(input.value);
+      const fallback = (which === 'min' ? m.min : m.max) ?? m.value ?? 0;
+      const base = current === null || Number.isNaN(current) ? fallback : current;
+      const step = wheelStep(m.value, base);
+      input.value = formatNum(Math.max(0, Math.round((base + (e.deltaY < 0 ? step : -step)) * 100) / 100));
+      commit();
+    },
+    { passive: false },
+  );
+  // Zum Tippen braucht das Overlay kurz den Tastaturfokus.
+  input.addEventListener('mousedown', () => {
+    if (document.activeElement !== input) api.focusOverlay();
+  });
+  input.addEventListener('focus', () => input.select());
+  input.addEventListener('input', () => input.classList.toggle('invalid', Number.isNaN(parseMin(input.value))));
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commit();
+      input.blur();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      input.value = committed;
+      input.classList.remove('invalid');
+      input.blur();
+    }
+  });
+  input.addEventListener('blur', commit);
+  return input;
+}
+
+/** Eine Stat-Zeile: Haken · Text (darunter Herkunft und Tier) · Min · Max. */
+function statRow(m: TradeMod, onChange: () => void): HTMLElement {
   const searchable = m.statId !== null || !!m.filter;
-  const row = el('div', `mod ${searchable ? '' : 'mod-off'} mod-${m.kind}`);
+  const reason = hiddenReason(m);
+  const row = el('div', `stat stat-${m.kind}${searchable ? '' : ' stat-off'}${reason ? ' stat-hidden' : ''}`);
   row.dataset.key = m.key;
   if (m.statId) row.dataset.stat = '1';
+  if (reason) row.title = reason;
 
   const box = el('input');
   box.type = 'checkbox';
   box.checked = m.enabled;
   box.disabled = !searchable;
-  box.addEventListener('change', onChange);
+  const sync = () => row.classList.toggle('on', box.checked);
+  box.addEventListener('change', () => {
+    sync();
+    onChange();
+  });
 
   // Klick auf den Text schaltet ebenfalls um (große Trefferfläche, kein Fokus nötig).
-  const text = el('span', 'mod-text', m.text);
+  const text = el('div', 'stat-text', m.text);
   if (searchable) {
     text.addEventListener('click', () => {
       box.checked = !box.checked;
+      sync();
       onChange();
     });
   }
 
-  const side = el('span', 'mod-side');
-  for (const t of m.tiers ?? []) side.append(tierBadge(t));
-  if (KIND_LABEL[m.kind]) side.append(el('span', 'mod-kind', KIND_LABEL[m.kind]!));
+  const tags = el('div', 'stat-tags');
+  const coveredLabel: Record<NonNullable<TradeMod['coveredBy']>, string> = { total: 'total', DPS: 'DPS', crit: 'crit chance', defence: 'defences' };
+  if (reason) tags.append(el('span', 'tag-hidden', m.coveredBy ? `◌ in ${coveredLabel[m.coveredBy]}` : '◌ not searchable'));
+  const kind = KIND_LABEL[m.kind];
+  if (kind && m.kind !== 'pseudo') tags.append(el('span', `kind kind-${m.kind}`, kind));
+  for (const t of m.tiers ?? []) tags.append(tierBadge(t));
   if (m.combined) {
-    side.append(el('span', 'mod-kind', 'summed'));
-    row.title = 'Several lines with the same stat – the trade search uses the sum.';
-  }
-  if (m.coveredBy) {
-    side.append(el('span', 'mod-kind covered', `in ${m.coveredBy}`));
-    row.title =
-      m.coveredBy === 'DPS'
-        ? 'Already included in the DPS above – unticked.'
-        : m.coveredBy === 'defence'
-          ? 'Already included in the defences above – unticked.'
-          : 'Already included in a total above – unticked.';
+    const s = el('span', 'kind', 'summed');
+    s.title = 'Several lines with the same stat – the trade search uses the sum.';
+    tags.append(s);
   }
 
-  if (searchable && m.value !== null) {
-    const input = el('input', 'min-input');
-    input.type = 'text';
-    input.inputMode = 'decimal';
-    input.value = formatMin(m.min);
-    input.placeholder = 'min';
-    input.title = 'Minimum – scroll to change, click to type, empty = no minimum';
-    let committed = input.value;
-
-    const commit = () => {
-      const n = parseMin(input.value);
-      input.classList.toggle('invalid', Number.isNaN(n));
-      if (Number.isNaN(n) || input.value === committed) return;
-      committed = input.value;
-      box.checked = true; // Wert geändert → Mod soll mitgesucht werden
-      onChange();
-    };
-
-    // Mausrad: ändert den Wert ohne Fokuswechsel – das Spiel behält die Tastatur.
-    input.addEventListener(
-      'wheel',
-      (e) => {
-        e.preventDefault();
-        const current = parseMin(input.value);
-        const base = current === null || Number.isNaN(current) ? (m.min ?? m.value ?? 0) : current;
-        const step = wheelStep(m.value, base);
-        const next = Math.max(0, Math.round((base + (e.deltaY < 0 ? step : -step)) * 100) / 100);
-        input.value = formatMin(next);
-        commit();
-      },
-      { passive: false },
-    );
-
-    // Zum Tippen braucht das Overlay kurz den Tastaturfokus.
-    input.addEventListener('mousedown', () => {
-      if (document.activeElement !== input) api.focusOverlay();
-    });
-    input.addEventListener('focus', () => input.select());
-    input.addEventListener('input', () => input.classList.toggle('invalid', Number.isNaN(parseMin(input.value))));
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        commit();
-        input.blur();
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        e.stopPropagation();
-        input.value = committed;
-        input.classList.remove('invalid');
-        input.blur();
-      }
-    });
-    input.addEventListener('blur', commit);
-    side.append(el('span', 'min-wrap', el('span', 'min-prefix', '≥'), input));
-  }
-  if (!searchable) {
-    row.title = 'Not found in the trade search';
-    side.append(el('span', 'mod-kind', 'n/a'));
-  }
-  row.append(box, text, side);
+  const withValue = searchable && m.value !== null;
+  const onValue = () => {
+    box.checked = true; // Wert geändert → Stat soll mitgesucht werden
+    sync();
+    onChange();
+  };
+  row.append(
+    box,
+    el('div', 'stat-main', text, tags.childElementCount ? tags : null),
+    withValue ? numInput(m, 'min', onValue) : el('span', 'num-empty'),
+    withValue ? numInput(m, 'max', onValue) : el('span', 'num-empty'),
+  );
+  sync();
   return row;
+}
+
+function listingRow(l: Listing, now: number): HTMLElement {
+  const stale = isStale(l, now);
+  const short = currencyShort(l.currency);
+  const row = el(
+    'div', `lst${stale ? ' lst-stale' : ''}`,
+    el('span', 'lst-price', `${amount(l.amount)} `, el('span', `unit unit-${short.toLowerCase()}`, short)),
+    el('span', 'lst-ilvl', l.itemLevel ? String(l.itemLevel) : '–'),
+    el('span', 'lst-age', ageFromIso(l.indexed)),
+  );
+  if (stale) row.title = `Listed for more than ${STALE_DAYS} days – probably not a real price, ignored for the typical price.`;
+  return row;
+}
+
+/** Verkaufspreis-Vorschlag mit Kopier-Button für die Stash-Notiz. */
+function sellBlock(sg: PriceSuggestion): HTMLElement {
+  const btn = el('button', 'btn-xs', 'Copy');
+  btn.title = `Copy "${sg.note}" as a stash tab note`;
+  btn.addEventListener('click', () => {
+    api.copyText(sg.note);
+    btn.textContent = 'Copied ✓';
+    btn.classList.add('done');
+    setTimeout(() => {
+      btn.textContent = 'Copy';
+      btn.classList.remove('done');
+    }, 1500);
+  });
+  const unit = sg.currency === 'divine' ? 'Div' : 'Ex';
+  // Vorschläge in Exalted zusätzlich in Div zeigen – sonst muss man im Kopf umrechnen.
+  const approx = sg.approxDivine !== undefined && sg.approxDivine >= 0.1 ? ` ≈ ${amount(Math.round(sg.approxDivine * 100) / 100)} Div` : '';
+  const block = el(
+    'div', 'sum-sell',
+    el('span', 'sum-label', 'Sell for'),
+    el('strong', 'sum-sell-value', `${amount(sg.amount)} `, el('span', `unit unit-${unit.toLowerCase()}`, unit)),
+    approx ? el('span', 'sum-approx', approx) : null,
+    btn,
+  );
+  block.title = `Just below the typical price (median of the ${sg.basedOn} cheapest)${sg.basedOn < 3 ? ' – little data' : ''}`;
+  return block;
+}
+
+/** Alles, was zu einer offenen Trade-Ansicht gehört; nach "Search" wird nur der Ergebnisteil ersetzt. */
+interface TradeView {
+  requestId: number;
+  card: HTMLElement;
+  head: HTMLElement;
+  results: HTMLElement;
+  matched: HTMLElement;
+  searchBtn: HTMLButtonElement;
+  openBtn: HTMLButtonElement;
+  url: string | null;
+  /** Auswahl seit der letzten Suche geändert? */
+  dirty: boolean;
+  searching: boolean;
+  refresh: () => void;
+}
+
+let view: TradeView | null = null;
+
+function matchedText(r: TradeResult): string {
+  if (r.pending) return 'Searching …';
+  return r.search ? `Matched: ${r.search.total}` : 'Not searched';
+}
+
+function resultsContent(r: TradeResult): HTMLElement[] {
+  const s = r.search;
+  const out: HTMLElement[] = [];
+  if (r.pending) {
+    // Platzhalter in Größe des späteren Ergebnisses, damit das Overlay beim Nachladen kaum springt.
+    out.push(
+      el('div', 'loading', el('span', 'spinner'), el('span', '', 'Searching pathofexile.com …')),
+      el('div', 'lst-table skeleton', ...Array.from({ length: 6 }, () => el('div', 'lst', el('span', 'bar w40'), el('span', 'bar w20'), el('span', 'bar w30')))),
+    );
+  } else if (!s && !r.error) {
+    // Noch nicht gesucht: erst Auswahl prüfen, dann "Search".
+    out.push(el('div', 'idle', 'Check the ticked stats and values, then click ', el('strong', '', 'Search'), '.'));
+  } else if (s && s.listings.length > 0) {
+    const cheapest = s.listings[0];
+    const now = Date.now();
+
+    // Kurzfassung: typischer Preis links, Verkaufsvorschlag rechts.
+    const price = el('div', 'sum-price');
+    if (s.market) {
+      const p = priceParts(s.market.divine, s.market.exalted);
+      price.append(
+        el('strong', 'sum-value', `≈ ${p.value} `, el('span', `unit unit-${p.unit.toLowerCase()}`, p.unit)),
+        el('span', 'sum-label', `typical · from ${amount(cheapest.amount)} ${currencyShort(cheapest.currency)}`),
+      );
+      price.title = `Median of the ${s.market.basedOn} cheapest current listings`
+        + (s.market.staleIgnored ? ` – ${s.market.staleIgnored} listings older than ${STALE_DAYS} days ignored` : '');
+    } else {
+      price.append(
+        el('strong', 'sum-value', `${amount(cheapest.amount)} `, el('span', `unit unit-${currencyShort(cheapest.currency).toLowerCase()}`, currencyShort(cheapest.currency))),
+        el('span', 'sum-label', 'cheapest'),
+      );
+    }
+    out.push(el('div', 'summary', price, s.suggestion ? sellBlock(s.suggestion) : null));
+
+    // Alle Hinweise in einem Kasten.
+    if (s.warnings?.length) out.push(el('div', 'warn', el('span', 'warn-icon', '!'), el('div', 'warn-lines', ...s.warnings.map((w) => el('span', '', w)))));
+
+    out.push(
+      el(
+        'div', 'lst-table',
+        el('div', 'lst lst-head', el('span', '', 'Price'), el('span', '', 'iLvl'), el('span', '', 'Listed')),
+        ...s.listings.slice(0, 20).map((l) => listingRow(l, now)),
+      ),
+    );
+  } else if (s) {
+    const hint = r.item.rarity === 'Unique' ? 'Tick fewer stats or lower values.' : 'Tick fewer stats or lower values.';
+    out.push(el('div', 'empty-result', `No listings with these stats. ${hint}`));
+  }
+  if (r.error) out.push(el('div', 'alert', r.error));
+  // Uniques: poe.ninja-Preis als Vergleich – auch schon vor der ersten Suche.
+  if (r.reference && !r.pending) {
+    out.push(el('div', 'ref', el('span', '', 'poe.ninja (any rolls)'), el('strong', '', priceText(r.reference))));
+  }
+  return out;
+}
+
+/** Schalt-Chip; aktiv = hervorgehoben. */
+function chip(cls = ''): HTMLButtonElement {
+  const b = el('button', `chip ${cls}`);
+  b.type = 'button';
+  return b;
 }
 
 function renderTrade(r: TradeResult): HTMLElement {
   const card = el('div', 'card card-trade');
-  const head = header(r, r.search?.icon);
-  const results = el('div', 'results', ...resultsContent(r));
-  card.append(head, results);
+  const head = header(r, r.search?.icon, undefined, false);
+  const unique = r.item.rarity === 'Unique';
 
-  const baseBox = el('input');
-  baseBox.type = 'checkbox';
-  baseBox.checked = r.useBaseType;
-  const baseToggle = el('label', 'toggle', baseBox, el('span', '', `Only base "${r.item.baseType}"`));
+  // Zustand der Chips; gelesen wird er erst beim Suchen.
+  let useBaseType = r.useBaseType;
+  let matchAll = r.matchAll;
+  let instantOnly = r.instantOnly;
+  const misc = r.mods.filter((m) => m.kind === 'misc').map((m) => ({ mod: m, on: m.enabled, min: m.min }));
 
-  const allBox = el('input');
-  allBox.type = 'checkbox';
-  allBox.checked = r.matchAll;
-  const countHint = el('span', 'faint');
-  const allToggle = el('label', 'toggle', allBox, el('span', '', 'All ticked mods must match ', countHint));
+  // Reihenfolge wie bei der Trade-Seite: Waffe, Verteidigung, Summen, dann die Mods des Items.
+  const order: TradeMod['kind'][] = ['weapon', 'defence', 'pseudo'];
+  const statMods = [
+    ...order.flatMap((k) => r.mods.filter((m) => m.kind === k)),
+    ...r.mods.filter((m) => !order.includes(m.kind) && m.kind !== 'misc'),
+  ];
 
-  const instantBox = el('input');
-  instantBox.type = 'checkbox';
-  instantBox.checked = r.instantOnly;
-  const instantToggle = el('label', 'toggle', instantBox, el('span', '', 'Instant buyout only ', el('span', 'faint', '(current prices)')));
+  const stats = el('div', 'stats');
+  const chips = el('div', 'chips');
+  const updaters: (() => void)[] = [];
+  const updateChips = () => updaters.forEach((u) => u());
 
-  // Alle Zeilen (Summen, Waffe, Mods, Filter) liegen in einem Container – die Auswahl wird daraus gelesen.
-  const mods = el('div', 'mod-sections');
-
-  const selection = (): TradeSelection => {
-    const rows = [...mods.querySelectorAll<HTMLElement>('.mod')];
-    const enabled = rows
-      .filter((row) => row.querySelector<HTMLInputElement>('input[type=checkbox]')?.checked)
-      .map((row) => row.dataset.key!);
-    const mins: Record<string, number | null> = {};
-    for (const row of rows) {
-      const input = row.querySelector<HTMLInputElement>('.min-input');
-      if (!input) continue;
-      const n = parseMin(input.value);
-      if (!Number.isNaN(n)) mins[row.dataset.key!] = n;
-    }
-    return { enabled, mins, useBaseType: baseBox.checked, matchAll: allBox.checked, instantOnly: instantBox.checked };
-  };
-
-  // Der "mind. N von M"-Modus zählt nur Stat-Zeilen (Mods und Summen), nicht DPS/Item-Level/Sockel.
-  const updateCountHint = () => {
-    const n = mods.querySelectorAll('.mod[data-stat] input[type=checkbox]:checked').length;
-    countHint.textContent = !allBox.checked && n > 2 ? `(otherwise at least ${defaultMatchCount(n)} of ${n})` : '';
-  };
-
-  const searchBtn = el('button', 'btn-sm primary', 'Search');
-  const openBtn = el('button', 'btn-sm', 'Trade site ↗');
-
-  // Änderungen werden nur gesammelt; gesucht wird erst mit Klick auf "Suchen".
+  // Änderungen werden nur gesammelt; gesucht wird erst mit Klick auf "Search".
   const onChange = () => {
-    updateCountHint();
+    updateChips();
     if (!view) return;
     view.dirty = true;
     view.refresh();
   };
 
-  const section = (title: string, list: TradeMod[], hint?: string) =>
-    list.length
-      ? el(
-          'div', 'mod-section',
-          el('div', 'label-row', el('span', 'label', title), hint ? el('span', 'hint', hint) : null),
-          el('div', 'mods', ...list.map((m) => modRow(m, onChange))),
-        )
-      : null;
-  const ofKind = (...kinds: TradeMod['kind'][]) => r.mods.filter((m) => kinds.includes(m.kind));
-  const plain = r.mods.filter((m) => m.kind !== 'pseudo' && m.kind !== 'weapon' && m.kind !== 'defence' && m.kind !== 'misc');
+  stats.append(...statMods.map((m) => statRow(m, onChange)));
 
-  const sections = [
-    section('Totals', ofKind('pseudo'), 'scroll over a value to change it'),
-    section('Weapon', ofKind('weapon')),
-    section('Defences', ofKind('defence')),
-    section('Mods', plain, ofKind('pseudo').length ? undefined : 'scroll over a value to change it'),
-    section('Filters', ofKind('misc')),
-  ].filter((s): s is HTMLDivElement => s !== null);
-  mods.append(...sections);
+  // --- Chips ---
+  // Standard ist die ganze Kategorie; ohne bekannte Kategorie geht nur die Basis.
+  if (!unique) {
+    const hasCategory = !!categoryFor(r.item.itemClass);
+    const c = chip('on');
+    c.title = hasCategory
+      ? 'Click to switch between the whole item category and only this base type'
+      : 'This item class has no trade category – searching this base type';
+    c.disabled = !hasCategory;
+    updaters.push(() => {
+      c.textContent = useBaseType || !hasCategory ? `Base: ${r.item.baseType}` : `Category: ${r.item.itemClass}`;
+    });
+    c.addEventListener('click', () => {
+      useBaseType = !useBaseType;
+      onChange();
+    });
+    chips.append(c);
+  }
+  for (const f of misc) {
+    const c = chip();
+    const isValue = f.mod.filter === 'ilvl' || f.mod.filter === 'sockets';
+    c.title = isValue ? 'Click to use this filter · scroll to change the value' : 'Click to use this filter';
+    updaters.push(() => {
+      c.classList.toggle('on', f.on);
+      c.textContent = f.mod.filter === 'ilvl' ? `Item level ${f.min ?? '–'}+` : f.mod.filter === 'sockets' ? `Sockets ${f.min ?? '–'}+` : f.mod.text;
+    });
+    c.addEventListener('click', () => {
+      f.on = !f.on;
+      onChange();
+    });
+    if (isValue) {
+      c.addEventListener(
+        'wheel',
+        (e) => {
+          e.preventDefault();
+          f.min = Math.max(0, (f.min ?? f.mod.value ?? 0) + (e.deltaY < 0 ? 1 : -1));
+          f.on = true;
+          onChange();
+        },
+        { passive: false },
+      );
+    }
+    chips.append(c);
+  }
+  {
+    const c = chip();
+    c.title = 'Click to switch between "all ticked stats must match" and "most of them"';
+    updaters.push(() => {
+      const n = stats.querySelectorAll('.stat[data-stat] input[type=checkbox]:checked').length;
+      c.classList.toggle('on', matchAll);
+      c.textContent = n === 0 ? 'No stats ticked' : matchAll || n <= 2 ? `All ${n} stat${n === 1 ? '' : 's'} must match` : `${defaultMatchCount(n)} of ${n} stats must match`;
+    });
+    c.addEventListener('click', () => {
+      matchAll = !matchAll;
+      onChange();
+    });
+    chips.append(c);
+  }
+
+  // --- Leiste unter den Stats: Einklappen, versteckte Stats ---
+  const hiddenCount = statMods.filter((m) => hiddenReason(m)).length;
+  const collapseBtn = el('button', 'link-btn');
+  const hiddenBtn = el('button', 'link-btn');
+  const wheelHint = el('span', 'hint', 'scroll a value to change it');
+  hiddenBtn.title = 'Stats that are already counted in a total/DPS or cannot be searched';
+  const applyView = () => {
+    const collapsed = pref('stats-collapsed');
+    const showHidden = pref('show-hidden');
+    stats.classList.toggle('collapsed', collapsed);
+    stats.classList.toggle('show-hidden', showHidden);
+    const ticked = stats.querySelectorAll('.stat input[type=checkbox]:checked').length;
+    collapseBtn.textContent = collapsed ? `▾ Show stats (${ticked} ticked)` : '▴ Collapse';
+    hiddenBtn.textContent = `${showHidden ? '◉' : '◌'} Hidden (${hiddenCount})`;
+    hiddenBtn.classList.toggle('on', showHidden);
+    hiddenBtn.hidden = collapsed || hiddenCount === 0;
+    wheelHint.hidden = collapsed;
+  };
+  updaters.push(applyView);
+  collapseBtn.addEventListener('click', () => {
+    setPref('stats-collapsed', !pref('stats-collapsed'));
+    applyView();
+    reportSize();
+  });
+  hiddenBtn.addEventListener('click', () => {
+    setPref('show-hidden', !pref('show-hidden'));
+    applyView();
+    reportSize();
+  });
+  const statsBar = el('div', 'stats-bar', collapseBtn, hiddenBtn, wheelHint);
+
+  // --- Ergebnisleiste ---
+  const matched = el('span', 'matched', matchedText(r));
+  const instantChip = chip();
+  instantChip.title = 'Only listings that can be bought instantly (current prices). Off = also "in person" trades.';
+  updaters.push(() => {
+    instantChip.classList.toggle('on', instantOnly);
+    instantChip.textContent = instantOnly ? '⏱ Instant buyout' : '⏱ Any listing';
+  });
+  instantChip.addEventListener('click', () => {
+    instantOnly = !instantOnly;
+    onChange();
+  });
+  const searchBtn = el('button', 'btn-sm primary', 'Search');
+  const openBtn = el('button', 'btn-sm', 'Trade ↗');
+  openBtn.title = 'Open the same search on pathofexile.com';
+
+  const selection = (): TradeSelection => {
+    const rows = [...stats.querySelectorAll<HTMLElement>('.stat')];
+    const enabled = rows.filter((row) => row.querySelector<HTMLInputElement>('input[type=checkbox]')?.checked).map((row) => row.dataset.key!);
+    const mins: Record<string, number | null> = {};
+    const maxs: Record<string, number | null> = {};
+    for (const row of rows) {
+      for (const input of row.querySelectorAll<HTMLInputElement>('.num-input')) {
+        const n = parseMin(input.value);
+        if (Number.isNaN(n)) continue;
+        (input.dataset.which === 'max' ? maxs : mins)[row.dataset.key!] = n;
+      }
+    }
+    for (const f of misc) {
+      if (f.on) enabled.push(f.mod.key);
+      if (f.min !== undefined) mins[f.mod.key] = f.min;
+    }
+    return { enabled, mins, maxs, useBaseType, matchAll, instantOnly };
+  };
+
   const runSearch = () => {
     if (!view) return;
     view.searching = true;
@@ -411,17 +587,6 @@ function renderTrade(r: TradeResult): HTMLElement {
     results.classList.add('stale');
     api.tradeSearch(selection()); // läuft schon eine Suche, merkt der Main-Prozess die neueste Auswahl vor
   };
-
-  // Die Schalter unten (Sofortkauf, alle Mods, Basis) wirken sofort – samt aktueller Mod-Auswahl.
-  // Mods und Werte warten dagegen auf "Suchen".
-  for (const box of [baseBox, allBox, instantBox]) {
-    box.addEventListener('change', () => {
-      updateCountHint();
-      runSearch();
-    });
-  }
-  updateCountHint();
-
   searchBtn.addEventListener('click', () => {
     if (view && !view.searching) runSearch();
   });
@@ -429,25 +594,33 @@ function renderTrade(r: TradeResult): HTMLElement {
     if (view?.url) api.openTrade(view.url);
   });
 
+  const results = el('div', 'results', ...resultsContent(r));
+  const rate = r.exaltedPerDivine ? ` · 1 Div = ${amount(r.exaltedPerDivine)} Ex` : '';
   card.append(
-    mods,
-    el('div', 'toggles', instantToggle, allToggle, baseToggle),
-    el('div', 'actions', searchBtn, openBtn),
-    el('div', 'foot', `pathofexile.com/trade · ${r.league}`),
+    head,
+    chips,
+    stats,
+    statsBar,
+    el('div', 'results-bar', matched, instantChip, el('span', 'spacer'), searchBtn, openBtn),
+    results,
+    el('div', 'foot', `pathofexile.com/trade · ${r.league}${rate}`),
   );
+  updateChips();
 
   const v: TradeView = {
     requestId: r.requestId,
     card,
     head,
     results,
+    matched,
     searchBtn,
     openBtn,
     url: r.search?.url ?? null,
-    dirty: false,
+    // Vor der ersten Suche ist "Search" hervorgehoben – das ist der nächste Schritt.
+    dirty: !r.search && !r.pending,
     searching: !!r.pending,
     refresh: () => {
-      // "Suchen" ist hervorgehoben, sobald etwas geändert wurde; nach Fehlern (z. B. Rate-Limit) immer klickbar.
+      // "Search" ist hervorgehoben, sobald etwas geändert wurde; nach Fehlern (z. B. Rate-Limit) immer klickbar.
       searchBtn.disabled = v.searching;
       searchBtn.textContent = v.searching ? 'Searching …' : 'Search';
       searchBtn.classList.toggle('dirty', v.dirty && !v.searching);
@@ -459,10 +632,11 @@ function renderTrade(r: TradeResult): HTMLElement {
   return card;
 }
 
-/** Neues Ergebnis derselben Rare-Prüfung: nur den Ergebnisbereich tauschen, Eingaben bleiben unangetastet. */
+/** Neues Ergebnis derselben Prüfung: nur den Ergebnisteil tauschen, Eingaben bleiben unangetastet. */
 function updateTrade(v: TradeView, r: TradeResult) {
   v.results.replaceChildren(...resultsContent(r));
   v.results.classList.toggle('stale', !!r.pending);
+  v.matched.textContent = matchedText(r);
   v.searching = !!r.pending;
   v.url = r.search?.url ?? v.url;
   if (r.search?.icon && !v.head.querySelector('.head-icon')) v.head.prepend(itemIcon(r.search.icon, 'head-icon'));
@@ -494,6 +668,11 @@ function reportSize() {
 
 api.onRemeasure(reportSize);
 
+// Nur der Hintergrund wird durchsichtig, Text und Bedienelemente bleiben voll sichtbar.
+api.onOpacity((o) => {
+  if (Number.isFinite(o)) document.documentElement.style.setProperty('--card-alpha', String(o));
+});
+
 // ---------- Verschieben von überall ----------
 // Gedrückt halten und ziehen verschiebt das Overlay – außer auf Eingabefeldern, Knöpfen und Checkboxen.
 // Ein kurzer Klick ohne Bewegung bleibt ein normaler Klick (z. B. Mod-Text an-/abwählen).
@@ -502,26 +681,71 @@ const DRAG_THRESHOLD = 4;
 let press: { x: number; y: number; dragging: boolean } | null = null;
 let suppressClick = false;
 
+// Wichtig: Wird die Taste AUSSERHALB des Fensters losgelassen (z. B. weil das Fenster beim Ziehen
+// hinterherhinkt), kommt hier kein pointerup an. Ein solcher alter Druck darf nie weiterleben –
+// sonst startet schon bloßes Darüberfahren ein Verschieben und ein Klick auf × wird verschluckt.
+
+function endPress() {
+  if (press?.dragging) api.dragEnd();
+  press = null;
+  document.body.classList.remove('dragging');
+}
+
 root.addEventListener('pointerdown', (e) => {
   suppressClick = false;
+  press = null; // jeder neue Druck beginnt sauber
+  document.body.classList.remove('dragging');
   if (e.button !== 0) return;
   if ((e.target as HTMLElement).closest('input, button, select, textarea, a')) return;
   press = { x: e.screenX, y: e.screenY, dragging: false };
 });
+// Maus raus → Fokus zurück ans Spiel (falls das Overlay durch einen Klick aktiv wurde),
+// außer man tippt gerade einen Wert oder zieht das Fenster.
+let hovering = false;
+window.addEventListener('pointermove', () => {
+  hovering = true;
+});
+document.documentElement.addEventListener('pointerleave', () => {
+  if (!hovering) return;
+  hovering = false;
+  if (press?.dragging) return;
+  if (document.activeElement instanceof HTMLInputElement) return;
+  api.overlayLeave();
+});
+
 window.addEventListener('pointermove', (e) => {
-  if (!press || press.dragging) return;
+  if (!press) return;
+  if (press.dragging) {
+    api.dragMove(); // Fenster folgt dem Mauszeiger
+    return;
+  }
+  // Taste nicht mehr gedrückt → wurde außerhalb losgelassen: alten Druck verwerfen.
+  if ((e.buttons & 1) === 0) {
+    press = null;
+    return;
+  }
   if (Math.hypot(e.screenX - press.x, e.screenY - press.y) >= DRAG_THRESHOLD) {
     press.dragging = true;
     suppressClick = true;
     document.body.classList.add('dragging');
-    api.dragStart(); // ab hier folgt das Fenster dem Mauszeiger (vom Main-Prozess gesteuert)
+    // Ab jetzt alle Mausereignisse hierher – auch wenn der Zeiger kurz außerhalb des Fensters ist
+    // (das Fenster hinkt beim Ziehen etwas hinterher). Erst jetzt, damit normale Klicks ihr Ziel behalten.
+    try {
+      root.setPointerCapture(e.pointerId);
+    } catch {
+      // ohne Capture endet das Ziehen spätestens beim nächsten Klick oder beim Schließen
+    }
+    api.dragStart();
   }
 });
 window.addEventListener('pointerup', () => {
-  if (press?.dragging) api.dragEnd();
-  press = null;
-  document.body.classList.remove('dragging');
+  endPress();
+  // Der Klick direkt nach dem Ziehen wird unten verschluckt; danach darf nichts mehr hängen bleiben.
+  setTimeout(() => (suppressClick = false), 0);
 });
+window.addEventListener('pointercancel', endPress);
+root.addEventListener('lostpointercapture', endPress);
+window.addEventListener('blur', endPress);
 // Der Klick am Ende eines Ziehvorgangs soll nichts an-/abwählen.
 root.addEventListener(
   'click',

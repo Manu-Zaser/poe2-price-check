@@ -20,7 +20,11 @@ const api = {
   overlayReady: (size: { width: number; height: number }) => ipcRenderer.send('overlay:ready', size),
   /** Größe hat sich geändert (Skalierung) – Overlay soll sich neu vermessen. */
   onRemeasure: (cb: () => void) => ipcRenderer.on('remeasure', () => cb()),
+  /** Deckkraft des Hintergrunds aus den Einstellungen (0.4–1). */
+  onOpacity: (cb: (opacity: number) => void) => ipcRenderer.on('opacity', (_e, o: number) => cb(o)),
   dragStart: () => ipcRenderer.send('overlay:drag-start'),
+  /** Maus hat sich beim Ziehen bewegt – das Fenster folgt dem Mauszeiger. */
+  dragMove: () => ipcRenderer.send('overlay:drag-move'),
   dragEnd: () => ipcRenderer.send('overlay:drag-end'),
   hideOverlay: () => ipcRenderer.send('overlay:hide'),
   tradeSearch: (selection: TradeSelection) => ipcRenderer.send('trade:search', selection),
@@ -29,6 +33,8 @@ const api = {
   copyText: (text: string) => ipcRenderer.send('clipboard:write', text),
   /** Overlay kurz fokussierbar machen, um einen Wert einzutippen. */
   focusOverlay: () => ipcRenderer.send('overlay:focus'),
+  /** Maus hat das Overlay verlassen – Fokus zurück ans Spiel. */
+  overlayLeave: () => ipcRenderer.send('overlay:leave'),
 };
 
 export type Api = typeof api;

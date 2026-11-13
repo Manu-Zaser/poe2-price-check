@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { defenceStats, pseudoContributions, suggestPrice, weaponStats } from '../src/shared/extras';
+import { defenceStats, isStale, marketPrice, priceWarnings, pricingBasis, pseudoContributions, suggestPrice, weaponStats } from '../src/shared/extras';
 import { parseItemText } from '../src/shared/parser';
 import { buildSearchQuery, buildTradeMods, StatIndex, type StatsData } from '../src/shared/stats';
 import type { Listing } from '../src/shared/types';
@@ -60,7 +60,16 @@ describe('Waffen-DPS (Morbid Stinger)', () => {
 
   it('berechnet pDPS, eDPS und Gesamt-DPS aus den Eigenschaften', () => {
     // (242+449)/2 × 1,10 = 380,05 · (37+59)/2 × 1,10 = 52,8
-    expect(weaponStats(item)).toEqual({ aps: 1.1, pdps: 380.1, edps: 52.8, cdps: 0, dps: 432.9 });
+    expect(weaponStats(item)).toEqual({ aps: 1.1, pdps: 380.1, edps: 52.8, cdps: 0, dps: 432.9, crit: 8.44 });
+  });
+
+  it('searches the overall critical hit chance instead of the local crit mod', () => {
+    const mods = buildTradeMods(item, stats);
+    // "Critical Hit Chance: 8.44%" from the properties (base + local mod + quality), minimum rounded down
+    expect(mods.find((m) => m.key === 'w:crit')).toMatchObject({ kind: 'weapon', filter: 'crit', value: 8.44, min: 8.4, enabled: true });
+    expect(mods.find((m) => m.text === '+3.44% to Critical Hit Chance')).toMatchObject({ enabled: false, coveredBy: 'crit' });
+    const q = buildSearchQuery(item, mods, { useBaseType: true, matchAll: true });
+    expect(q.query.filters.equipment_filters?.filters).toMatchObject({ crit: { min: 8.4 } });
   });
 
   it('sucht standardmäßig nach pDPS und wählt die enthaltenen Schadens-Mods ab', () => {
@@ -170,5 +179,57 @@ describe('Corrupted-Status', () => {
     const item = parseItemText(fixture('rare-gloves-grim-claw.txt'))!;
     const mods = buildTradeMods(item, stats).map((m) => (m.filter === 'corrupted' ? { ...m, enabled: false } : m));
     expect(buildSearchQuery(item, mods, { useBaseType: true, matchAll: false }).query.filters).not.toHaveProperty('misc_filters');
+  });
+});
+
+describe('market price and stale listings', () => {
+  const now = Date.parse('2026-11-13T12:00:00Z');
+  const daysAgo = (d: number) => new Date(now - d * 86_400_000).toISOString();
+  const l = (exalted: number, age: number): Listing => ({ amount: exalted, currency: 'exalted', divine: exalted / 600, exalted, indexed: daysAgo(age) });
+
+  it('marks listings older than 14 days as stale', () => {
+    expect(isStale(l(10, 13), now)).toBe(false);
+    expect(isStale(l(10, 15), now)).toBe(true);
+    expect(isStale({ ...l(10, 1), indexed: '' }, now)).toBe(false);
+  });
+
+  it('uses the median of the cheapest current listings and ignores an old outlier', () => {
+    // Like Grim Claw: a 61-day-old 30 Ex listing in front of real prices around 1 Div
+    const listings = [l(30, 61), l(600, 10), l(620, 2), l(3000, 5)];
+    expect(pricingBasis(listings, now)).toMatchObject({ staleIgnored: 1 });
+    expect(marketPrice(listings, 600, now)).toMatchObject({ exalted: 620, divine: 620 / 600, basedOn: 3, staleIgnored: 1 });
+  });
+
+  it('falls back to all listings when fewer than 2 are current', () => {
+    const listings = [l(30, 61), l(600, 50), l(620, 2)];
+    expect(marketPrice(listings, 600, now)).toMatchObject({ exalted: 600, staleIgnored: 0 });
+    expect(marketPrice(listings, null, now)).toBeNull();
+  });
+
+  it('warns about few results and only old listings', () => {
+    const old = [l(30, 61), l(600, 50)];
+    expect(priceWarnings(6, old, now)).toHaveLength(2);
+    expect(priceWarnings(50, [l(30, 1)], now)).toEqual([]);
+  });
+
+  it('adds the divine equivalent to suggestions in exalted', () => {
+    expect(suggestPrice([l(600, 1), l(620, 1), l(640, 1)], 650)).toMatchObject({ currency: 'exalted', amount: 590, approxDivine: 590 / 650 });
+  });
+});
+
+describe('summed defence mods (Vengeance Wrap)', () => {
+  // Two hybrid prefixes each add flat and % evasion – the mods are summed into one line each.
+  const item = parseItemText([
+    'Item Class: Body Armours', 'Rarity: Rare', 'Vengeance Wrap', 'Corsair Coat', '--------',
+    'Evasion Rating: 2849 (augmented)', '--------', 'Requires: Level 65', '--------', 'Item Level: 81', '--------',
+    '+200 to Evasion Rating', '+184 to Evasion Rating', '80% increased Evasion Rating', '62% increased Evasion Rating',
+    '+38% to Fire Resistance',
+  ].join('\n'))!;
+  const mods = buildTradeMods(item, stats);
+
+  it('searches the overall evasion and hides the summed evasion mods under it', () => {
+    expect(mods.find((m) => m.key === 'd:ev')).toMatchObject({ value: 2849, enabled: true });
+    expect(mods.find((m) => m.text === '384 to Evasion Rating')).toMatchObject({ combined: true, enabled: false, coveredBy: 'defence' });
+    expect(mods.find((m) => m.text === '142% increased Evasion Rating')).toMatchObject({ combined: true, enabled: false, coveredBy: 'defence' });
   });
 });

@@ -22,6 +22,8 @@ const SendInput = user32.func('uint32 __stdcall SendInput(uint32 cInputs, INPUT 
 const GetAsyncKeyState = user32.func('int16 __stdcall GetAsyncKeyState(int vKey)');
 const GetForegroundWindow = user32.func('void* __stdcall GetForegroundWindow()');
 const GetWindowTextW = user32.func('int __stdcall GetWindowTextW(void* hWnd, _Out_ uint16_t* lpString, int nMaxCount)');
+const FindWindowW = user32.func('void* __stdcall FindWindowW(const char16_t* lpClassName, const char16_t* lpWindowName)');
+const SetForegroundWindow = user32.func('bool __stdcall SetForegroundWindow(void* hWnd)');
 
 const INPUT_KEYBOARD = 1;
 const KEYEVENTF_KEYUP = 0x0002;
@@ -52,9 +54,10 @@ export function sendCopy(): void {
   if (!ctrlHeld) key(VK_CONTROL, true);
 }
 
-/** Ist die linke Maustaste gerade gedrückt? (fürs Verschieben des Overlays) */
-export function isLeftButtonDown(): boolean {
-  return isDown(0x01);
+/** Handle des aktuellen Vordergrundfensters als Zahl (0 = keins) – zum Vergleich mit eigenen Fenstern. */
+export function foregroundWindowHandle(): bigint {
+  const hwnd = GetForegroundWindow();
+  return hwnd ? koffi.address(hwnd) : 0n;
 }
 
 /** Titel des aktuellen Vordergrundfensters. */
@@ -64,4 +67,14 @@ export function foregroundWindowTitle(): string {
   const buf = new Uint16Array(512);
   const len = GetWindowTextW(hwnd, buf, buf.length);
   return String.fromCharCode(...buf.subarray(0, Math.max(0, len)));
+}
+
+/**
+ * Holt das Fenster mit diesem Titel (das Spiel) wieder in den Vordergrund. Nur ein Fensterwechsel –
+ * keine Eingabe ans Spiel. Klappt, solange unser Overlay gerade das Vordergrundfenster ist.
+ */
+export function focusWindowByTitle(title: string): boolean {
+  const hwnd = FindWindowW(null, title);
+  if (!hwnd) return false;
+  return !!SetForegroundWindow(hwnd);
 }

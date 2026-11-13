@@ -1,8 +1,8 @@
 /** Preischeck für Rares/Magic-Items über die Trade-Suche. */
 import { readFileSync, statSync, writeFileSync } from 'node:fs';
-import { buildSearchQuery, buildTradeMods, StatIndex, tradeSearchUrl, type StatsData } from '../shared/stats';
-import { suggestPrice } from '../shared/extras';
-import type { Listing, ParsedItem, PriceResult, TradeMod, TradeSearch, TradeSelection } from '../shared/types';
+import { buildSearchQuery, buildTradeMods, isNamedUnique, normalDefaults, StatIndex, tradeSearchUrl, uniqueDefaults, type StatsData } from '../shared/stats';
+import { marketPrice, priceWarnings, pricingBasis, suggestPrice } from '../shared/extras';
+import type { Listing, ParsedItem, PriceMatch, PriceResult, TradeMod, TradeSearch, TradeSelection } from '../shared/types';
 import type { PriceIndex } from './ninja';
 import { RateLimitError } from './ratelimit';
 import type { FetchedListing, TradeClient } from './trade';
@@ -71,22 +71,40 @@ export interface RareRequest {
   useBaseType: boolean;
   matchAll: boolean;
   instantOnly: boolean;
+  /** Uniques: poe.ninja-Preis als Vergleich. */
+  reference?: PriceMatch;
 }
 
 let nextRequestId = 1;
 
-export function newRareRequest(item: ParsedItem, stats: StatIndex): RareRequest {
-  return { id: nextRequestId++, item, mods: buildTradeMods(item, stats), useBaseType: true, matchAll: false, instantOnly: true };
+export function newRareRequest(item: ParsedItem, stats: StatIndex, reference?: PriceMatch): RareRequest {
+  const mods = buildTradeMods(item, stats);
+  // Uniques: alle angehakten Rolls müssen passen ("4 von 6" ergibt bei festen Mods keinen Sinn).
+  if (isNamedUnique(item)) return { id: nextRequestId++, item, mods: uniqueDefaults(mods), useBaseType: true, matchAll: true, instantOnly: true, reference };
+  // Weiße Items: Basis zählt (nicht die Kategorie), dazu Item-Level.
+  if (item.rarity === 'Normal') return { id: nextRequestId++, item, mods: normalDefaults(mods), useBaseType: true, matchAll: true, instantOnly: true };
+  // Standard: ganze Item-Kategorie (z. B. alle Bögen, nicht nur "Obliterator Bow") – bei Rares zählen
+  // die Mods, nicht die Basis. Alle angehakten Stats müssen passen. Beides per Chip umschaltbar.
+  return { id: nextRequestId++, item, mods, useBaseType: false, matchAll: true, instantOnly: true };
 }
 
 function baseResult(index: PriceIndex, req: RareRequest) {
-  return { kind: 'trade' as const, requestId: req.id, item: req.item, league: index.league, mods: req.mods, useBaseType: req.useBaseType, matchAll: req.matchAll, instantOnly: req.instantOnly };
+  return {
+    kind: 'trade' as const, requestId: req.id, item: req.item, league: index.league, mods: req.mods,
+    useBaseType: req.useBaseType, matchAll: req.matchAll, instantOnly: req.instantOnly,
+    ...(req.reference ? { reference: req.reference } : {}),
+    ...(index.exaltedPerDivine ? { exaltedPerDivine: index.exaltedPerDivine } : {}),
+  };
 }
 
-/** Zwischenstand fürs Overlay, solange die Trade-API noch antwortet. */
-export function pendingRareResult(index: PriceIndex, req: RareRequest): PriceResult {
-  return { ...baseResult(index, req), search: null, pending: true };
+/**
+ * Erste Ansicht nach dem Hotkey: Mods und Filter, aber noch keine Suche. Gesucht wird erst mit
+ * Klick auf "Search" – so geht keine Anfrage an pathofexile.com, bevor die Auswahl passt.
+ */
+export function idleRareResult(index: PriceIndex, req: RareRequest): PriceResult {
+  return { ...baseResult(index, req), search: null };
 }
+
 
 /**
  * Gleiche Suche innerhalb einer Minute (z. B. dasselbe Item zweimal geprüft oder zwischen
@@ -105,7 +123,8 @@ function cachedSearch(key: string): TradeSearch | undefined {
 export async function runRareSearch(client: TradeClient, index: PriceIndex, req: RareRequest): Promise<PriceResult> {
   const base = baseResult(index, req);
 
-  if (!req.mods.some((m) => m.enabled && (m.statId || m.filter))) {
+  // Uniques und weiße Basen lassen sich auch ganz ohne Mods suchen (Name bzw. Basis reichen).
+  if (!isNamedUnique(req.item) && req.item.rarity !== 'Normal' && !req.mods.some((m) => m.enabled && (m.statId || m.filter))) {
     return { ...base, search: null, error: 'No mods selected. Tick at least one mod and search again.' };
   }
 
@@ -117,7 +136,14 @@ ${JSON.stringify(query)}`;
     if (cached) return { ...base, search: cached };
 
     const found = await client.search(index.league, query);
-    const fetched = await client.fetchListings(found.id, found.result.slice(0, 10));
+    // 20 günstigste Angebote = zwei Abrufe zu je 10 (API-Grenze), parallel. Scheitert der zweite
+    // (z. B. Rate-Limit), reichen die ersten 10.
+    const [first, second] = await Promise.allSettled([
+      client.fetchListings(found.id, found.result.slice(0, 10)),
+      found.result.length > 10 ? client.fetchListings(found.id, found.result.slice(10, 20)) : Promise.resolve([]),
+    ]);
+    if (first.status === 'rejected') throw first.reason;
+    const fetched = [...first.value, ...(second.status === 'fulfilled' ? second.value : [])];
     const listings = sortByValue(fetched.map((f) => toListing(f, index)).filter((l): l is Listing => l !== null));
     const search: TradeSearch = {
       queryId: found.id,
@@ -125,7 +151,10 @@ ${JSON.stringify(query)}`;
       total: found.total,
       listings,
       icon: fetched.find((f) => f.item.icon)?.item.icon,
-      suggestion: suggestPrice(listings, index.exaltedPerDivine || null),
+      // Vorschlag und typischer Preis aus aktuellen Angeboten; alte zählen nur, wenn es sonst keine gibt.
+      suggestion: suggestPrice(pricingBasis(listings).listings, index.exaltedPerDivine || null),
+      market: marketPrice(listings, index.exaltedPerDivine || null),
+      warnings: priceWarnings(found.total, listings),
     };
     searchCache.set(cacheKey, { at: Date.now(), search });
     return { ...base, search };
@@ -138,9 +167,11 @@ ${JSON.stringify(query)}`;
 /** Auswahl aus dem Overlay (Haken, Mindestwerte, Schalter) auf eine Rare-Suche anwenden. */
 export function applySelection(req: RareRequest, sel: TradeSelection): RareRequest {
   const enabled = new Set(sel.enabled);
+  const maxs = sel.maxs ?? {};
   const mods = req.mods.map((m) => {
     const min = m.key in sel.mins ? (sel.mins[m.key] ?? undefined) : m.min;
-    return { ...m, enabled: (m.statId !== null || !!m.filter) && enabled.has(m.key), min };
+    const max = m.key in maxs ? (maxs[m.key] ?? undefined) : m.max;
+    return { ...m, enabled: (m.statId !== null || !!m.filter) && enabled.has(m.key), min, max };
   });
   return { ...req, mods, useBaseType: sel.useBaseType, matchAll: sel.matchAll, instantOnly: sel.instantOnly };
 }

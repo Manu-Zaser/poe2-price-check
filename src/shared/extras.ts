@@ -51,7 +51,7 @@ export function pseudoContributions(template: string): { key: string; factor: nu
 
 // ---------- Waffen-DPS ----------
 
-export interface WeaponStats { aps: number; pdps: number; edps: number; cdps: number; dps: number }
+export interface WeaponStats { aps: number; pdps: number; edps: number; cdps: number; dps: number; /** Kritische Trefferchance in %, wie angezeigt (0 = keine Angabe). */ crit: number }
 
 const DAMAGE_LINE = /^(Physical|Fire|Cold|Lightning|Chaos|Elemental) Damage:\s*(.+)$/i;
 const RANGE = /(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)/g;
@@ -78,7 +78,9 @@ export function weaponStats(item: ParsedItem): WeaponStats | null {
     else ele += avg;
   }
   const round = (n: number) => Math.round(n * 10) / 10;
-  return { aps, pdps: round(phys * aps), edps: round(ele * aps), cdps: round(chaos * aps), dps: round((phys + ele + chaos) * aps) };
+  // Gesamtwert inkl. Basis, lokaler Mods und Qualität – aussagekräftiger als der einzelne Mod.
+  const crit = Number(lines.find((l) => /^Critical Hit Chance:/i.test(l))?.match(/(\d+(?:\.\d+)?)%/)?.[1] ?? 0);
+  return { aps, pdps: round(phys * aps), edps: round(ele * aps), cdps: round(chaos * aps), dps: round((phys + ele + chaos) * aps), crit };
 }
 
 /** Lokale Schadens-Mods, die in den DPS schon enthalten sind. */
@@ -86,6 +88,13 @@ const DPS_MODS = [/^#% increased Physical Damage$/, /^Adds # to # (Physical|Fire
 
 export function coveredByDps(template: string): boolean {
   return DPS_MODS.some((re) => re.test(template));
+}
+
+/** Lokale Crit-Mods einer Waffe, die in der angezeigten Critical Hit Chance schon enthalten sind. */
+const CRIT_MODS = [/^#% to Critical Hit Chance$/, /^#% increased Critical Hit Chance$/];
+
+export function coveredByCrit(template: string): boolean {
+  return CRIT_MODS.some((re) => re.test(template));
 }
 
 // ---------- Verteidigung (Rüstungen) ----------
@@ -152,12 +161,12 @@ export function buildExtraMods(item: ParsedItem, lines: ModLine[], mods: TradeMo
 
   // Pseudo-Summen über alle Mod-Quellen (explizit, implicit, Rune …)
   const totals = new Map<string, number>();
-  const coveredTexts = new Set<string>();
+  const coveredTemplates = new Set<string>();
   for (const line of lines) {
     const contrib = pseudoContributions(line.template);
     if (!contrib.length || line.values.length === 0) continue;
     for (const c of contrib) totals.set(c.key, (totals.get(c.key) ?? 0) + line.values[0] * c.factor);
-    coveredTexts.add(line.text);
+    coveredTemplates.add(line.template);
   }
   for (const [key, total] of totals) {
     if (total <= 0) continue;
@@ -179,6 +188,10 @@ export function buildExtraMods(item: ParsedItem, lines: ModLine[], mods: TradeMo
       if (value <= 0) continue;
       extras.push({ key: `w:${filter}`, text, kind: 'weapon', statId: null, filter, value, min: minOf(value), enabled: filter === main });
     }
+  }
+  // Gesamte Crit-Chance der Waffe statt des einzelnen "+#% to Critical Hit Chance"-Mods.
+  if (w && w.crit > 0) {
+    extras.push({ key: 'w:crit', text: `${w.crit}% Critical Hit Chance`, kind: 'weapon', statId: null, filter: 'crit', value: w.crit, min: minOf(w.crit), enabled: true });
   }
 
   // Verteidigung: Rüstung/Ausweichen/Energieschild an, Block/Spirit zur Auswahl
@@ -211,18 +224,21 @@ export function buildExtraMods(item: ParsedItem, lines: ModLine[], mods: TradeMo
   }
 
   // Abgedeckte Einzel-Mods abwählen (bleiben sichtbar und können wieder angehakt werden).
-  const dpsActive = extras.some((e) => e.kind === 'weapon' && e.enabled);
+  const dpsActive = extras.some((e) => e.kind === 'weapon' && e.filter !== 'crit' && e.enabled);
+  const critActive = extras.some((e) => e.filter === 'crit' && e.enabled);
   const defenceActive = extras.some((e) => e.kind === 'defence' && e.enabled);
   for (const m of mods) {
     if (m.kind === 'pseudo' || m.kind === 'weapon' || m.kind === 'defence' || m.kind === 'misc') continue;
-    const line = lines.find((l) => l.text === m.text);
-    const template = line?.template ?? '';
-    const byPseudo = coveredTexts.has(m.text) && pseudoContributions(template).some((c) => totals.get(c.key)! > 0);
+    // Über das Template statt den Text: zusammengefasste Mods ("384 to Evasion Rating" aus zwei Zeilen)
+    // haben einen neuen Text, aber dasselbe Template.
+    const template = m.template ?? lines.find((l) => l.text === m.text)?.template ?? '';
+    const byPseudo = coveredTemplates.has(template) && pseudoContributions(template).some((c) => totals.get(c.key)! > 0);
     const byDps = dpsActive && (coveredByDps(template) || (m.combined && /increased Physical Damage$/.test(m.text)));
     const byDefence = defenceActive && coveredByDefence(template);
-    if (byPseudo || byDps || byDefence) {
+    const byCrit = critActive && coveredByCrit(template);
+    if (byPseudo || byDps || byDefence || byCrit) {
       m.enabled = false;
-      m.coveredBy = byPseudo ? 'total' : byDps ? 'DPS' : 'defence';
+      m.coveredBy = byPseudo ? 'total' : byDps ? 'DPS' : byCrit ? 'crit' : 'defence';
     }
   }
   return extras;
@@ -237,6 +253,8 @@ export interface PriceSuggestion {
   note: string;
   /** Auf wie vielen Angeboten der Vorschlag beruht. */
   basedOn: number;
+  /** Vorschlag umgerechnet in Divine (bei Vorschlägen in Exalted), falls Kurs bekannt. */
+  approxDivine?: number;
 }
 
 function niceRound(n: number): number {
@@ -264,5 +282,68 @@ export function suggestPrice(listings: Listing[], exaltedPerDivine: number | nul
     return { amount, currency: 'divine', note: `~b/o ${amount} divine`, basedOn: values.length };
   }
   const amount = Math.max(1, niceRound(target));
-  return { amount, currency: 'exalted', note: `~b/o ${amount} exalted`, basedOn: values.length };
+  return {
+    amount, currency: 'exalted', note: `~b/o ${amount} exalted`, basedOn: values.length,
+    ...(exaltedPerDivine ? { approxDivine: amount / exaltedPerDivine } : {}),
+  };
+}
+
+// ---------- Marktpreis und Verlässlichkeit ----------
+
+/** Angebote, die länger als das online sind, sind meist Ladenhüter oder Lockangebote. */
+export const STALE_DAYS = 14;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function isStale(l: Listing, now = Date.now()): boolean {
+  const t = Date.parse(l.indexed);
+  return !Number.isNaN(t) && now - t > STALE_DAYS * DAY_MS;
+}
+
+/**
+ * Angebote für Preis und Vorschlag: aktuelle bevorzugt. Gibt es weniger als 2 aktuelle,
+ * werden alle verwendet (besser alte Daten als gar keine).
+ */
+export function pricingBasis(listings: Listing[], now = Date.now()): { listings: Listing[]; staleIgnored: number } {
+  const fresh = listings.filter((l) => !isStale(l, now));
+  if (fresh.length >= 2) return { listings: fresh, staleIgnored: listings.length - fresh.length };
+  return { listings, staleIgnored: 0 };
+}
+
+export interface MarketPrice {
+  divine: number;
+  exalted: number;
+  /** Auf wie vielen Angeboten der Wert beruht. */
+  basedOn: number;
+  /** Wie viele alte Angebote dafür übergangen wurden. */
+  staleIgnored: number;
+}
+
+/**
+ * Typischer Preis = Median der n günstigsten (aktuellen) Angebote. Robuster als das günstigste
+ * Angebot, das oft ein vergessenes oder falsch bepreistes Item ist.
+ */
+export function marketPrice(listings: Listing[], exaltedPerDivine: number | null, now = Date.now(), n = 3): MarketPrice | null {
+  if (!exaltedPerDivine) return null;
+  const basis = pricingBasis(listings, now);
+  const values = basis.listings.slice(0, n).map((l) => l.exalted).filter((v): v is number => v !== null && v > 0);
+  if (values.length === 0) return null;
+  values.sort((a, b) => a - b);
+  const mid = Math.floor(values.length / 2);
+  const exalted = values.length % 2 ? values[mid] : (values[mid - 1] + values[mid]) / 2;
+  return { exalted, divine: exalted / exaltedPerDivine, basedOn: values.length, staleIgnored: basis.staleIgnored };
+}
+
+/** Wenig Treffer = der Preis ist nur grob; dann lieber Mods abwählen. */
+export const FEW_RESULTS = 10;
+
+/** Hinweise, wenn der angezeigte Preis wenig aussagekräftig ist. */
+export function priceWarnings(total: number, listings: Listing[], now = Date.now()): string[] {
+  const out: string[] = [];
+  if (listings.length > 0 && listings.every((l) => isStale(l, now))) {
+    out.push(`All listings are older than ${STALE_DAYS} days – price probably outdated.`);
+  }
+  if (total > 0 && total < FEW_RESULTS) {
+    out.push(`Only ${total} result${total === 1 ? '' : 's'} – untick some mods for a more reliable price.`);
+  }
+  return out;
 }

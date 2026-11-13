@@ -25,6 +25,11 @@ function variants(line: ModLine): Variant[] {
   // "fire an additional Arrow" → "fire # additional Arrows"
   const additional = line.template.match(/^(.*)\ban additional (\w+)(.*)$/);
   if (additional) out.push({ template: `${additional[1]}# additional ${additional[2]}s${additional[3]}`, sign: 1, fixedValue: 1 });
+  // Die Stat-Liste schreibt Mengen im Singular: "Has 3 Charm Slots" steht dort als "Has # Charm Slot".
+  for (const v of [...out]) {
+    const singular = v.template.replace(/(# (?:\w+ )?\w+?)s\b/, '$1');
+    if (singular !== v.template) out.push({ ...v, template: singular });
+  }
   return out;
 }
 
@@ -58,13 +63,16 @@ export class StatIndex {
     return undefined;
   }
 
-  /** Passende Stat-ID plus Vergleichswert, oder null. */
-  match(line: ModLine, item: ParsedItem): { id: string; value: number | null } | null {
+  /**
+   * Passende Stat-ID plus Vergleichswert, oder null. inverted = als "increased"/"more" gefunden,
+   * obwohl auf dem Item "reduced"/"less" steht (Wert in der Suche negativ).
+   */
+  match(line: ModLine, item: ParsedItem): { id: string; value: number | null; inverted: boolean } | null {
     const allowLocal = !NON_LOCAL_CLASSES.test(item.itemClass);
     for (const v of variants(line)) {
       const entry = this.lookup(v.template, line.kind, allowLocal);
       if (!entry) continue;
-      return { id: entry.id, value: statValue(line, v) };
+      return { id: entry.id, value: statValue(line, v), inverted: v.sign === -1 };
     }
     return null;
   }
@@ -111,7 +119,9 @@ export function buildTradeMods(item: ParsedItem, stats: StatIndex): TradeMod[] {
   const lines = extractModLines(item, (l) => stats.isKnown(l));
   lines.forEach((line, i) => {
     const m = stats.match(line, item);
-    const value = m?.value ?? null;
+    // "50% reduced X": im Overlay wie auf dem Item (50), die Suche rechnet mit -50.
+    const invert = !!m?.inverted;
+    const value = m?.value != null && invert ? Math.abs(m.value) : (m?.value ?? null);
 
     // Gleiche Stat-ID mehrfach (z. B. zwei Zeilen "% increased Physical Damage" aus Präfix + Hybrid-Mod):
     // Die Trade-Suche kennt nur die Summe.
@@ -130,10 +140,12 @@ export function buildTradeMods(item: ParsedItem, stats: StatIndex): TradeMod[] {
     const mod: TradeMod = {
       key: `${i}`,
       text: line.text,
+      template: line.template,
       kind: line.kind,
       statId: m?.id ?? null,
       value,
       min: defaultMin(value),
+      ...(invert ? { invert: true } : {}),
       enabled: m !== null && selectable && (value === null || value > 0),
       ...(line.tier !== undefined ? { tiers: [{ affix: line.affix ?? 'other', tier: line.tier }] } : {}),
     };
@@ -175,6 +187,28 @@ export function categoryFor(itemClass: string): string | undefined {
   return CATEGORIES[itemClass];
 }
 
+/** Unique mit bekanntem Namen – wird über die Trade-Suche (Name + Mods) geprüft. */
+export function isNamedUnique(item: ParsedItem): boolean {
+  return item.rarity === 'Unique' && !!item.name && !item.unidentified;
+}
+
+/**
+ * Bei Uniques sind die Mods fest, nur die Rolls schwanken. Standardmäßig wird daher nur nach dem
+ * Unique selbst gesucht (plus Corrupted-Status); wer einen Roll anhakt, sucht "mindestens mein Wert".
+ */
+export function uniqueDefaults(mods: TradeMod[]): TradeMod[] {
+  return mods.map((m) => ({ ...m, enabled: m.filter === 'corrupted' }));
+}
+
+/**
+ * Normale (weiße) Items sind meist Crafting-Basen: Basis und Item-Level bestimmen den Preis.
+ * Standardmäßig daher nur Item-Level (mind. das eigene) und Corrupted-Status; Implicits und
+ * Verteidigungswerte stehen zur Auswahl.
+ */
+export function normalDefaults(mods: TradeMod[]): TradeMod[] {
+  return mods.map((m) => ({ ...m, enabled: m.filter === 'corrupted' || m.filter === 'ilvl' }));
+}
+
 export interface SearchOptions {
   /** Nur Items mit genau diesem Basistyp suchen. */
   useBaseType: boolean;
@@ -184,16 +218,33 @@ export interface SearchOptions {
   instantOnly?: boolean;
 }
 
+/** Min/Max für die Suche; bei "reduced"-Mods negiert und vertauscht ("mind. 15 % reduced" = höchstens -15). */
+export function statRange(m: Pick<TradeMod, 'min' | 'max' | 'invert'>): { min?: number; max?: number } | null {
+  const lo = m.invert ? (m.max !== undefined ? -m.max : undefined) : m.min;
+  const hi = m.invert ? (m.min !== undefined ? -m.min : undefined) : m.max;
+  if (lo === undefined && hi === undefined) return null;
+  return { ...(lo !== undefined ? { min: lo } : {}), ...(hi !== undefined ? { max: hi } : {}) };
+}
+
 /** JSON für POST /api/trade2/search/poe2/{league}. */
 export function buildSearchQuery(item: ParsedItem, mods: TradeMod[], opts: SearchOptions) {
   const filters = mods
     .filter((m) => m.enabled && m.statId && !m.filter)
-    .map((m) => ({ id: m.statId!, ...(m.min !== undefined ? { value: { min: m.min } } : {}) }));
+    .map((m) => {
+      const range = statRange(m);
+      return { id: m.statId!, ...(range ? { value: range } : {}) };
+    });
 
-  const typeFilters: Record<string, unknown> = { rarity: { option: 'nonunique' } };
+  // Identifizierte Uniques werden über Name + Basis gesucht; die Mods grenzen nur die Rolls ein.
+  const unique = isNamedUnique(item);
+  // Weiße Basen nur mit weißen Basen vergleichen; Magic/Rare untereinander.
+  const rarity = unique ? 'unique' : item.rarity === 'Normal' ? 'normal' : 'nonunique';
+  const typeFilters: Record<string, unknown> = { rarity: { option: rarity } };
   const category = categoryFor(item.itemClass);
-  if (!opts.useBaseType && category) typeFilters.category = { option: category };
-  const equipment: Record<string, { min: number }> = {};
+  // Unbekannte Item-Klasse: ohne Kategorie würde über alle Items gesucht – dann doch die Basis.
+  const byBase = unique || opts.useBaseType || !category;
+  if (!byBase) typeFilters.category = { option: category };
+  const equipment: Record<string, { min?: number; max?: number }> = {};
   const misc: Record<string, { option: string }> = {};
   for (const m of mods) {
     if (!m.enabled || !m.filter) continue;
@@ -201,16 +252,18 @@ export function buildSearchQuery(item: ParsedItem, mods: TradeMod[], opts: Searc
       misc.corrupted = { option: item.corrupted ? 'true' : 'false' };
       continue;
     }
-    if (m.min === undefined) continue;
-    if (m.filter === 'ilvl') typeFilters.ilvl = { min: m.min };
-    else if (m.filter === 'sockets') equipment.rune_sockets = { min: m.min };
-    else equipment[m.filter] = { min: m.min };
+    const range = statRange(m);
+    if (!range) continue;
+    if (m.filter === 'ilvl') typeFilters.ilvl = range;
+    else if (m.filter === 'sockets') equipment.rune_sockets = range;
+    else equipment[m.filter] = range;
   }
 
   return {
     query: {
       status: { option: opts.instantOnly ? 'securable' : 'available' },
-      ...(opts.useBaseType ? { type: item.baseType } : {}),
+      ...(unique ? { name: item.name } : {}),
+      ...(byBase ? { type: item.baseType } : {}),
       stats: [
         opts.matchAll || filters.length <= 2
           ? { type: 'and', filters }
