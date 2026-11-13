@@ -46,6 +46,11 @@ export function sendCopy(): void {
   if (!ctrlHeld) key(VK_CONTROL, true);
 }
 
+/** Ist die linke Maustaste gerade gedrückt? (fürs Verschieben des Overlays) */
+export function isLeftButtonDown(): boolean {
+  return isDown(0x01);
+}
+
 /** Titel des aktuellen Vordergrundfensters. */
 export function foregroundWindowTitle(): string {
   const hwnd = GetForegroundWindow();

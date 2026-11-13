@@ -27,13 +27,16 @@ describe('buildTradeMods – Handschuhe (Grim Claw)', () => {
   const mods = buildTradeMods(item, stats);
   const byText = (t: string) => mods.find((m) => m.text.includes(t))!;
 
+  const plain = mods.filter((m) => !["pseudo", "weapon", "misc"].includes(m.kind));
+
   it('findet alle Mods inklusive Rune', () => {
-    expect(mods).toHaveLength(7);
-    expect(mods.every((m) => m.statId !== null)).toBe(true);
+    expect(plain).toHaveLength(7);
+    expect(plain.every((m) => m.statId !== null)).toBe(true);
   });
 
   it('ordnet Stat-IDs korrekt zu', () => {
-    expect(byText('maximum Life')).toMatchObject({ statId: 'explicit.stat_3299347043', value: 10, enabled: true });
+    // Leben ist jetzt in der Summe "Leben gesamt" enthalten und deshalb abgewählt.
+    expect(byText('maximum Life')).toMatchObject({ statId: 'explicit.stat_3299347043', value: 10, enabled: false, coveredBy: 'Summe' });
     expect(byText('Cold damage to Attacks')).toMatchObject({ statId: 'explicit.stat_4067062424', value: 18 });
     expect(byText('Dexterity')).toMatchObject({ statId: 'explicit.stat_3261801346', value: 30, min: 25 });
     expect(byText('Fire Resistance')).toMatchObject({ kind: 'rune', statId: 'rune.stat_3372524247', enabled: false });
@@ -77,15 +80,17 @@ describe('buildSearchQuery', () => {
     const item = parseItemText(fixture('rare-gloves-grim-claw.txt'))!;
     const q = buildSearchQuery(item, buildTradeMods(item, stats), { useBaseType: true, matchAll: false });
     expect(q.query.type).toBe('Barbed Bracers');
-    expect(q.query.stats[0].filters).toHaveLength(6);
-    expect(q.query.stats[0].filters).toContainEqual({ id: 'explicit.stat_3299347043', value: { min: 8 } });
+    // 4 explizite Mods + 3 Summen (Elementar-Resistenzen, Leben, Geschick)
+    expect(q.query.stats[0].filters).toHaveLength(7);
+    expect(q.query.stats[0].filters).toContainEqual({ id: 'pseudo.pseudo_total_life', value: { min: 8 } });
+    expect(q.query.stats[0].filters).not.toContainEqual(expect.objectContaining({ id: 'explicit.stat_3299347043' }));
     expect(q.sort).toEqual({ price: 'asc' });
   });
 
   it('verlangt standardmäßig nur einen Teil der Mods (count), auf Wunsch alle (and)', () => {
     const item = parseItemText(fixture('rare-gloves-grim-claw.txt'))!;
     const mods = buildTradeMods(item, stats);
-    expect(buildSearchQuery(item, mods, { useBaseType: true, matchAll: false }).query.stats[0]).toMatchObject({ type: 'count', value: { min: 4 } });
+    expect(buildSearchQuery(item, mods, { useBaseType: true, matchAll: false }).query.stats[0]).toMatchObject({ type: 'count', value: { min: 5 } });
     expect(buildSearchQuery(item, mods, { useBaseType: true, matchAll: true }).query.stats[0]).toMatchObject({ type: 'and' });
     expect(defaultMatchCount(2)).toBe(2);
     expect(defaultMatchCount(3)).toBe(2);

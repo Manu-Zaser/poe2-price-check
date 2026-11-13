@@ -27,7 +27,16 @@ PoE2 im Modus **Fenster/Vollbild-Fenster** spielen, sonst liegt das Overlay unte
   - Standard: explizite Mods mit ca. 85 % des Wertes, davon müssen die meisten passen (z. B. 4 von 6).
   - Im Overlay Mods an-/abhaken (auch Klick auf den Text), Mindestwerte per **Mausrad** ändern oder anklicken und
     eintippen (leer = ohne Minimum). Gesucht wird erst mit Klick auf **Suchen** (leuchtet auf, sobald etwas geändert wurde).
+    Die Schalter „Nur Sofortkauf“, „Alle Mods müssen passen“ und „Nur Basis“ suchen sofort neu.
   - „Trade-Seite ↗“ öffnet dieselbe Suche im Browser.
+  - **Summen (Pseudo-Stats):** Resistenzen, Leben, Mana und Attribute werden zu Gesamtwerten zusammengefasst
+    (z. B. „+45 % Elementar-Resistenzen gesamt“), die Einzel-Mods dafür abgewählt – findet viel mehr vergleichbare Items.
+  - **Waffen:** DPS, physische und elementare DPS werden aus den Eigenschaften berechnet; standardmäßig wird nach dem
+    dominanten Wert gesucht, die darin enthaltenen Schadens-Mods werden abgewählt.
+  - **Filter:** Item-Level und Rune-Sockel (optional), **Nur Sofortkauf** (Standard an, nur aktuelle Instant-Buyout-Preise).
+  - **Verkaufspreis-Vorschlag:** knapp unter dem Median der 3 günstigsten Angebote, mit Button zum Kopieren als
+    Stash-Notiz (z. B. `~b/o 58 exalted`).
+  - Angebote werden nach ihrem Wert laut poe.ninja sortiert (GGG sortiert mit eigenen Kursen).
 
 poe.ninja wird höchstens einmal pro Stunde geladen, die Stat-Liste der Trade-Suche einmal am Tag
 (`%APPDATA%\poe2-pricecheck\trade-stats.json`).
@@ -52,8 +61,8 @@ Preischeck-Tools nutzen sie; GGG kann das jederzeit ändern.
 ## Overlay
 
 - Bleibt offen, bis man es mit **×** (oder Esc) schließt; ein neuer Preischeck ersetzt den Inhalt.
-- An der Kopfzeile ziehen, um es zu verschieben. Die Position wird gemerkt und für alle weiteren Preischecks
-  verwendet (Einstellungen → „Position zurücksetzen“ = wieder neben dem Mauszeiger).
+- An einer beliebigen freien Stelle ziehen, um es zu verschieben (ein kurzer Klick bleibt ein Klick). Die Position
+  wird gemerkt und für alle weiteren Preischecks verwendet (Einstellungen → „Position zurücksetzen“ = wieder neben dem Mauszeiger).
 - Stürzt der Overlay-Inhalt ab, wird das Fenster automatisch neu erstellt, damit nichts Unsichtbares über dem
   Spiel liegen bleibt. Fehler landen in `%APPDATA%\poe2-pricecheck\poe2-pricecheck.log`.
 
@@ -73,6 +82,7 @@ Hotkey, League und Overlay-Dauer stellst du in der Oberfläche ein. Gespeichert 
 | `hotkey` | `Ctrl+D` | Electron-Accelerator |
 | `gameWindowTitle` | `Path of Exile 2` | Fenstertitel des Spiels |
 | `contact` | `""` | optionaler Kontakt im User-Agent |
+| `overlayScale` | `1.15` | Größe des Overlays (0.8–1.6) |
 | `overlayPosition` | `null` | gemerkte Overlay-Position (`null` = am Mauszeiger) |
 | `gpuAcceleration` | `false` | GPU-Beschleunigung der App-Fenster |
 

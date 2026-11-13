@@ -42,7 +42,7 @@ describe('Rare-Suche', () => {
     const req = newRareRequest(parseItemText(fixture('rare-gloves-grim-claw.txt'))!, stats);
     const p = pendingRareResult(index, req);
     expect(p).toMatchObject({ kind: 'trade', pending: true, search: null });
-    expect(p.kind === 'trade' && p.mods.length).toBe(7);
+    expect(p.kind === 'trade' && p.mods.filter((m) => m.kind !== 'pseudo' && m.kind !== 'misc').length).toBe(7);
   });
 
   it('verwendet dieselbe Suche innerhalb einer Minute wieder (keine erneuten Anfragen)', async () => {
@@ -77,6 +77,7 @@ describe('Overlay-Auswahl', () => {
       mins: { [life.key]: 5, [dex.key]: null },
       useBaseType: false,
       matchAll: true,
+      instantOnly: false,
     });
     const get = (k: string) => next.mods.find((m) => m.key === k)!;
     expect(get(life.key)).toMatchObject({ enabled: true, min: 5 });

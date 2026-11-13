@@ -1,4 +1,5 @@
 import { defaultMatchCount } from '../shared/stats';
+import type { PriceSuggestion } from '../shared/extras';
 import type { Listing, PriceMatch, PriceResult, TradeMod, TradeSelection } from '../shared/types';
 import { api, el, itemIcon } from './api';
 import { ageFromIso, amount, currencyShort, parseMin, priceParts, priceText } from './format';
@@ -65,9 +66,9 @@ function header(r: Result | null, icon?: string, title?: string): HTMLElement {
   } else {
     text.append(el('div', 'title', title ?? ''));
   }
-  const head = el('div', 'head drag', icon ? itemIcon(icon, 'head-icon') : null, text, el('span', 'grip', '⠿'), closeButton());
-  head.title = 'Zum Verschieben ziehen';
-  return head;
+  const grip = el('span', 'grip', '⠿');
+  grip.title = 'Overlay lässt sich an jeder freien Stelle verschieben';
+  return el('div', 'head', icon ? itemIcon(icon, 'head-icon') : null, text, grip, closeButton());
 }
 
 // ---------- poe.ninja (Währung, Uniques) ----------
@@ -173,6 +174,7 @@ function resultsContent(r: TradeResult): HTMLElement[] {
     }
     meta.append(el('span', 'faint', `${s.total} Treffer`));
     out.push(bigPrice(amount(cheapest.amount), currencyShort(cheapest.currency), 'ab', meta));
+    if (s.suggestion) out.push(suggestionRow(s.suggestion));
     out.push(el('div', 'lsts', ...s.listings.slice(0, 6).map(listingRow)));
   } else if (s) {
     out.push(el('div', 'empty-result', 'Keine Angebote mit diesen Mods. Weniger Mods anhaken, Werte senken oder Basistyp lockern.'));
@@ -181,10 +183,36 @@ function resultsContent(r: TradeResult): HTMLElement[] {
   return out;
 }
 
+/** Verkaufspreis-Vorschlag mit Kopier-Button für die Stash-Notiz. */
+function suggestionRow(sg: PriceSuggestion): HTMLElement {
+  const btn = el('button', 'btn-xs', 'Kopieren');
+  btn.title = 'Als Notiz für den Stash-Tab in die Zwischenablage kopieren';
+  btn.addEventListener('click', () => {
+    api.copyText(sg.note);
+    btn.textContent = 'Kopiert ✓';
+    btn.classList.add('done');
+    setTimeout(() => {
+      btn.textContent = 'Kopieren';
+      btn.classList.remove('done');
+    }, 1500);
+  });
+  const unit = sg.currency === 'divine' ? 'Div' : 'Ex';
+  const hint = sg.basedOn < 3 ? ' · wenig Daten' : '';
+  return el(
+    'div', 'suggest',
+    el('span', 'suggest-label', 'Verkaufen für'),
+    el('strong', 'suggest-value', `${amount(sg.amount)} `, el('span', `unit unit-${unit.toLowerCase()}`, unit)),
+    el('code', 'suggest-note', sg.note),
+    btn,
+    el('span', 'suggest-hint', `knapp unter dem Median der ${sg.basedOn} günstigsten${hint}`),
+  );
+}
+
 function modRow(m: TradeMod, onChange: () => void): HTMLElement {
-  const searchable = m.statId !== null;
+  const searchable = m.statId !== null || !!m.filter;
   const row = el('div', `mod ${searchable ? '' : 'mod-off'} mod-${m.kind}`);
   row.dataset.key = m.key;
+  if (m.statId) row.dataset.stat = '1';
 
   const box = el('input');
   box.type = 'checkbox';
@@ -204,8 +232,12 @@ function modRow(m: TradeMod, onChange: () => void): HTMLElement {
   const side = el('span', 'mod-side');
   if (KIND_LABEL[m.kind]) side.append(el('span', 'mod-kind', KIND_LABEL[m.kind]!));
   if (m.combined) {
-    side.append(el('span', 'mod-kind', 'Summe'));
+    side.append(el('span', 'mod-kind', 'addiert'));
     row.title = 'Mehrere Zeilen mit demselben Stat – die Trade-Suche rechnet mit der Summe.';
+  }
+  if (m.coveredBy) {
+    side.append(el('span', 'mod-kind covered', `in ${m.coveredBy}`));
+    row.title = m.coveredBy === 'DPS' ? 'Schon in den DPS oben enthalten – daher abgewählt.' : 'Schon in einer Summe oben enthalten – daher abgewählt.';
   }
 
   if (searchable && m.value !== null) {
@@ -288,7 +320,13 @@ function renderTrade(r: TradeResult): HTMLElement {
   const countHint = el('span', 'faint');
   const allToggle = el('label', 'toggle', allBox, el('span', '', 'Alle angehakten Mods müssen passen ', countHint));
 
-  const mods = el('div', 'mods');
+  const instantBox = el('input');
+  instantBox.type = 'checkbox';
+  instantBox.checked = r.instantOnly;
+  const instantToggle = el('label', 'toggle', instantBox, el('span', '', 'Nur Sofortkauf ', el('span', 'faint', '(Instant Buyout, aktuelle Preise)')));
+
+  // Alle Zeilen (Summen, Waffe, Mods, Filter) liegen in einem Container – die Auswahl wird daraus gelesen.
+  const mods = el('div', 'mod-sections');
 
   const selection = (): TradeSelection => {
     const rows = [...mods.querySelectorAll<HTMLElement>('.mod')];
@@ -302,11 +340,12 @@ function renderTrade(r: TradeResult): HTMLElement {
       const n = parseMin(input.value);
       if (!Number.isNaN(n)) mins[row.dataset.key!] = n;
     }
-    return { enabled, mins, useBaseType: baseBox.checked, matchAll: allBox.checked };
+    return { enabled, mins, useBaseType: baseBox.checked, matchAll: allBox.checked, instantOnly: instantBox.checked };
   };
 
+  // Der "mind. N von M"-Modus zählt nur Stat-Zeilen (Mods und Summen), nicht DPS/Item-Level/Sockel.
   const updateCountHint = () => {
-    const n = mods.querySelectorAll('.mod input[type=checkbox]:checked').length;
+    const n = mods.querySelectorAll('.mod[data-stat] input[type=checkbox]:checked').length;
     countHint.textContent = !allBox.checked && n > 2 ? `(sonst mind. ${defaultMatchCount(n)} von ${n})` : '';
   };
 
@@ -321,28 +360,53 @@ function renderTrade(r: TradeResult): HTMLElement {
     view.refresh();
   };
 
-  mods.append(...r.mods.map((m) => modRow(m, onChange)));
-  baseBox.addEventListener('change', onChange);
-  allBox.addEventListener('change', onChange);
-  updateCountHint();
+  const section = (title: string, list: TradeMod[], hint?: string) =>
+    list.length
+      ? el(
+          'div', 'mod-section',
+          el('div', 'label-row', el('span', 'label', title), hint ? el('span', 'hint', hint) : null),
+          el('div', 'mods', ...list.map((m) => modRow(m, onChange))),
+        )
+      : null;
+  const ofKind = (...kinds: TradeMod['kind'][]) => r.mods.filter((m) => kinds.includes(m.kind));
+  const plain = r.mods.filter((m) => m.kind !== 'pseudo' && m.kind !== 'weapon' && m.kind !== 'misc');
 
-  searchBtn.addEventListener('click', () => {
-    if (!view || view.searching) return;
+  const sections = [
+    section('Summen', ofKind('pseudo'), 'Mausrad über Wert = ändern'),
+    section('Waffe', ofKind('weapon')),
+    section('Mods', plain, ofKind('pseudo').length ? undefined : 'Mausrad über Wert = ändern'),
+    section('Filter', ofKind('misc')),
+  ].filter((s): s is HTMLDivElement => s !== null);
+  mods.append(...sections);
+  const runSearch = () => {
+    if (!view) return;
     view.searching = true;
     view.dirty = false;
     view.refresh();
     results.classList.add('stale');
-    api.tradeSearch(selection());
+    api.tradeSearch(selection()); // läuft schon eine Suche, merkt der Main-Prozess die neueste Auswahl vor
+  };
+
+  // Die Schalter unten (Sofortkauf, alle Mods, Basis) wirken sofort – samt aktueller Mod-Auswahl.
+  // Mods und Werte warten dagegen auf "Suchen".
+  for (const box of [baseBox, allBox, instantBox]) {
+    box.addEventListener('change', () => {
+      updateCountHint();
+      runSearch();
+    });
+  }
+  updateCountHint();
+
+  searchBtn.addEventListener('click', () => {
+    if (view && !view.searching) runSearch();
   });
   openBtn.addEventListener('click', () => {
     if (view?.url) api.openTrade(view.url);
   });
 
   card.append(
-    el('div', 'label-row', el('span', 'label', 'Gesuchte Mods'), el('span', 'hint', 'Mausrad über Wert = ändern')),
     mods,
-    allToggle,
-    baseToggle,
+    el('div', 'toggles', instantToggle, allToggle, baseToggle),
     el('div', 'actions', searchBtn, openBtn),
     el('div', 'foot', `pathofexile.com/trade · ${r.league}`),
   );
@@ -391,12 +455,59 @@ function render(r: PriceResult): HTMLElement {
   return el('div', 'card', header(r), el('div', 'note', r.reason));
 }
 
+/**
+ * Natürliche Größe des Inhalts melden. Wichtig: scrollHeight statt der sichtbaren Höhe – die Karte
+ * ist auf die aktuelle Fensterhöhe begrenzt, sonst könnte das Fenster nach einer kleinen Karte nie
+ * wieder wachsen. Kein requestAnimationFrame: im versteckten Fenster feuert es nicht zuverlässig.
+ */
 function reportSize() {
-  // getBoundingClientRect erzwingt das Layout synchron. Kein requestAnimationFrame:
-  // Das Fenster ist zu diesem Zeitpunkt evtl. noch versteckt, dort feuert rAF nicht zuverlässig.
+  const card = root.firstElementChild as HTMLElement | null;
   const rect = root.getBoundingClientRect();
-  api.overlayReady({ width: rect.width, height: rect.height });
+  const height = card ? Math.max(rect.height, card.scrollHeight + (card.offsetHeight - card.clientHeight)) : rect.height;
+  api.overlayReady({ width: rect.width, height });
 }
+
+api.onRemeasure(reportSize);
+
+// ---------- Verschieben von überall ----------
+// Gedrückt halten und ziehen verschiebt das Overlay – außer auf Eingabefeldern, Knöpfen und Checkboxen.
+// Ein kurzer Klick ohne Bewegung bleibt ein normaler Klick (z. B. Mod-Text an-/abwählen).
+
+const DRAG_THRESHOLD = 4;
+let press: { x: number; y: number; dragging: boolean } | null = null;
+let suppressClick = false;
+
+root.addEventListener('pointerdown', (e) => {
+  suppressClick = false;
+  if (e.button !== 0) return;
+  if ((e.target as HTMLElement).closest('input, button, select, textarea, a')) return;
+  press = { x: e.screenX, y: e.screenY, dragging: false };
+});
+window.addEventListener('pointermove', (e) => {
+  if (!press || press.dragging) return;
+  if (Math.hypot(e.screenX - press.x, e.screenY - press.y) >= DRAG_THRESHOLD) {
+    press.dragging = true;
+    suppressClick = true;
+    document.body.classList.add('dragging');
+    api.dragStart(); // ab hier folgt das Fenster dem Mauszeiger (vom Main-Prozess gesteuert)
+  }
+});
+window.addEventListener('pointerup', () => {
+  if (press?.dragging) api.dragEnd();
+  press = null;
+  document.body.classList.remove('dragging');
+});
+// Der Klick am Ende eines Ziehvorgangs soll nichts an-/abwählen.
+root.addEventListener(
+  'click',
+  (e) => {
+    if (!suppressClick) return;
+    suppressClick = false;
+    e.stopPropagation();
+    e.preventDefault();
+  },
+  true,
+);
 
 api.onResult((r) => {
   try {

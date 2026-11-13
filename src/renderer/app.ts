@@ -234,6 +234,10 @@ function renderSettings(s: AppState) {
     select.value = s.settings.league;
   }
 
+  const scale = $<HTMLInputElement>('scale');
+  if (document.activeElement !== scale) scale.value = String(Math.round(s.settings.overlayScale * 100));
+  $('scale-out').textContent = `${scale.value} %`;
+
   $('pos-out').textContent = s.overlayPositionSaved ? 'gemerkt' : 'am Mauszeiger';
   ($('pos-reset') as HTMLButtonElement).disabled = !s.overlayPositionSaved;
   $('log-path').textContent = s.logFile;
@@ -243,6 +247,12 @@ $<HTMLSelectElement>('league').addEventListener('change', (e) => {
   void api.saveSettings({ league: (e.target as HTMLSelectElement).value });
 });
 $('pos-reset').addEventListener('click', () => api.resetOverlayPosition());
+$<HTMLInputElement>('scale').addEventListener('input', (e) => {
+  $('scale-out').textContent = `${(e.target as HTMLInputElement).value} %`;
+});
+$<HTMLInputElement>('scale').addEventListener('change', (e) => {
+  void api.saveSettings({ overlayScale: Number((e.target as HTMLInputElement).value) / 100 });
+});
 $('overlay-test').addEventListener('click', () => api.testOverlay());
 
 function renderGpu(s: AppState) {

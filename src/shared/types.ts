@@ -34,7 +34,8 @@ export interface PriceMatch {
 export interface TradeMod {
   key: string;
   text: string;
-  kind: 'explicit' | 'implicit' | 'rune' | 'enchant' | 'crafted' | 'fractured' | 'desecrated';
+  /** pseudo = Summe (z. B. Resistenzen gesamt), weapon = DPS, misc = Item-Level/Sockel. */
+  kind: 'explicit' | 'implicit' | 'rune' | 'enchant' | 'crafted' | 'fractured' | 'desecrated' | 'pseudo' | 'weapon' | 'misc';
   /** null = nicht in der Trade-Suche gefunden (wird ausgegraut). */
   statId: string | null;
   value: number | null;
@@ -42,11 +43,17 @@ export interface TradeMod {
   enabled: boolean;
   /** Aus mehreren Zeilen mit derselben Stat-ID zusammengefasst. */
   combined?: boolean;
+  /** Kein Stat, sondern ein Item-Filter der Trade-Suche. */
+  filter?: 'dps' | 'pdps' | 'edps' | 'ilvl' | 'sockets';
+  /** Abgewählt, weil schon in einer Summe bzw. den DPS enthalten. */
+  coveredBy?: 'Summe' | 'DPS';
 }
 
 /** Auswahl aus dem Overlay für "Neu suchen". */
 export interface TradeSelection {
   enabled: string[];
+  /** Nur Sofortkauf-Angebote (Instant Buyout). */
+  instantOnly: boolean;
   /** Mod-Key → Mindestwert; null = ohne Mindestwert. Fehlende Keys behalten ihren Wert. */
   mins: Record<string, number | null>;
   useBaseType: boolean;
@@ -70,6 +77,7 @@ export interface TradeSearch {
   total: number;
   listings: Listing[];
   icon?: string;
+  suggestion?: import('./extras').PriceSuggestion | null;
 }
 
 export type PriceResult =
@@ -83,6 +91,7 @@ export type PriceResult =
       mods: TradeMod[];
       useBaseType: boolean;
       matchAll: boolean;
+      instantOnly: boolean;
       /** null = Suche lief nicht (z. B. Rate-Limit), dann steht der Grund in error. */
       search: TradeSearch | null;
       error?: string;
@@ -101,6 +110,8 @@ export interface Settings {
   hotkey: string;
   /** GPU-Beschleunigung für die App-Fenster (Standard aus, schont das Spiel). Wirkt nach Neustart. */
   gpuAcceleration: boolean;
+  /** Skalierung des Overlays (1 = 100 %). */
+  overlayScale: number;
 }
 
 export interface AppStatus {

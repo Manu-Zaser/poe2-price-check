@@ -14,7 +14,7 @@ html, body { background: transparent; overflow: hidden; user-select: none; }
   border: 1px solid var(--line-strong);
   animation: pop .16s ease-out;
 }
-.card-trade { width: 388px; }
+.card-trade { width: 400px; }
 @keyframes pop { from { opacity: 0; transform: translateY(6px) scale(.98); } }
 
 /* Kopf */
@@ -67,13 +67,16 @@ html, body { background: transparent; overflow: hidden; user-select: none; }
 
 /* ---------- Trade-Karte (Rares) ---------- */
 /* Kopfzeile = Griff zum Verschieben des Fensters */
-.head.drag { -webkit-app-region: drag; cursor: move; margin: -14px -16px 0; padding: 12px 10px 10px 16px; border-radius: 12px 12px 0 0; }
-.head.drag:hover { background: rgba(255,255,255,.025); }
+/* Verschieben: überall ziehen (außer auf Eingaben/Knöpfen), siehe overlay.ts */
+.card { cursor: grab; }
+body.dragging, body.dragging * { cursor: grabbing !important; }
+input, button, label { cursor: pointer; }
+.min-input { cursor: ns-resize; }
 .head .head-text { flex: 1; }
 .grip { color: var(--faint); font-size: 14px; letter-spacing: -1px; align-self: flex-start; margin-top: 3px; }
-.head.drag:hover .grip { color: var(--muted); }
+.card:hover .grip { color: var(--muted); }
 .close {
-  -webkit-app-region: no-drag; flex: none; align-self: flex-start;
+  flex: none; align-self: flex-start;
   width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px;
   background: none; color: var(--faint); font-size: 18px; line-height: 1; cursor: pointer;
 }
@@ -151,7 +154,7 @@ input[type="checkbox"]:disabled { opacity: .35; cursor: default; }
 .label-row { display: flex; justify-content: space-between; align-items: baseline; margin-top: 12px; }
 .label-row .label { margin-top: 0; }
 .hint { font-size: 10.5px; color: var(--faint); }
-.mod { cursor: default; }
+
 .mod:not(.mod-off) .mod-text { cursor: pointer; }
 .min-wrap { display: inline-flex; align-items: center; gap: 3px; }
 .min-prefix { color: var(--faint); font-size: 11.5px; }
@@ -169,3 +172,30 @@ input[type="checkbox"]:disabled { opacity: .35; cursor: default; }
 .results.stale { opacity: .45; }
 .status { flex: 1; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 .actions .btn-sm { flex: none; }
+
+/* ---------- Bereiche, Vorschlag, Filter ---------- */
+.card-trade { max-height: 100vh; overflow-y: auto; }
+.card-trade::-webkit-scrollbar { width: 8px; }
+.card-trade::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 8px; }
+.mod-section .label-row { margin-top: 12px; }
+.mod-weapon .mod-text, .mod-pseudo .mod-text { color: var(--text); font-weight: 600; }
+.mod-misc .mod-text { color: var(--muted); }
+.mod-kind.covered { background: none; border: 1px dashed var(--line-strong); }
+.toggles { margin-top: 10px; display: flex; flex-direction: column; gap: 2px; }
+.toggles .toggle { margin-top: 4px; }
+
+.suggest {
+  display: grid; grid-template-columns: auto auto 1fr auto; gap: 2px 8px; align-items: center;
+  margin-top: 10px; padding: 8px 10px; border-radius: 8px;
+  background: rgba(201,168,92,.08); border: 1px solid rgba(201,168,92,.25);
+}
+.suggest-label { font-size: 12px; color: var(--muted); }
+.suggest-value { font-variant-numeric: tabular-nums; color: var(--gold-bright); }
+.suggest-note { font: 11.5px Consolas, monospace; color: var(--muted); justify-self: start; }
+.suggest-hint { grid-column: 1 / -1; font-size: 10.5px; color: var(--faint); }
+.btn-xs {
+  padding: 3px 9px; border-radius: 6px; cursor: pointer; font-size: 11.5px; font-weight: 600;
+  background: var(--surface-2); border: 1px solid var(--line-strong); color: var(--text);
+}
+.btn-xs:hover { border-color: var(--gold-deep); background: var(--surface-3); }
+.btn-xs.done { color: var(--ok); border-color: rgba(127,176,105,.5); }

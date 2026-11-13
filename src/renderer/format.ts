@@ -6,7 +6,7 @@ function num(n: number, digits: number): string {
 
 /** Sinnvolle Nachkommastellen je nach Größenordnung. */
 export function amount(n: number): string {
-  if (n >= 100) return num(n, 0);
+  if (n >= 100 || Number.isInteger(n)) return num(n, 0);
   if (n >= 10) return num(n, 1);
   if (n >= 0.01) return num(n, 2);
   return num(n, 3);

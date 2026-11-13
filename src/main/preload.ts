@@ -18,9 +18,15 @@ const api = {
   // Overlay
   onResult: (cb: (r: PriceResult) => void) => ipcRenderer.on('result', (_e, r: PriceResult) => cb(r)),
   overlayReady: (size: { width: number; height: number }) => ipcRenderer.send('overlay:ready', size),
+  /** Größe hat sich geändert (Skalierung) – Overlay soll sich neu vermessen. */
+  onRemeasure: (cb: () => void) => ipcRenderer.on('remeasure', () => cb()),
+  dragStart: () => ipcRenderer.send('overlay:drag-start'),
+  dragEnd: () => ipcRenderer.send('overlay:drag-end'),
   hideOverlay: () => ipcRenderer.send('overlay:hide'),
   tradeSearch: (selection: TradeSelection) => ipcRenderer.send('trade:search', selection),
   openTrade: (url: string) => ipcRenderer.send('trade:open', url),
+  /** Preisvorschlag (z. B. "~b/o 55 exalted") in die Zwischenablage legen. */
+  copyText: (text: string) => ipcRenderer.send('clipboard:write', text),
   /** Overlay kurz fokussierbar machen, um einen Wert einzutippen. */
   focusOverlay: () => ipcRenderer.send('overlay:focus'),
 };

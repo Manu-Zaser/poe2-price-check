@@ -9,7 +9,7 @@ import { log, logFile } from './log';
 import { buildPriceIndex, CACHE_TTL_MS, fetchLeagues, lookupPrice, makeFetchJson, type PriceIndex } from './ninja';
 import { applySelection, loadStatIndex, newRareRequest, pendingRareResult, runRareSearch, type RareRequest } from './rare';
 import { TradeClient } from './trade';
-import { foregroundWindowTitle, sendCopy } from './win32';
+import { foregroundWindowTitle, isLeftButtonDown, sendCopy } from './win32';
 
 // ---------- Absturzschutz ----------
 // Ohne diese Handler zeigt Electron bei einem Fehler einen modalen Dialog. Der liegt hinter dem
@@ -51,6 +51,7 @@ const DEFAULT_CONFIG: Config = {
   gameWindowTitle: 'Path of Exile 2',
   contact: '',
   gpuAcceleration: false,
+  overlayScale: 1.15,
   overlayPosition: null,
 };
 
@@ -125,10 +126,10 @@ function status(): AppStatus {
 }
 
 function state(): AppState {
-  const { league, hotkey, gpuAcceleration } = config;
+  const { league, hotkey, gpuAcceleration, overlayScale } = config;
   return {
     status: status(),
-    settings: { league, hotkey, gpuAcceleration },
+    settings: { league, hotkey, gpuAcceleration, overlayScale },
     overlayPositionSaved: config.overlayPosition !== null,
     logFile: logFile(),
     leagues,
@@ -217,6 +218,11 @@ async function saveSettings(patch: Partial<Settings>): Promise<SaveResult> {
   }
 
   if (patch.gpuAcceleration !== undefined) config.gpuAcceleration = patch.gpuAcceleration; // wirkt nach Neustart
+
+  if (patch.overlayScale !== undefined && Number.isFinite(patch.overlayScale)) {
+    config.overlayScale = Math.min(1.6, Math.max(0.8, Math.round(patch.overlayScale * 100) / 100));
+    applyOverlayScale();
+  }
 
   if (patch.league !== undefined && patch.league !== config.league) {
     config.league = patch.league;
@@ -311,6 +317,7 @@ function createOverlayWindow() {
   overlayWin = win;
   win.setAlwaysOnTop(true, 'screen-saver');
   void win.loadFile(join(__dirname, 'overlay.html'));
+  win.webContents.on('did-finish-load', () => win.webContents.setZoomFactor(config.overlayScale));
 
   // Vom Nutzer verschoben (Ziehen an der Kopfzeile) → Position für künftige Preischecks merken.
   win.on('moved', () => {
@@ -364,12 +371,22 @@ function overlayOrigin(width: number, height: number): { x: number; y: number } 
   };
 }
 
+/** Größe neu anwenden: Zoom setzen und das Overlay sich neu vermessen lassen. */
+function applyOverlayScale() {
+  if (!alive(overlayWin)) return;
+  overlayWin.webContents.setZoomFactor(config.overlayScale);
+  overlayWin.webContents.send('remeasure');
+}
+
 function placeOverlay(size: { width: number; height: number }) {
   if (!alive(overlayWin)) return;
-  const width = Math.max(100, Math.ceil(Number(size.width) || OVERLAY_WIDTH));
-  const origin = overlayOrigin(width, Math.ceil(Number(size.height) || 200));
+  // Das Overlay misst in CSS-Pixeln; mit Zoom ist das Fenster entsprechend größer.
+  const scale = config.overlayScale;
+  const width = Math.max(100, Math.ceil((Number(size.width) || OVERLAY_WIDTH) * scale));
+  const rawHeight = Math.ceil((Number(size.height) || 200) * scale);
+  const origin = overlayOrigin(width, rawHeight);
   const area = screen.getDisplayNearestPoint(origin).workArea;
-  const height = Math.max(60, Math.min(Math.ceil(Number(size.height) || 200), area.height));
+  const height = Math.max(60, Math.min(rawHeight, area.height));
   // Unten nicht aus dem Bildschirm ragen lassen.
   const y = Math.max(area.y, Math.min(origin.y, area.y + area.height - height));
   placing = true;
@@ -379,6 +396,41 @@ function placeOverlay(size: { width: number; height: number }) {
     setTimeout(() => (placing = false), 50);
   }
   if (!overlayWin.isVisible()) overlayWin.showInactive(); // Spiel behält den Fokus
+}
+
+// ---------- Verschieben ----------
+
+let drag: { cursor: Electron.Point; bounds: Electron.Rectangle; timer: NodeJS.Timeout } | null = null;
+
+/**
+ * Overlay folgt dem Mauszeiger, bis die linke Maustaste losgelassen wird. Die Taste wird direkt
+ * abgefragt – so endet das Ziehen auch dann sauber, wenn die Maus beim Loslassen außerhalb liegt.
+ */
+function startDrag() {
+  if (!alive(overlayWin) || drag) return;
+  const win = overlayWin;
+  drag = {
+    cursor: screen.getCursorScreenPoint(),
+    bounds: win.getBounds(),
+    timer: setInterval(() => {
+      if (!drag || !alive(win) || !isLeftButtonDown()) return endDrag();
+      const p = screen.getCursorScreenPoint();
+      placing = true;
+      win.setPosition(drag.bounds.x + p.x - drag.cursor.x, drag.bounds.y + p.y - drag.cursor.y);
+      placing = false;
+    }, 16),
+  };
+}
+
+function endDrag() {
+  if (!drag) return;
+  clearInterval(drag.timer);
+  drag = null;
+  if (!alive(overlayWin)) return;
+  const { x, y } = overlayWin.getBounds();
+  config.overlayPosition = { x, y };
+  saveConfig(config);
+  pushState();
 }
 
 /** Das Overlay bleibt offen, bis man es schließt (× oder Esc). */
@@ -537,8 +589,15 @@ app.whenReady().then(() => {
     overlayWin.setFocusable(true);
     overlayWin.focus();
   }));
+  // Verschieben: Der Renderer meldet nur Start/Ende, die Bewegung folgt dem echten Mauszeiger.
+  ipcMain.on('overlay:drag-start', safe('overlay:drag-start', () => startDrag()));
+  ipcMain.on('overlay:drag-end', safe('overlay:drag-end', () => endDrag()));
   ipcMain.on('overlay:ready', safe('overlay:ready', (_e, size: { width: number; height: number }) => placeOverlay(size)));
   ipcMain.on('trade:search', safe('trade:search', (_e, selection: TradeSelection) => rareResearch(selection)));
+  ipcMain.on('clipboard:write', safe('clipboard:write', (_e, text: string) => {
+    // Nur kurze Preis-Notizen zulassen, nichts Beliebiges aus dem Renderer.
+    if (typeof text === 'string' && /^~(b\/o|price) [\d.]+ [a-z]+$/.test(text)) void clipboard.writeText(text);
+  }));
   ipcMain.on('trade:open', safe('trade:open', (_e, url: string) => {
     // Nur echte Trade-Links öffnen, nichts Beliebiges aus dem Renderer.
     if (typeof url === 'string' && url.startsWith('https://www.pathofexile.com/trade2/search/poe2/')) void shell.openExternal(url);

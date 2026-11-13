@@ -81,8 +81,14 @@
       </div>
 
       <div class="field">
+        <label for="scale">Overlay-Größe <output id="scale-out"></output></label>
+        <p class="help">Skaliert Schrift und Fenster des Preis-Overlays. Mit „Test-Overlay anzeigen“ weiter unten direkt prüfen.</p>
+        <input type="range" id="scale" min="80" max="160" step="5" />
+      </div>
+
+      <div class="field">
         <label>Overlay-Position <output id="pos-out"></output></label>
-        <p class="help">Das Preisfenster bleibt offen, bis du es mit × (oder Esc) schließt. Zum Verschieben an der Kopfzeile ziehen – die Stelle wird für alle weiteren Preischecks gemerkt.</p>
+        <p class="help">Das Preisfenster bleibt offen, bis du es mit × (oder Esc) schließt. Zum Verschieben an einer beliebigen freien Stelle im Overlay ziehen – die Stelle wird für alle weiteren Preischecks gemerkt.</p>
         <button class="btn" id="pos-reset">Position zurücksetzen (wieder neben dem Mauszeiger)</button>
       </div>
 

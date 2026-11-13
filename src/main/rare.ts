@@ -1,6 +1,7 @@
 /** Preischeck für Rares/Magic-Items über die Trade-Suche. */
 import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { buildSearchQuery, buildTradeMods, StatIndex, tradeSearchUrl, type StatsData } from '../shared/stats';
+import { suggestPrice } from '../shared/extras';
 import type { Listing, ParsedItem, PriceResult, TradeMod, TradeSearch, TradeSelection } from '../shared/types';
 import type { PriceIndex } from './ninja';
 import { RateLimitError } from './ratelimit';
@@ -48,22 +49,38 @@ export function toListing(f: FetchedListing, index: PriceIndex): Listing | null 
   };
 }
 
+/**
+ * GGG sortiert mit eigenen Wechselkursen (z. B. 1 Chaos vor 25 Exalted). Für die Anzeige
+ * nach dem Wert in Exalted laut poe.ninja sortieren; nicht umrechenbare Angebote ans Ende.
+ */
+export function sortByValue(listings: Listing[]): Listing[] {
+  return listings
+    .map((l, i) => ({ l, i }))
+    .sort((a, b) => {
+      const va = a.l.exalted ?? Infinity;
+      const vb = b.l.exalted ?? Infinity;
+      return va - vb || a.i - b.i;
+    })
+    .map(({ l }) => l);
+}
+
 export interface RareRequest {
   id: number;
   item: ParsedItem;
   mods: TradeMod[];
   useBaseType: boolean;
   matchAll: boolean;
+  instantOnly: boolean;
 }
 
 let nextRequestId = 1;
 
 export function newRareRequest(item: ParsedItem, stats: StatIndex): RareRequest {
-  return { id: nextRequestId++, item, mods: buildTradeMods(item, stats), useBaseType: true, matchAll: false };
+  return { id: nextRequestId++, item, mods: buildTradeMods(item, stats), useBaseType: true, matchAll: false, instantOnly: true };
 }
 
 function baseResult(index: PriceIndex, req: RareRequest) {
-  return { kind: 'trade' as const, requestId: req.id, item: req.item, league: index.league, mods: req.mods, useBaseType: req.useBaseType, matchAll: req.matchAll };
+  return { kind: 'trade' as const, requestId: req.id, item: req.item, league: index.league, mods: req.mods, useBaseType: req.useBaseType, matchAll: req.matchAll, instantOnly: req.instantOnly };
 }
 
 /** Zwischenstand fürs Overlay, solange die Trade-API noch antwortet. */
@@ -88,12 +105,12 @@ function cachedSearch(key: string): TradeSearch | undefined {
 export async function runRareSearch(client: TradeClient, index: PriceIndex, req: RareRequest): Promise<PriceResult> {
   const base = baseResult(index, req);
 
-  if (!req.mods.some((m) => m.enabled && m.statId)) {
+  if (!req.mods.some((m) => m.enabled && (m.statId || m.filter))) {
     return { ...base, search: null, error: 'Keine Mods ausgewählt. Mindestens einen Mod anhaken und neu suchen.' };
   }
 
   try {
-    const query = buildSearchQuery(req.item, req.mods, { useBaseType: req.useBaseType, matchAll: req.matchAll });
+    const query = buildSearchQuery(req.item, req.mods, { useBaseType: req.useBaseType, matchAll: req.matchAll, instantOnly: req.instantOnly });
     const cacheKey = `${index.league}
 ${JSON.stringify(query)}`;
     const cached = cachedSearch(cacheKey);
@@ -101,13 +118,14 @@ ${JSON.stringify(query)}`;
 
     const found = await client.search(index.league, query);
     const fetched = await client.fetchListings(found.id, found.result.slice(0, 10));
-    const listings = fetched.map((f) => toListing(f, index)).filter((l): l is Listing => l !== null);
+    const listings = sortByValue(fetched.map((f) => toListing(f, index)).filter((l): l is Listing => l !== null));
     const search: TradeSearch = {
       queryId: found.id,
       url: tradeSearchUrl(index.league, found.id),
       total: found.total,
       listings,
       icon: fetched.find((f) => f.item.icon)?.item.icon,
+      suggestion: suggestPrice(listings, index.exaltedPerDivine || null),
     };
     searchCache.set(cacheKey, { at: Date.now(), search });
     return { ...base, search };
@@ -122,7 +140,7 @@ export function applySelection(req: RareRequest, sel: TradeSelection): RareReque
   const enabled = new Set(sel.enabled);
   const mods = req.mods.map((m) => {
     const min = m.key in sel.mins ? (sel.mins[m.key] ?? undefined) : m.min;
-    return { ...m, enabled: m.statId !== null && enabled.has(m.key), min };
+    return { ...m, enabled: (m.statId !== null || !!m.filter) && enabled.has(m.key), min };
   });
-  return { ...req, mods, useBaseType: sel.useBaseType, matchAll: sel.matchAll };
+  return { ...req, mods, useBaseType: sel.useBaseType, matchAll: sel.matchAll, instantOnly: sel.instantOnly };
 }

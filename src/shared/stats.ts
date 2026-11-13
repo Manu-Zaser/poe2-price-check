@@ -3,6 +3,7 @@
  * und Aufbau der Suchanfrage.
  */
 import { extractModLines, toTemplate, type ModKind, type ModLine } from './mods';
+import { buildExtraMods } from './extras';
 import type { ParsedItem, TradeMod } from './types';
 
 export interface StatEntry { id: string; text: string; type: string }
@@ -100,7 +101,8 @@ export function buildTradeMods(item: ParsedItem, stats: StatIndex): TradeMod[] {
   const mods: TradeMod[] = [];
   const byStat = new Map<string, TradeMod>();
 
-  extractModLines(item, (l) => stats.isKnown(l)).forEach((line, i) => {
+  const lines = extractModLines(item, (l) => stats.isKnown(l));
+  lines.forEach((line, i) => {
     const m = stats.match(line, item);
     const value = m?.value ?? null;
 
@@ -129,7 +131,8 @@ export function buildTradeMods(item: ParsedItem, stats: StatIndex): TradeMod[] {
     if (m) byStat.set(m.id, mod);
     mods.push(mod);
   });
-  return mods;
+  // Summen, DPS, Item-Level, Sockel davor; abgedeckte Einzel-Mods werden dabei abgewählt.
+  return [...buildExtraMods(item, lines, mods), ...mods];
 }
 
 function amountText(n: number): string {
@@ -168,31 +171,40 @@ export interface SearchOptions {
   useBaseType: boolean;
   /** true = alle angehakten Mods müssen passen, sonst nur defaultMatchCount() davon. */
   matchAll: boolean;
-  /** Mindest-Item-Level (optional). */
-  minItemLevel?: number;
+  /** true = nur Sofortkauf (Instant Buyout), sonst auch "In Person". */
+  instantOnly?: boolean;
 }
 
 /** JSON für POST /api/trade2/search/poe2/{league}. */
 export function buildSearchQuery(item: ParsedItem, mods: TradeMod[], opts: SearchOptions) {
   const filters = mods
-    .filter((m) => m.enabled && m.statId)
+    .filter((m) => m.enabled && m.statId && !m.filter)
     .map((m) => ({ id: m.statId!, ...(m.min !== undefined ? { value: { min: m.min } } : {}) }));
 
   const typeFilters: Record<string, unknown> = { rarity: { option: 'nonunique' } };
   const category = categoryFor(item.itemClass);
   if (!opts.useBaseType && category) typeFilters.category = { option: category };
-  if (opts.minItemLevel) typeFilters.ilvl = { min: opts.minItemLevel };
+  const equipment: Record<string, { min: number }> = {};
+  for (const m of mods) {
+    if (!m.enabled || !m.filter || m.min === undefined) continue;
+    if (m.filter === 'ilvl') typeFilters.ilvl = { min: m.min };
+    else if (m.filter === 'sockets') equipment.rune_sockets = { min: m.min };
+    else equipment[m.filter] = { min: m.min };
+  }
 
   return {
     query: {
-      status: { option: 'available' },
+      status: { option: opts.instantOnly ? 'securable' : 'available' },
       ...(opts.useBaseType ? { type: item.baseType } : {}),
       stats: [
         opts.matchAll || filters.length <= 2
           ? { type: 'and', filters }
           : { type: 'count', filters, value: { min: defaultMatchCount(filters.length) } },
       ],
-      filters: { type_filters: { filters: typeFilters } },
+      filters: {
+        type_filters: { filters: typeFilters },
+        ...(Object.keys(equipment).length ? { equipment_filters: { filters: equipment } } : {}),
+      },
     },
     sort: { price: 'asc' },
   };
