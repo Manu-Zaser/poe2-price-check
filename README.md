@@ -89,7 +89,7 @@ Hotkey, League und Overlay-Dauer stellst du in der Oberfläche ein. Gespeichert 
 | `league` | `""` | leer = aktuelle Challenge-League |
 | `hotkey` | `Ctrl+D` | Electron-Accelerator |
 | `gameWindowTitle` | `Path of Exile 2` | Fenstertitel des Spiels |
-| `contact` | `""` | optionaler Kontakt im User-Agent |
+| `contact` | `""` | optionaler zusätzlicher Kontakt im User-Agent (die Projekt-URL wird immer mitgesendet) |
 | `overlayScale` | `1.15` | Größe des Overlays (0.8–1.6) |
 | `overlayPosition` | `null` | gemerkte Overlay-Position (`null` = am Mauszeiger) |
 | `gpuAcceleration` | `false` | GPU-Beschleunigung der App-Fenster |
@@ -117,3 +117,12 @@ Aufbau: `src/shared/parser.ts` (Item-Text), `src/shared/hotkey.ts` (Hotkey-Aufna
 `src/renderer/` (Hauptfenster `app.*`, Overlay `overlay.*`).
 
 Debug-Ausgabe der Ergebnisse: Umgebungsvariable `POE2PC_DEBUG=1` setzen.
+
+## Lizenz und Rechtliches
+
+Code unter [MIT-Lizenz](LICENSE).
+
+Path of Exile ist eine Marke von Grinding Gear Games. Dieses Projekt ist ein inoffizielles Fan-Tool, steht in keiner
+Verbindung zu GGG und wird von GGG weder unterstützt noch geprüft. Spielinhalte (Item-Texte, Stat-Bezeichnungen) gehören
+GGG; Preisdaten stammen von [poe.ninja](https://poe.ninja). Anfragen an pathofexile.com und poe.ninja tragen einen
+User-Agent mit der Projekt-URL, damit die Betreiber den Absender zuordnen können.

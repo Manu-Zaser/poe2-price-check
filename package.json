@@ -2,6 +2,12 @@
   "name": "poe2-pricecheck",
   "version": "0.1.0",
   "description": "Clipboard-Preischeck-Overlay für Path of Exile 2 (nur lesend, ein Tastendruck = eine Aktion)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Manu-Zaser/poe2-price-check.git"
+  },
+  "homepage": "https://github.com/Manu-Zaser/poe2-price-check",
   "private": true,
   "main": "dist/main.js",
   "type": "commonjs",
@@ -30,7 +36,7 @@
     "electron-winstaller": false
   },
   "productName": "PoE2 Price Check",
-  "author": "poe2-pricecheck",
+  "author": "Manu-Zaser",
   "build": {
     "appId": "local.poe2.pricecheck",
     "productName": "PoE2 Price Check",

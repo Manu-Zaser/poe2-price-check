@@ -113,8 +113,11 @@ let mainWin: BrowserWindow | null = null;
 let overlayWin: BrowserWindow | null = null;
 let quitting = false;
 
+/** Projektseite – damit GGG/poe.ninja den Absender des Tools zuordnen und kontaktieren können. */
+const PROJECT_URL = 'https://github.com/Manu-Zaser/poe2-price-check';
+
 const userAgent = () =>
-  `poe2-pricecheck/${app.getVersion()}` + (config.contact ? ` (contact: ${config.contact})` : ' (personal use)');
+  `poe2-pricecheck/${app.getVersion()} (+${PROJECT_URL}` + (config.contact ? `; contact: ${config.contact})` : ')');
 
 function status(): AppStatus {
   return {
