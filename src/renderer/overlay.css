@@ -1,0 +1,74 @@
+html, body { background: transparent; overflow: hidden; user-select: none; }
+#root { padding: 6px; }
+
+.card {
+  position: relative;
+  overflow: hidden;
+  padding: 14px 16px 12px;
+  border-radius: 12px;
+  background:
+    radial-gradient(140% 80% at 0% 0%, rgba(201,168,92,.10), transparent 55%),
+    rgba(16, 14, 12, .96);
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 0 0 1px rgba(0,0,0,.6), 0 12px 28px rgba(0,0,0,.55);
+  cursor: pointer;
+  animation: pop .16s ease-out;
+}
+@keyframes pop { from { opacity: 0; transform: translateY(6px) scale(.98); } }
+
+/* Kopf */
+.head { display: flex; gap: 12px; align-items: center; }
+.head-icon { width: 48px; height: 48px; }
+.head-text { min-width: 0; }
+.title { font: 600 16px/1.25 var(--font-display); }
+.sub { color: var(--muted); font-size: 12.5px; }
+.tags { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+.tag { font-size: 10.5px; padding: 1px 6px; border-radius: 4px; background: var(--surface-3); color: var(--muted); }
+.tag-bad { background: rgba(217,112,95,.15); color: #f0a597; }
+
+/* Preis */
+.price-block { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.price-big { display: flex; align-items: baseline; }
+.price-big .value { font: 700 30px/1 var(--font-display); color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.price-big .unit { font-size: 15px; margin-left: 6px; }
+.price-meta { display: flex; gap: 8px; align-items: center; margin-top: 6px; font-size: 12px; color: var(--muted); }
+.faint { color: var(--faint); }
+.trend { font-weight: 600; font-variant-numeric: tabular-nums; }
+.trend.up { color: var(--ok); }
+.trend.down { color: var(--bad); }
+.trend.flat { color: var(--muted); }
+
+.stack {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-top: 10px; padding: 7px 10px; border-radius: 8px;
+  background: var(--surface-2); font-size: 13px; color: var(--muted);
+}
+.stack strong { color: var(--gold-bright); font-variant-numeric: tabular-nums; }
+
+/* Kandidaten (unidentifiziert) */
+.label { margin-top: 12px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.cands { margin-top: 6px; display: flex; flex-direction: column; gap: 4px; }
+.cand { display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; align-items: center; padding: 4px 6px; border-radius: 6px; background: var(--surface); }
+.cand-icon { width: 28px; height: 28px; }
+.cand-name { color: var(--unique); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cand-price { color: var(--gold-bright); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.note { margin-top: 10px; color: var(--muted); font-size: 12.5px; }
+.foot { margin-top: 12px; font-size: 11px; color: var(--faint); }
+
+/* Fehler */
+.card-error { border-color: rgba(217,112,95,.45); }
+.msg { display: flex; gap: 10px; align-items: flex-start; color: var(--text); }
+.msg-icon {
+  flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  background: rgba(217,112,95,.18); color: var(--bad); font-weight: 700;
+}
+
+/* Countdown bis zum Ausblenden */
+.timer {
+  position: absolute; left: 0; bottom: 0; height: 2px; width: 100%;
+  background: linear-gradient(90deg, var(--gold-deep), var(--gold));
+  transform-origin: left;
+  animation: countdown linear forwards;
+}
+@keyframes countdown { to { transform: scaleX(0); } }

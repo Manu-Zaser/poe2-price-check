@@ -1,0 +1,9 @@
+Item Class: Body Armours
+Rarity: Unique
+Silk Robe
+--------
+Energy Shield: 98
+--------
+Item Level: 70
+--------
+Unidentified

@@ -1,0 +1,67 @@
+:root {
+  --bg: #100e0c;
+  --surface: #17140f;
+  --surface-2: #1e1a14;
+  --surface-3: #262119;
+  --line: #2f291f;
+  --line-strong: #453b2b;
+  --text: #ece4d4;
+  --muted: #9a8f7c;
+  --faint: #6c6354;
+  --gold: #c9a85c;
+  --gold-bright: #e8c97a;
+  --gold-deep: #8a6d33;
+  --ok: #7fb069;
+  --bad: #d9705f;
+  --unique: #d0803f;
+  --rare: #e3cf62;
+  --magic: #8c96ff;
+  --currency: #c8b78f;
+  --gem: #3fc6b3;
+  --div: #9fd3e6;
+  --ex: #e8c97a;
+  --radius: 10px;
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { font: 14px/1.45 var(--font); color: var(--text); -webkit-font-smoothing: antialiased; }
+button, select, input { font: inherit; color: inherit; }
+
+.rarity-unique { color: var(--unique); }
+.rarity-rare { color: var(--rare); }
+.rarity-magic { color: var(--magic); }
+.rarity-currency { color: var(--currency); }
+.rarity-gem { color: var(--gem); }
+
+.unit { font-size: 0.72em; font-weight: 600; letter-spacing: .04em; margin-left: 4px; }
+.unit-div { color: var(--div); }
+.unit-ex { color: var(--ex); }
+
+.icon-box { display: block; flex: none; overflow: hidden; }
+.icon-box img { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,.6)); }
+.icon-empty {
+  background: radial-gradient(circle at 50% 40%, var(--surface-3), var(--surface));
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+kbd.key {
+  display: inline-grid;
+  place-items: center;
+  min-width: 2.4em;
+  padding: 0 .7em;
+  font: 600 1em var(--font-display);
+  color: var(--text);
+  background: linear-gradient(180deg, #2c261d, #1c1813);
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 3px;
+  border-radius: 8px;
+  box-shadow: 0 1px 0 rgba(255,255,255,.05) inset, 0 2px 6px rgba(0,0,0,.35);
+}
+kbd.key.lg { height: 52px; font-size: 20px; min-width: 56px; }
+kbd.key.sm { height: 28px; font-size: 12px; border-radius: 6px; border-bottom-width: 2px; }
+.plus { color: var(--faint); font-weight: 600; margin: 0 8px; }

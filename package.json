@@ -1,0 +1,29 @@
+{
+  "name": "poe2-pricecheck",
+  "version": "0.1.0",
+  "description": "Clipboard-Preischeck-Overlay für Path of Exile 2 (nur lesend, ein Tastendruck = eine Aktion)",
+  "private": true,
+  "main": "dist/main.js",
+  "type": "commonjs",
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "node build.mjs && electron .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "electron": "^45.3.1",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  },
+  "dependencies": {
+    "koffi": "^3.3.8"
+  },
+  "allowScripts": {
+    "electron@45.3.1": true,
+    "esbuild@0.28.2": true,
+    "koffi@3.3.8": true
+  }
+}
