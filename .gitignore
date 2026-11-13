@@ -8,3 +8,6 @@ release/
 .vscode/
 .idea/
 Thumbs.db
+
+# Local helper scripts (e.g. rendering the README images) – not part of the repo
+scripts/

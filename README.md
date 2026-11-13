@@ -8,7 +8,15 @@ A small overlay for Path of Exile 2: hover over an item, press **Ctrl+D**, and t
 
 > This product isn't affiliated with or endorsed by Grinding Gear Games in any way.
 
-## Getting started
+## Download
+
+Get **`PoE2-Price-Check-<version>.exe`** from the [latest release](https://github.com/Manu-Zaser/poe2-price-check/releases/latest)
+and run it – a portable file, no installation needed. Settings are stored in `%APPDATA%\poe2-pricecheck`.
+
+The exe is not signed: on first launch Windows shows "Windows protected your PC" → "More info" → "Run anyway".
+Play PoE2 in **windowed / windowed fullscreen** mode, otherwise the overlay ends up behind the game.
+
+## Running from source
 
 ```bash
 npm install
@@ -148,9 +156,6 @@ Layout: `src/shared/parser.ts` (item text), `src/shared/hotkey.ts` (hotkey captu
 `src/renderer/` (main window `app.*`, overlay `overlay.*`).
 
 Debug output of the results: set the environment variable `POE2PC_DEBUG=1`.
-
-The README images (`docs/images/`) are rendered from the real overlay with sample data:
-`npm run readme-images` (invisible window, no input to anything).
 
 ## License and legal
 
