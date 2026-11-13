@@ -9,11 +9,13 @@
     "build": "node build.mjs",
     "start": "node build.mjs && electron .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "dist": "node build.mjs && electron-builder --win portable --x64"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
     "electron": "^45.3.1",
+    "electron-builder": "^26.18.0",
     "esbuild": "^0.28.2",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
@@ -24,6 +26,39 @@
   "allowScripts": {
     "electron@45.3.1": true,
     "esbuild@0.28.2": true,
-    "koffi@3.3.8": true
+    "koffi@3.3.8": true,
+    "electron-winstaller": false
+  },
+  "productName": "PoE2 Price Check",
+  "author": "poe2-pricecheck",
+  "build": {
+    "appId": "local.poe2.pricecheck",
+    "productName": "PoE2 Price Check",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "!dist/**/*.map",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/koffi/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "portable": {
+      "artifactName": "PoE2-Price-Check-${version}.exe"
+    }
   }
 }

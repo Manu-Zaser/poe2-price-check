@@ -11,6 +11,10 @@ import { applySelection, loadStatIndex, newRareRequest, pendingRareResult, runRa
 import { TradeClient } from './trade';
 import { foregroundWindowTitle, isLeftButtonDown, sendCopy } from './win32';
 
+// Fester Datenordner (%APPDATA%\poe2-pricecheck), egal ob per `npm start` oder als gebaute .exe
+// mit anderem Produktnamen gestartet – so bleiben Einstellungen und Overlay-Position erhalten.
+app.setPath('userData', join(app.getPath('appData'), 'poe2-pricecheck'));
+
 // ---------- Absturzschutz ----------
 // Ohne diese Handler zeigt Electron bei einem Fehler einen modalen Dialog. Der liegt hinter dem
 // Spiel, blockiert die App – und das Overlay bleibt als unsichtbares Fenster über dem Spiel hängen.

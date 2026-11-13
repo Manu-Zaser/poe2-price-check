@@ -94,6 +94,16 @@ Hotkey, League und Overlay-Dauer stellst du in der Oberfläche ein. Gespeichert 
 | `overlayPosition` | `null` | gemerkte Overlay-Position (`null` = am Mauszeiger) |
 | `gpuAcceleration` | `false` | GPU-Beschleunigung der App-Fenster |
 
+## exe bauen
+
+```bash
+npm run dist
+```
+
+Erzeugt `release/PoE2-Price-Check-<version>.exe` – eine portable Datei ohne Installation, die man weitergeben kann.
+Die exe ist nicht signiert: Windows zeigt beim ersten Start „Der Computer wurde durch Windows geschützt“ →
+„Weitere Informationen“ → „Trotzdem ausführen“. Einstellungen liegen in `%APPDATA%\poe2-pricecheck`.
+
 ## Entwicklung
 
 ```bash
