@@ -44,6 +44,8 @@ export interface PriceIndex {
   exaltedPerDivine: number;
   /** Kleingeschriebener Name → Preis. */
   currency: Map<string, PriceMatch>;
+  /** Währungs-ID der Trade-API (z. B. "exalted") → Wert in Divine. */
+  currencyById: Map<string, number>;
   /** Kleingeschriebener Unique-Name → Varianten (verschiedene Basistypen). */
   uniquesByName: Map<string, PriceMatch[]>;
   /** Kleingeschriebener Basistyp → Uniques auf dieser Basis (für unidentifizierte Items). */
@@ -73,7 +75,24 @@ function push<K, V>(map: Map<K, V[]>, key: K, value: V) {
   else map.set(key, [value]);
 }
 
-/** Lädt alle Kurse einer League. Anfragen laufen nacheinander, um poe.ninja zu schonen. */
+/** Höchstens so viele Anfragen gleichzeitig – schnell genug, ohne poe.ninja zu belasten. */
+const CONCURRENCY = 4;
+
+/** Wie Promise.all, aber mit begrenzter Parallelität; Reihenfolge der Ergebnisse bleibt erhalten. */
+export async function mapLimit<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+/** Lädt alle Kurse einer League (23 Anfragen, max. 4 parallel). */
 export async function buildPriceIndex(fetchJson: FetchJson, league: string): Promise<PriceIndex> {
   const q = (type: string) => `league=${encodeURIComponent(league)}&type=${type}`;
   const index: PriceIndex = {
@@ -81,16 +100,27 @@ export async function buildPriceIndex(fetchJson: FetchJson, league: string): Pro
     fetchedAt: Date.now(),
     exaltedPerDivine: 0,
     currency: new Map(),
+    currencyById: new Map(),
     uniquesByName: new Map(),
     uniquesByBase: new Map(),
   };
 
-  for (const type of EXCHANGE_TYPES) {
-    const data = (await fetchJson(`${BASE}/exchange/current/overview?${q(type)}`)) as ExchangeResponse;
+  const urls = [
+    ...EXCHANGE_TYPES.map((t) => `${BASE}/exchange/current/overview?${q(t)}`),
+    ...UNIQUE_TYPES.map((t) => `${BASE}/stash/current/item/overview?${q(t)}`),
+  ];
+  const responses = await mapLimit(urls, CONCURRENCY, fetchJson);
+  const exchange = responses.slice(0, EXCHANGE_TYPES.length) as ExchangeResponse[];
+  const uniques = responses.slice(EXCHANGE_TYPES.length) as UniqueResponse[];
+
+  // "Currency" zuerst auswerten: liefert den Divine→Exalted-Kurs für alles andere.
+  for (const [i, type] of EXCHANGE_TYPES.entries()) {
+    const data = exchange[i];
     const rate = data.core?.rates?.exalted ?? 0;
     if (type === 'Currency' && rate > 0) index.exaltedPerDivine = rate;
     const items = new Map(data.items.map((i) => [i.id, i]));
     for (const line of data.lines) {
+      index.currencyById.set(line.id, line.primaryValue);
       const meta = items.get(line.id);
       if (!meta) continue;
       const name = meta.name;
@@ -104,8 +134,7 @@ export async function buildPriceIndex(fetchJson: FetchJson, league: string): Pro
     }
   }
 
-  for (const type of UNIQUE_TYPES) {
-    const data = (await fetchJson(`${BASE}/stash/current/item/overview?${q(type)}`)) as UniqueResponse;
+  for (const data of uniques) {
     const rate = data.core?.rates?.exalted ?? index.exaltedPerDivine;
     for (const line of data.lines) {
       const match: PriceMatch = {

@@ -198,3 +198,10 @@ main::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 10p
   footer { flex-direction: column; }
   .disclaimer { text-align: left; }
 }
+
+.field > .check { display: flex; justify-content: flex-start; align-items: center; gap: 10px; cursor: pointer; font-weight: 400; }
+.check input { width: 16px; height: 16px; accent-color: var(--gold); cursor: pointer; }
+#gpu-restart { margin-top: 10px; }
+
+code { font: 11.5px Consolas, monospace; color: var(--text); background: var(--surface-2); padding: 1px 5px; border-radius: 4px; word-break: break-all; }
+.btn:disabled { opacity: .45; cursor: default; }

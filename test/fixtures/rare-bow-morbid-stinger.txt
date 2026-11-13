@@ -1,0 +1,29 @@
+Item Class: Bows
+Rarity: Rare
+Morbid Stinger
+Obliterator Bow
+--------
+Quality: +20% (augmented)
+Physical Damage: 242-449 (augmented)
+Cold Damage: 37-59 (cold)
+Critical Hit Chance: 8.44% (augmented)
+Attacks per Second: 1.10
+--------
+Requires: Level 78, 163 Dex
+--------
+Sockets: S S
+--------
+Item Level: 80
+--------
+18% increased Physical Damage (rune)
+Bow Attacks fire an additional Arrow (rune)
+--------
+50% reduced Projectile Range
+--------
+144(135-154)% increased Physical Damage
+Adds 37(31-38) to 59(47-59) Cold Damage
+63(55-64)% increased Physical Damage
++142(124-149) to Accuracy Rating
+Leeches 7.05(7-7.9)% of Physical Damage as Life
++19(17-19)% to Critical Damage Bonus
++3.44(3.11-3.8)% to Critical Hit Chance

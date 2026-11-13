@@ -1,7 +1,7 @@
 import { acceleratorFromEvent, formatHotkey, validateHotkey } from '../shared/hotkey';
 import type { AppState, HistoryEntry } from '../shared/types';
 import { api, el, itemIcon } from './api';
-import { amount, clock, priceParts, timeAgo } from './format';
+import { amount, clock, currencyShort, priceParts, timeAgo } from './format';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -168,6 +168,14 @@ function historyRow(h: HistoryEntry): HTMLElement {
   }
   const item = r.item;
   const name = el('span', `h-name rarity-${item.rarity.toLowerCase()}`, item.name ?? item.baseType);
+  if (r.kind === 'trade') {
+    const cheapest = r.search?.listings[0];
+    const sub = r.search ? `${item.baseType} · ${r.search.total} Treffer` : (r.error ?? item.baseType);
+    const price = cheapest
+      ? el('div', 'h-price', el('span', 'h-value', `ab ${amount(cheapest.amount)}`), el('span', `unit unit-${currencyShort(cheapest.currency).toLowerCase()}`, currencyShort(cheapest.currency)))
+      : el('div', 'h-price muted', '–');
+    return el('li', `h-row ${cheapest ? '' : 'muted'}`, itemIcon(r.search?.icon, 'h-icon'), el('div', 'h-main', name, el('span', 'h-sub', sub)), price, time);
+  }
   if (r.kind !== 'priced') {
     return el('li', 'h-row muted', itemIcon(undefined, 'h-icon'), el('div', 'h-main', name, el('span', 'h-sub', r.reason)), time);
   }
@@ -179,9 +187,24 @@ function historyRow(h: HistoryEntry): HTMLElement {
   return el('li', 'h-row', itemIcon(m.icon, 'h-icon'), el('div', 'h-main', name, el('span', 'h-sub', sub)), price, time);
 }
 
+let historySig = '';
+
+/** Nur neu aufbauen, wenn sich der Verlauf geändert hat (spart Layout und Bild-Dekodierung). */
 function renderHistory(s: AppState) {
+  const sig = s.history.map((h) => h.id).join(',');
+  if (sig === historySig) return;
+  historySig = sig;
   const list = $('history');
-  list.replaceChildren(...s.history.map(historyRow));
+  const known = new Map([...list.children].map((li) => [(li as HTMLElement).dataset.id, li]));
+  list.replaceChildren(
+    ...s.history.map((h) => {
+      const existing = known.get(String(h.id));
+      if (existing) return existing;
+      const row = historyRow(h);
+      row.dataset.id = String(h.id);
+      return row;
+    }),
+  );
   $('history-empty').hidden = s.history.length > 0;
   $('history-clear').hidden = s.history.length === 0;
 }
@@ -191,9 +214,14 @@ $('history-clear').addEventListener('click', () => api.clearHistory());
 
 // ---------- Einstellungen ----------
 
+let leagueSig = '';
+let gpuAtStart: boolean | null = null;
+
 function renderSettings(s: AppState) {
   const select = $<HTMLSelectElement>('league');
-  if (document.activeElement !== select) {
+  const sig = s.leagues.join('|') + '#' + s.settings.league;
+  if (document.activeElement !== select && sig !== leagueSig) {
+    leagueSig = sig;
     const options = [el('option', '', `Automatisch${s.leagues[0] ? ` (${s.leagues[0]})` : ''}`)];
     options[0].value = '';
     const names = s.leagues.includes(s.settings.league) || !s.settings.league ? s.leagues : [s.settings.league, ...s.leagues];
@@ -206,21 +234,26 @@ function renderSettings(s: AppState) {
     select.value = s.settings.league;
   }
 
-  const range = $<HTMLInputElement>('seconds');
-  if (document.activeElement !== range) range.value = String(s.settings.overlaySeconds);
-  $('seconds-out').textContent = `${range.value} s`;
+  $('pos-out').textContent = s.overlayPositionSaved ? 'gemerkt' : 'am Mauszeiger';
+  ($('pos-reset') as HTMLButtonElement).disabled = !s.overlayPositionSaved;
+  $('log-path').textContent = s.logFile;
 }
 
 $<HTMLSelectElement>('league').addEventListener('change', (e) => {
   void api.saveSettings({ league: (e.target as HTMLSelectElement).value });
 });
-$<HTMLInputElement>('seconds').addEventListener('input', (e) => {
-  $('seconds-out').textContent = `${(e.target as HTMLInputElement).value} s`;
-});
-$<HTMLInputElement>('seconds').addEventListener('change', (e) => {
-  void api.saveSettings({ overlaySeconds: Number((e.target as HTMLInputElement).value) });
-});
+$('pos-reset').addEventListener('click', () => api.resetOverlayPosition());
 $('overlay-test').addEventListener('click', () => api.testOverlay());
+
+function renderGpu(s: AppState) {
+  gpuAtStart ??= s.settings.gpuAcceleration;
+  $<HTMLInputElement>('gpu').checked = s.settings.gpuAcceleration;
+  $('gpu-restart').hidden = s.settings.gpuAcceleration === gpuAtStart;
+}
+$<HTMLInputElement>('gpu').addEventListener('change', (e) => {
+  void api.saveSettings({ gpuAcceleration: (e.target as HTMLInputElement).checked });
+});
+$('gpu-restart').addEventListener('click', () => api.restartApp());
 
 // ---------- Start ----------
 
@@ -230,6 +263,7 @@ function render(s: AppState) {
   renderStats(s);
   renderHistory(s);
   renderSettings(s);
+  renderGpu(s);
 }
 
 api.onState(render);

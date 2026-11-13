@@ -81,14 +81,21 @@
       </div>
 
       <div class="field">
-        <label for="seconds">Overlay-Anzeigedauer <output id="seconds-out"></output></label>
-        <p class="help">So lange bleibt das Preisfenster sichtbar. Ein Klick darauf schließt es sofort.</p>
-        <input type="range" id="seconds" min="3" max="30" step="1" />
+        <label>Overlay-Position <output id="pos-out"></output></label>
+        <p class="help">Das Preisfenster bleibt offen, bis du es mit × (oder Esc) schließt. Zum Verschieben an der Kopfzeile ziehen – die Stelle wird für alle weiteren Preischecks gemerkt.</p>
+        <button class="btn" id="pos-reset">Position zurücksetzen (wieder neben dem Mauszeiger)</button>
+      </div>
+
+      <div class="field">
+        <label for="gpu">Leistung</label>
+        <p class="help">Ohne GPU-Beschleunigung zeichnet das Tool seine Fenster auf der CPU und nimmt dem Spiel keine Grafikleistung weg. Empfohlen: aus.</p>
+        <label class="check"><input type="checkbox" id="gpu" /> <span>GPU-Beschleunigung verwenden</span></label>
+        <button class="btn" id="gpu-restart" hidden>Jetzt neu starten, um es zu übernehmen</button>
       </div>
 
       <div class="field">
         <label>Overlay testen</label>
-        <p class="help">Zeigt eine Divine Orb neben dem Mauszeiger, um Aussehen und Position zu prüfen.</p>
+        <p class="help">Zeigt eine Divine Orb an der Overlay-Position, um Aussehen und Platz zu prüfen.</p>
         <button class="btn" id="overlay-test">Test-Overlay anzeigen</button>
       </div>
 
@@ -97,7 +104,8 @@
         <ul class="notes">
           <li>Spiel im Modus <b>Fenster</b> oder <b>Vollbild-Fenster</b> spielen, sonst liegt das Overlay unter dem Spiel.</li>
           <li>Pro Hotkey-Druck wird genau ein Strg+C ans Spiel gesendet, sonst nichts.</li>
-          <li>Rares und Magic-Items werden noch nicht bewertet (Trade-Suche folgt).</li>
+          <li>Rares und Magic-Items werden über die offizielle Trade-Seite gesucht: pro Preischeck eine Suche, Limits von GGG werden eingehalten.</li>
+          <li>Fehler werden protokolliert in <code id="log-path"></code></li>
         </ul>
       </div>
     </section>

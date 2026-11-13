@@ -41,6 +41,30 @@ export function timeAgo(ms: number, now = Date.now()): string {
   return `vor ${h} Std.`;
 }
 
+const CURRENCY_SHORT: Record<string, string> = { exalted: 'Ex', divine: 'Div', chaos: 'Chaos', alch: 'Alch', annul: 'Annul', regal: 'Regal', vaal: 'Vaal' };
+
+/** Trade-Währungs-ID → Kurzname. */
+export function currencyShort(id: string): string {
+  return CURRENCY_SHORT[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
+}
+
+/** "vor 3 Std." für ISO-Zeitstempel; Tage ab 48 Std. */
+export function ageFromIso(iso: string, now = Date.now()): string {
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) return '';
+  const h = (now - ms) / 3_600_000;
+  if (h >= 36) return `vor ${Math.round(h / 24)} T.`;
+  return timeAgo(ms, now);
+}
+
 export function clock(ms: number): string {
   return new Date(ms).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+}
+
+/** "" → null (ohne Minimum), ungültig → NaN. Komma und Punkt als Dezimaltrenner. */
+export function parseMin(text: string): number | null {
+  const t = text.trim().replace(',', '.');
+  if (t === '') return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : NaN;
 }

@@ -1,19 +1,20 @@
 html, body { background: transparent; overflow: hidden; user-select: none; }
-#root { padding: 6px; }
+/* Kein durchsichtiger Rand: auch transparente Fensterbereiche würden Klicks im Spiel abfangen. */
+#root { padding: 0; display: inline-block; }
 
 .card {
   position: relative;
   overflow: hidden;
+  width: 328px;
   padding: 14px 16px 12px;
   border-radius: 12px;
   background:
     radial-gradient(140% 80% at 0% 0%, rgba(201,168,92,.10), transparent 55%),
     rgba(16, 14, 12, .96);
   border: 1px solid var(--line-strong);
-  box-shadow: 0 0 0 1px rgba(0,0,0,.6), 0 12px 28px rgba(0,0,0,.55);
-  cursor: pointer;
   animation: pop .16s ease-out;
 }
+.card-trade { width: 388px; }
 @keyframes pop { from { opacity: 0; transform: translateY(6px) scale(.98); } }
 
 /* Kopf */
@@ -64,11 +65,107 @@ html, body { background: transparent; overflow: hidden; user-select: none; }
   background: rgba(217,112,95,.18); color: var(--bad); font-weight: 700;
 }
 
-/* Countdown bis zum Ausblenden */
-.timer {
-  position: absolute; left: 0; bottom: 0; height: 2px; width: 100%;
-  background: linear-gradient(90deg, var(--gold-deep), var(--gold));
-  transform-origin: left;
-  animation: countdown linear forwards;
+/* ---------- Trade-Karte (Rares) ---------- */
+/* Kopfzeile = Griff zum Verschieben des Fensters */
+.head.drag { -webkit-app-region: drag; cursor: move; margin: -14px -16px 0; padding: 12px 10px 10px 16px; border-radius: 12px 12px 0 0; }
+.head.drag:hover { background: rgba(255,255,255,.025); }
+.head .head-text { flex: 1; }
+.grip { color: var(--faint); font-size: 14px; letter-spacing: -1px; align-self: flex-start; margin-top: 3px; }
+.head.drag:hover .grip { color: var(--muted); }
+.close {
+  -webkit-app-region: no-drag; flex: none; align-self: flex-start;
+  width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px;
+  background: none; color: var(--faint); font-size: 18px; line-height: 1; cursor: pointer;
 }
-@keyframes countdown { to { transform: scaleX(0); } }
+.close:hover { color: var(--text); background: var(--surface-3); }
+
+.price-big .prefix { font-size: 13px; color: var(--muted); margin-right: 6px; font-weight: 600; }
+
+.lsts { margin-top: 8px; display: flex; flex-direction: column; }
+.lst {
+  display: grid; grid-template-columns: 1fr auto 64px; gap: 10px; align-items: baseline;
+  padding: 4px 2px; border-top: 1px solid var(--line); font-size: 12.5px;
+}
+.lst:first-child { border-top: 0; }
+.lst-price { font-weight: 600; font-variant-numeric: tabular-nums; }
+.lst-price .unit { margin-left: 2px; }
+.lst-ilvl { color: var(--muted); font-variant-numeric: tabular-nums; }
+.lst-age { color: var(--faint); text-align: right; font-size: 11.5px; }
+
+.loading { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12.5px; }
+.spinner {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--surface-3); border-top-color: var(--gold);
+  animation: spin .8s steps(8) infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.skeleton .bar { display: block; height: 9px; border-radius: 4px; background: var(--surface-3); }
+.skeleton .w40 { width: 40%; } .skeleton .w20 { width: 34px; } .skeleton .w30 { width: 44px; justify-self: end; }
+
+.empty-result { margin-top: 12px; padding: 10px; border-radius: 8px; background: var(--surface-2); color: var(--muted); font-size: 12.5px; }
+.alert { margin-top: 10px; padding: 8px 10px; border-radius: 8px; font-size: 12.5px; background: rgba(217,112,95,.12); border: 1px solid rgba(217,112,95,.35); color: #f0a597; }
+
+.mods { margin-top: 6px; display: flex; flex-direction: column; gap: 2px; }
+.mod {
+  display: grid; grid-template-columns: 16px 1fr auto; gap: 8px; align-items: center;
+  padding: 4px 6px; border-radius: 6px; font-size: 12.5px; cursor: pointer;
+}
+.mod:hover { background: var(--surface-2); }
+.mod-text { color: #a9a3ff; }
+.mod-implicit .mod-text, .mod-enchant .mod-text { color: #b8c4d6; }
+.mod-rune .mod-text { color: #d6c08f; }
+.mod-fractured .mod-text { color: #c9b27a; }
+.mod-desecrated .mod-text { color: #d58a8a; }
+.mod-off { cursor: default; }
+.mod-off .mod-text { color: var(--faint); text-decoration: line-through; text-decoration-color: rgba(255,255,255,.15); }
+.mod-side { display: flex; gap: 6px; align-items: center; white-space: nowrap; }
+.mod-kind { font-size: 10px; padding: 0 5px; border-radius: 4px; background: var(--surface-3); color: var(--muted); }
+.mod-min { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+input[type="checkbox"] {
+  appearance: none; margin: 0; width: 15px; height: 15px; border-radius: 4px; cursor: pointer;
+  border: 1px solid var(--line-strong); background: var(--surface-2); display: grid; place-items: center;
+}
+input[type="checkbox"]:checked { background: var(--gold); border-color: var(--gold); }
+input[type="checkbox"]:checked::after {
+  content: ""; width: 4px; height: 8px; margin-top: -2px;
+  border: solid #1a140a; border-width: 0 2px 2px 0; transform: rotate(45deg);
+}
+input[type="checkbox"]:disabled { opacity: .35; cursor: default; }
+
+.toggle { display: flex; gap: 8px; align-items: center; margin-top: 8px; padding: 0 6px; font-size: 12.5px; color: var(--muted); cursor: pointer; }
+
+.actions { display: flex; gap: 8px; margin-top: 12px; }
+.btn-sm {
+  flex: 1; padding: 7px 10px; border-radius: 7px; cursor: pointer; font-size: 12.5px; font-weight: 600;
+  background: var(--surface-2); border: 1px solid var(--line-strong); color: var(--text);
+}
+.btn-sm:hover:not(:disabled) { border-color: var(--gold-deep); background: var(--surface-3); }
+/* "Suchen" leuchtet erst auf, wenn sich seit der letzten Suche etwas geändert hat. */
+.btn-sm.primary { flex: 1 !important; border-color: var(--gold-deep); color: var(--gold-bright); }
+.btn-sm.primary.dirty { background: linear-gradient(180deg, #d9b768, #b08f45); border-color: #c9a85c; color: #1a140a; }
+.btn-sm.primary.dirty:hover { background: linear-gradient(180deg, #e8c97a, #c09d50); }
+.btn-sm:disabled { opacity: .45; cursor: default; }
+
+/* ---------- Interaktive Mod-Liste ---------- */
+.label-row { display: flex; justify-content: space-between; align-items: baseline; margin-top: 12px; }
+.label-row .label { margin-top: 0; }
+.hint { font-size: 10.5px; color: var(--faint); }
+.mod { cursor: default; }
+.mod:not(.mod-off) .mod-text { cursor: pointer; }
+.min-wrap { display: inline-flex; align-items: center; gap: 3px; }
+.min-prefix { color: var(--faint); font-size: 11.5px; }
+.min-input {
+  width: 46px; padding: 2px 5px; border-radius: 5px; text-align: right;
+  font: 600 12px var(--font); font-variant-numeric: tabular-nums; color: var(--text);
+  background: var(--surface-2); border: 1px solid var(--line-strong); outline: none; cursor: ns-resize;
+}
+.min-input:hover { border-color: var(--gold-deep); }
+.min-input:focus { border-color: var(--gold); background: var(--surface-3); cursor: text; }
+.min-input.invalid { border-color: var(--bad); color: #f0a597; }
+.min-input::placeholder { color: var(--faint); font-weight: 400; }
+
+/* Kein Übergang: jede Zwischenstufe wäre ein zusätzliches Bild über dem Spiel. */
+.results.stale { opacity: .45; }
+.status { flex: 1; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.actions .btn-sm { flex: none; }
