@@ -16,7 +16,8 @@
     "start": "node build.mjs && electron .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "dist": "node build.mjs && electron-builder --win portable --x64"
+    "dist": "node build.mjs && electron-builder --win portable --x64",
+    "readme-images": "node build.mjs && electron scripts/readme-images.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

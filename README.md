@@ -2,6 +2,10 @@
 
 A small overlay for Path of Exile 2: hover over an item, press **Ctrl+D**, and the price appears next to the cursor.
 
+<p align="center">
+  <img src="docs/images/overlay-rare.png" width="420" alt="Price check overlay for a rare bow: filter chips, stats with min/max, typical price, sell suggestion and the cheapest listings">
+</p>
+
 > This product isn't affiliated with or endorsed by Grinding Gear Games in any way.
 
 ## Getting started
@@ -24,6 +28,9 @@ Play PoE2 in **windowed / windowed fullscreen** mode, otherwise the overlay ends
 - **Identified uniques** → trade search by name and base, with the same mod list as for rares. By default no mod is
   ticked, so you see the cheapest copies; tick a roll to search for copies that are at least as good as yours (all
   ticked rolls must match). The poe.ninja price ("any rolls") stays visible for comparison.
+
+  <img src="docs/images/overlay-unique.png" width="360" alt="Price check overlay for a unique: rolls with min/max, listings and the poe.ninja price for comparison">
+
 - **Normal (white) items** such as crafting bases or waystones → trade search like rares, with defaults for bases:
   only white items of **this base type** with at least **your item level**, same corrupted state. Implicits and
   defences are listed but not ticked. Anything poe.ninja knows (e.g. currency) is still priced via poe.ninja.
@@ -141,6 +148,9 @@ Layout: `src/shared/parser.ts` (item text), `src/shared/hotkey.ts` (hotkey captu
 `src/renderer/` (main window `app.*`, overlay `overlay.*`).
 
 Debug output of the results: set the environment variable `POE2PC_DEBUG=1`.
+
+The README images (`docs/images/`) are rendered from the real overlay with sample data:
+`npm run readme-images` (invisible window, no input to anything).
 
 ## License and legal
 
