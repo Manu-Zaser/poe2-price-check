@@ -36,18 +36,18 @@ describe('validateHotkey', () => {
   });
 
   it('lehnt Kollisionen und Einzeltasten ab', () => {
-    expect(validateHotkey('Ctrl+C')).toMatch(/Spiel/);
-    expect(validateHotkey('CommandOrControl+V')).toMatch(/Spiel/);
-    expect(validateHotkey('D')).toMatch(/Strg oder Alt/);
-    expect(validateHotkey('Shift+D')).toMatch(/Strg oder Alt/);
+    expect(validateHotkey('Ctrl+C')).toMatch(/game/);
+    expect(validateHotkey('CommandOrControl+V')).toMatch(/game/);
+    expect(validateHotkey('D')).toMatch(/Ctrl or Alt/);
+    expect(validateHotkey('Shift+D')).toMatch(/Ctrl or Alt/);
     expect(validateHotkey('Super+D')).toMatch(/Windows/);
   });
 });
 
 describe('formatHotkey', () => {
-  it('beschriftet Tasten auf Deutsch', () => {
-    expect(formatHotkey('CommandOrControl+D')).toEqual(['Strg', 'D']);
-    expect(formatHotkey('Ctrl+Shift+Space')).toEqual(['Strg', 'Umschalt', 'Leertaste']);
+  it('beschriftet Tasten auf Englisch', () => {
+    expect(formatHotkey('CommandOrControl+D')).toEqual(['Ctrl', 'D']);
+    expect(formatHotkey('Ctrl+Shift+Space')).toEqual(['Ctrl', 'Shift', 'Space']);
     expect(formatHotkey('Alt+num4')).toEqual(['Alt', 'Num 4']);
   });
 });

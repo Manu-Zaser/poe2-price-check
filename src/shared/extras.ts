@@ -10,13 +10,13 @@ import type { Listing, ParsedItem, TradeMod } from './types';
 interface PseudoDef { id: string; label: (v: string) => string }
 
 export const PSEUDO: Record<string, PseudoDef> = {
-  ele: { id: 'pseudo.pseudo_total_elemental_resistance', label: (v) => `+${v}% Elementar-Resistenzen gesamt` },
-  chaos: { id: 'pseudo.pseudo_total_chaos_resistance', label: (v) => `+${v}% Chaos-Resistenz gesamt` },
-  life: { id: 'pseudo.pseudo_total_life', label: (v) => `+${v} Leben gesamt` },
-  mana: { id: 'pseudo.pseudo_total_mana', label: (v) => `+${v} Mana gesamt` },
-  str: { id: 'pseudo.pseudo_total_strength', label: (v) => `+${v} Stärke gesamt` },
-  dex: { id: 'pseudo.pseudo_total_dexterity', label: (v) => `+${v} Geschick gesamt` },
-  int: { id: 'pseudo.pseudo_total_intelligence', label: (v) => `+${v} Intelligenz gesamt` },
+  ele: { id: 'pseudo.pseudo_total_elemental_resistance', label: (v) => `+${v}% total Elemental Resistance` },
+  chaos: { id: 'pseudo.pseudo_total_chaos_resistance', label: (v) => `+${v}% total Chaos Resistance` },
+  life: { id: 'pseudo.pseudo_total_life', label: (v) => `+${v} total maximum Life` },
+  mana: { id: 'pseudo.pseudo_total_mana', label: (v) => `+${v} total maximum Mana` },
+  str: { id: 'pseudo.pseudo_total_strength', label: (v) => `+${v} total Strength` },
+  dex: { id: 'pseudo.pseudo_total_dexterity', label: (v) => `+${v} total Dexterity` },
+  int: { id: 'pseudo.pseudo_total_intelligence', label: (v) => `+${v} total Intelligence` },
 };
 
 const ELEMENTS = new Set(['Fire', 'Cold', 'Lightning']);
@@ -88,6 +88,53 @@ export function coveredByDps(template: string): boolean {
   return DPS_MODS.some((re) => re.test(template));
 }
 
+// ---------- Verteidigung (Rüstungen) ----------
+
+export interface DefenceStats { ar: number; ev: number; es: number; block: number; spirit: number }
+
+const DEFENCE_LINES: [keyof DefenceStats, RegExp][] = [
+  ['ar', /^Armour:\s*([\d.]+)/i],
+  ['ev', /^Evasion Rating:\s*([\d.]+)/i],
+  ['es', /^Energy Shield:\s*([\d.]+)/i],
+  ['block', /^Block chance:\s*([\d.]+)/i],
+  ['spirit', /^Spirit:\s*([\d.]+)/i],
+];
+
+/**
+ * Liest die Verteidigungswerte aus dem Eigenschaften-Block (wie im Spiel angezeigt, inkl. Qualität
+ * und lokaler Mods). Nur Abschnitte vor "Requires"/"Item Level" – damit Mod-Zeilen nicht mitzählen.
+ */
+export function defenceStats(item: ParsedItem): DefenceStats | null {
+  const props: string[] = [];
+  for (const section of item.sections) {
+    if (section.some((l) => /^(Requires|Item Level|Sockets):/i.test(l))) break;
+    props.push(...section);
+  }
+  const d: DefenceStats = { ar: 0, ev: 0, es: 0, block: 0, spirit: 0 };
+  let found = false;
+  for (const line of props) {
+    for (const [key, re] of DEFENCE_LINES) {
+      const m = line.match(re);
+      if (m) {
+        d[key] = Number(m[1]);
+        found = true;
+      }
+    }
+  }
+  return found ? d : null;
+}
+
+/** Lokale Verteidigungs-Mods, die in den angezeigten Werten schon enthalten sind. */
+const DEFENCE_MODS = [
+  /^# to (Armour|Evasion Rating|maximum Energy Shield)$/,
+  /^#% increased (Armour|Evasion( Rating)?|Energy Shield)( and (Armour|Evasion( Rating)?|Energy Shield))?$/,
+  /^#% increased Armour, Evasion and Energy Shield$/,
+];
+
+export function coveredByDefence(template: string): boolean {
+  return DEFENCE_MODS.some((re) => re.test(template));
+}
+
 // ---------- Zusatz-Kriterien ----------
 
 /** Mindestwert = eigener Wert, auf eine Nachkommastelle abgerundet. */
@@ -124,9 +171,9 @@ export function buildExtraMods(item: ParsedItem, lines: ModLine[], mods: TradeMo
   if (w && w.dps > 0) {
     const main = w.pdps >= w.dps * 0.6 ? 'pdps' : w.edps >= w.dps * 0.6 ? 'edps' : 'dps';
     const rows: [TradeMod['filter'], string, number][] = [
-      ['dps', `${w.dps} DPS gesamt`, w.dps],
-      ['pdps', `${w.pdps} physische DPS`, w.pdps],
-      ['edps', `${w.edps} elementare DPS`, w.edps],
+      ['dps', `${w.dps} total DPS`, w.dps],
+      ['pdps', `${w.pdps} physical DPS`, w.pdps],
+      ['edps', `${w.edps} elemental DPS`, w.edps],
     ];
     for (const [filter, text, value] of rows) {
       if (value <= 0) continue;
@@ -134,26 +181,48 @@ export function buildExtraMods(item: ParsedItem, lines: ModLine[], mods: TradeMo
     }
   }
 
+  // Verteidigung: Rüstung/Ausweichen/Energieschild an, Block/Spirit zur Auswahl
+  const d = w ? null : defenceStats(item);
+  if (d) {
+    const rows: [NonNullable<TradeMod['filter']>, string, number, boolean][] = [
+      ['ar', `${d.ar} Armour`, d.ar, true],
+      ['ev', `${d.ev} Evasion Rating`, d.ev, true],
+      ['es', `${d.es} Energy Shield`, d.es, true],
+      ['block', `${d.block}% Block chance`, d.block, false],
+      ['spirit', `${d.spirit} Spirit`, d.spirit, false],
+    ];
+    for (const [filter, text, value, on] of rows) {
+      if (value <= 0) continue;
+      extras.push({ key: `d:${filter}`, text, kind: 'defence', statId: null, filter, value, min: minOf(value), enabled: on });
+    }
+  }
+
+  // Corrupted-Status: standardmäßig nur Items mit demselben Status suchen (wichtig für den Preis)
+  extras.push({ key: 'f:corrupted', text: item.corrupted ? 'Corrupted' : 'Not corrupted', kind: 'misc', statId: null, filter: 'corrupted', value: null, enabled: true });
+
   // Item-Level und Rune-Sockel (standardmäßig aus)
   if (item.itemLevel) {
-    extras.push({ key: 'f:ilvl', text: 'Item-Level', kind: 'misc', statId: null, filter: 'ilvl', value: item.itemLevel, min: item.itemLevel, enabled: false });
+    extras.push({ key: 'f:ilvl', text: 'Item level', kind: 'misc', statId: null, filter: 'ilvl', value: item.itemLevel, min: item.itemLevel, enabled: false });
   }
   const sockets = item.sections.flat().find((l) => /^Sockets:/i.test(l));
   const socketCount = sockets ? (sockets.slice(sockets.indexOf(':') + 1).match(/\bS\b/g) ?? []).length : 0;
   if (socketCount > 0) {
-    extras.push({ key: 'f:sockets', text: 'Rune-Sockel', kind: 'misc', statId: null, filter: 'sockets', value: socketCount, min: socketCount, enabled: false });
+    extras.push({ key: 'f:sockets', text: 'Rune sockets', kind: 'misc', statId: null, filter: 'sockets', value: socketCount, min: socketCount, enabled: false });
   }
 
   // Abgedeckte Einzel-Mods abwählen (bleiben sichtbar und können wieder angehakt werden).
   const dpsActive = extras.some((e) => e.kind === 'weapon' && e.enabled);
+  const defenceActive = extras.some((e) => e.kind === 'defence' && e.enabled);
   for (const m of mods) {
-    if (m.kind === 'pseudo' || m.kind === 'weapon' || m.kind === 'misc') continue;
+    if (m.kind === 'pseudo' || m.kind === 'weapon' || m.kind === 'defence' || m.kind === 'misc') continue;
     const line = lines.find((l) => l.text === m.text);
     const template = line?.template ?? '';
     const byPseudo = coveredTexts.has(m.text) && pseudoContributions(template).some((c) => totals.get(c.key)! > 0);
-    if (byPseudo || (dpsActive && (coveredByDps(template) || (m.combined && /increased Physical Damage$/.test(m.text))))) {
+    const byDps = dpsActive && (coveredByDps(template) || (m.combined && /increased Physical Damage$/.test(m.text)));
+    const byDefence = defenceActive && coveredByDefence(template);
+    if (byPseudo || byDps || byDefence) {
       m.enabled = false;
-      m.coveredBy = byPseudo ? 'Summe' : 'DPS';
+      m.coveredBy = byPseudo ? 'total' : byDps ? 'DPS' : 'defence';
     }
   }
   return extras;

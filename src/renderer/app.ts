@@ -34,15 +34,15 @@ let recording = false;
 
 function liveModifiers(e: KeyboardEvent): string[] {
   const mods: string[] = [];
-  if (e.ctrlKey) mods.push('Strg');
+  if (e.ctrlKey) mods.push('Ctrl');
   if (e.altKey) mods.push('Alt');
-  if (e.shiftKey) mods.push('Umschalt');
+  if (e.shiftKey) mods.push('Shift');
   return mods;
 }
 
 function showRecordingKeys(labels: string[]) {
   const box = $('hotkey-keys');
-  if (labels.length === 0) box.replaceChildren(el('span', 'keys-placeholder', 'Neue Tastenkombination drücken …'));
+  if (labels.length === 0) box.replaceChildren(el('span', 'keys-placeholder', 'Press the new key combination …'));
   else box.replaceChildren(...keycaps([...labels, '…']));
 }
 
@@ -56,11 +56,11 @@ function startRecording() {
   setError('');
   $('hotkey-card').classList.add('recording');
   $('hotkey-pill').className = 'pill rec';
-  $('hotkey-pill').querySelector('span')!.textContent = 'Aufnahme';
+  $('hotkey-pill').querySelector('span')!.textContent = 'Recording';
   $('hotkey-change').hidden = true;
   $('hotkey-reset').hidden = true;
   $('hotkey-cancel').hidden = false;
-  $('hotkey-hint').textContent = 'Strg oder Alt plus eine Taste – oder eine F-Taste allein. Esc bricht ab.';
+  $('hotkey-hint').textContent = 'Ctrl or Alt plus a key – or an F-key on its own. Esc cancels.';
   showRecordingKeys([]);
   window.addEventListener('keydown', onRecordKey, true);
   window.addEventListener('keyup', onRecordKeyUp, true);
@@ -139,10 +139,10 @@ function renderHotkey(s: AppState) {
   if (recording) return;
   $('hotkey-keys').replaceChildren(...keycaps(formatHotkey(s.settings.hotkey)));
   $('empty-keys').replaceChildren(...keycaps(formatHotkey(s.settings.hotkey), 'sm'));
-  $('hotkey-hint').textContent = 'Maus im Spiel über ein Item halten und Hotkey drücken.';
+  $('hotkey-hint').textContent = 'Hover over an item in game and press the hotkey.';
   const pill = $('hotkey-pill');
   pill.className = `pill ${s.status.hotkeyActive ? 'ok' : 'bad'}`;
-  pill.querySelector('span')!.textContent = s.status.hotkeyActive ? 'Aktiv' : 'Nicht aktiv';
+  pill.querySelector('span')!.textContent = s.status.hotkeyActive ? 'Active' : 'Inactive';
   $('hotkey-reset').hidden = s.settings.hotkey === 'Ctrl+D' || s.settings.hotkey === 'CommandOrControl+D';
 }
 
@@ -151,8 +151,8 @@ function renderStats(s: AppState) {
   $('stat-league').textContent = st.league ?? '–';
   $('stat-rate').textContent = st.exaltedPerDivine ? `${amount(st.exaltedPerDivine)} Ex` : '–';
   $('stat-count').textContent = st.fetchedAt ? `${st.currencyCount + st.uniqueCount}` : '–';
-  $('stat-count').title = `${st.currencyCount} Währungen & Co., ${st.uniqueCount} Uniques`;
-  $('stat-age').textContent = st.loading ? 'lädt …' : st.fetchedAt ? timeAgo(st.fetchedAt) : 'nicht geladen';
+  $('stat-count').title = `${st.currencyCount} currency & co., ${st.uniqueCount} uniques`;
+  $('stat-age').textContent = st.loading ? 'loading …' : st.fetchedAt ? timeAgo(st.fetchedAt) : 'not loaded';
   $('refresh').classList.toggle('spinning', st.loading);
 
   const banner = $('error-banner');
@@ -164,15 +164,15 @@ function historyRow(h: HistoryEntry): HTMLElement {
   const r = h.result;
   const time = el('span', 'h-time', clock(h.time));
   if (r.kind === 'error') {
-    return el('li', 'h-row muted', itemIcon(undefined, 'h-icon'), el('div', 'h-main', el('span', 'h-name', 'Fehler'), el('span', 'h-sub', r.message)), time);
+    return el('li', 'h-row muted', itemIcon(undefined, 'h-icon'), el('div', 'h-main', el('span', 'h-name', 'Error'), el('span', 'h-sub', r.message)), time);
   }
   const item = r.item;
   const name = el('span', `h-name rarity-${item.rarity.toLowerCase()}`, item.name ?? item.baseType);
   if (r.kind === 'trade') {
     const cheapest = r.search?.listings[0];
-    const sub = r.search ? `${item.baseType} · ${r.search.total} Treffer` : (r.error ?? item.baseType);
+    const sub = r.search ? `${item.baseType} · ${r.search.total} results` : (r.error ?? item.baseType);
     const price = cheapest
-      ? el('div', 'h-price', el('span', 'h-value', `ab ${amount(cheapest.amount)}`), el('span', `unit unit-${currencyShort(cheapest.currency).toLowerCase()}`, currencyShort(cheapest.currency)))
+      ? el('div', 'h-price', el('span', 'h-value', `from ${amount(cheapest.amount)}`), el('span', `unit unit-${currencyShort(cheapest.currency).toLowerCase()}`, currencyShort(cheapest.currency)))
       : el('div', 'h-price muted', '–');
     return el('li', `h-row ${cheapest ? '' : 'muted'}`, itemIcon(r.search?.icon, 'h-icon'), el('div', 'h-main', name, el('span', 'h-sub', sub)), price, time);
   }
@@ -181,9 +181,9 @@ function historyRow(h: HistoryEntry): HTMLElement {
   }
   const m = r.matches[0];
   const unidentified = !item.name && r.matches.length > 1;
-  const sub = unidentified ? `Unidentifiziert · ${r.matches.length} Möglichkeiten` : item.name ? item.baseType : item.itemClass;
+  const sub = unidentified ? `Unidentified · ${r.matches.length} candidates` : item.name ? item.baseType : item.itemClass;
   const p = priceParts(m.divine, m.exalted);
-  const price = el('div', 'h-price', el('span', 'h-value', unidentified ? `bis ${p.value}` : p.value), el('span', `unit unit-${p.unit.toLowerCase()}`, p.unit));
+  const price = el('div', 'h-price', el('span', 'h-value', unidentified ? `up to ${p.value}` : p.value), el('span', `unit unit-${p.unit.toLowerCase()}`, p.unit));
   return el('li', 'h-row', itemIcon(m.icon, 'h-icon'), el('div', 'h-main', name, el('span', 'h-sub', sub)), price, time);
 }
 
@@ -222,7 +222,7 @@ function renderSettings(s: AppState) {
   const sig = s.leagues.join('|') + '#' + s.settings.league;
   if (document.activeElement !== select && sig !== leagueSig) {
     leagueSig = sig;
-    const options = [el('option', '', `Automatisch${s.leagues[0] ? ` (${s.leagues[0]})` : ''}`)];
+    const options = [el('option', '', `Automatic${s.leagues[0] ? ` (${s.leagues[0]})` : ''}`)];
     options[0].value = '';
     const names = s.leagues.includes(s.settings.league) || !s.settings.league ? s.leagues : [s.settings.league, ...s.leagues];
     for (const l of names) {
@@ -236,9 +236,9 @@ function renderSettings(s: AppState) {
 
   const scale = $<HTMLInputElement>('scale');
   if (document.activeElement !== scale) scale.value = String(Math.round(s.settings.overlayScale * 100));
-  $('scale-out').textContent = `${scale.value} %`;
+  $('scale-out').textContent = `${scale.value}%`;
 
-  $('pos-out').textContent = s.overlayPositionSaved ? 'gemerkt' : 'am Mauszeiger';
+  $('pos-out').textContent = s.overlayPositionSaved ? 'saved' : 'at mouse cursor';
   ($('pos-reset') as HTMLButtonElement).disabled = !s.overlayPositionSaved;
   $('log-path').textContent = s.logFile;
 }
@@ -248,7 +248,7 @@ $<HTMLSelectElement>('league').addEventListener('change', (e) => {
 });
 $('pos-reset').addEventListener('click', () => api.resetOverlayPosition());
 $<HTMLInputElement>('scale').addEventListener('input', (e) => {
-  $('scale-out').textContent = `${(e.target as HTMLInputElement).value} %`;
+  $('scale-out').textContent = `${(e.target as HTMLInputElement).value}%`;
 });
 $<HTMLInputElement>('scale').addEventListener('change', (e) => {
   void api.saveSettings({ overlayScale: Number((e.target as HTMLInputElement).value) / 100 });

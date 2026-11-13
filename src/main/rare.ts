@@ -106,7 +106,7 @@ export async function runRareSearch(client: TradeClient, index: PriceIndex, req:
   const base = baseResult(index, req);
 
   if (!req.mods.some((m) => m.enabled && (m.statId || m.filter))) {
-    return { ...base, search: null, error: 'Keine Mods ausgewählt. Mindestens einen Mod anhaken und neu suchen.' };
+    return { ...base, search: null, error: 'No mods selected. Tick at least one mod and search again.' };
   }
 
   try {

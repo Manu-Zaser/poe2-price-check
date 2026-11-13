@@ -4,6 +4,8 @@ Kleines Overlay für Path of Exile 2: Maus über ein Item, **Strg+D** drücken, 
 
 > This product isn't affiliated with or endorsed by Grinding Gear Games in any way.
 
+Die Oberfläche des Tools (Hauptfenster, Overlay, Meldungen) ist auf Englisch.
+
 ## Starten
 
 ```bash
@@ -35,7 +37,10 @@ PoE2 im Modus **Fenster/Vollbild-Fenster** spielen, sonst liegt das Overlay unte
     (z. B. „+45 % Elementar-Resistenzen gesamt“), die Einzel-Mods dafür abgewählt – findet viel mehr vergleichbare Items.
   - **Waffen:** DPS, physische und elementare DPS werden aus den Eigenschaften berechnet; standardmäßig wird nach dem
     dominanten Wert gesucht, die darin enthaltenen Schadens-Mods werden abgewählt.
-  - **Filter:** Item-Level und Rune-Sockel (optional), **Nur Sofortkauf** (Standard an, nur aktuelle Instant-Buyout-Preise).
+  - **Rüstungen:** Rüstung, Ausweichen und Energieschild (wie angezeigt, inkl. Qualität) werden als Mindestwerte
+    gesucht, Block und Spirit optional; die darin enthaltenen lokalen Verteidigungs-Mods werden abgewählt.
+  - **Filter:** Corrupted-Status (Standard an: nur Items mit demselben Status), Item-Level und Rune-Sockel (optional),
+    **Nur Sofortkauf** (Standard an, nur aktuelle Instant-Buyout-Preise).
   - **Verkaufspreis-Vorschlag:** knapp unter dem Median der 3 günstigsten Angebote, mit Button zum Kopieren als
     Stash-Notiz (z. B. `~b/o 58 exalted`).
   - Angebote werden nach ihrem Wert laut poe.ninja sortiert (GGG sortiert mit eigenen Kursen).

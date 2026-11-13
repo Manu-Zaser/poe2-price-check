@@ -1,7 +1,7 @@
 import type { PriceMatch } from '../shared/types';
 
 function num(n: number, digits: number): string {
-  return n.toLocaleString('de-DE', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  return n.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 
 /** Sinnvolle Nachkommastellen je nach Größenordnung. */
@@ -34,11 +34,11 @@ export function priceText(m: Pick<PriceMatch, 'divine' | 'exalted'>, factor = 1)
 
 export function timeAgo(ms: number, now = Date.now()): string {
   const s = Math.max(0, Math.round((now - ms) / 1000));
-  if (s < 45) return 'gerade eben';
+  if (s < 45) return 'just now';
   const m = Math.round(s / 60);
-  if (m < 60) return `vor ${m} Min.`;
+  if (m < 60) return `${m} min ago`;
   const h = Math.round(m / 60);
-  return `vor ${h} Std.`;
+  return `${h} h ago`;
 }
 
 const CURRENCY_SHORT: Record<string, string> = { exalted: 'Ex', divine: 'Div', chaos: 'Chaos', alch: 'Alch', annul: 'Annul', regal: 'Regal', vaal: 'Vaal' };
@@ -53,12 +53,12 @@ export function ageFromIso(iso: string, now = Date.now()): string {
   const ms = Date.parse(iso);
   if (Number.isNaN(ms)) return '';
   const h = (now - ms) / 3_600_000;
-  if (h >= 36) return `vor ${Math.round(h / 24)} T.`;
+  if (h >= 36) return `${Math.round(h / 24)} d ago`;
   return timeAgo(ms, now);
 }
 
 export function clock(ms: number): string {
-  return new Date(ms).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  return new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
 
 /** "" → null (ohne Minimum), ungültig → NaN. Komma und Punkt als Dezimaltrenner. */

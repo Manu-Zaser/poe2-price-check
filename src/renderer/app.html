@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; img-src 'self' https://web.poecdn.com" />
-  <title>PoE2 Preischeck</title>
+  <title>PoE2 Price Check</title>
   <link rel="stylesheet" href="base.css" />
   <link rel="stylesheet" href="app.css" />
 </head>
@@ -14,10 +14,10 @@
       <path d="M16 8 L22 11.5 V20.5 L16 24 L10 20.5 V11.5 Z" fill="currentColor" opacity=".25" />
       <circle cx="16" cy="16" r="3.2" fill="currentColor" />
     </svg>
-    <span class="app-name">PoE2 <b>Preischeck</b></span>
+    <span class="app-name">PoE2 <b>Price Check</b></span>
     <nav class="tabs" role="tablist">
-      <button class="tab active" role="tab" data-tab="overview">Übersicht</button>
-      <button class="tab" role="tab" data-tab="settings">Einstellungen</button>
+      <button class="tab active" role="tab" data-tab="overview">Overview</button>
+      <button class="tab" role="tab" data-tab="settings">Settings</button>
     </nav>
   </header>
 
@@ -26,16 +26,16 @@
     <section class="page active" data-page="overview">
       <div class="hotkey-card" id="hotkey-card">
         <div class="hotkey-head">
-          <span class="eyebrow">Preischeck-Hotkey</span>
+          <span class="eyebrow">Price check hotkey</span>
           <span class="pill" id="hotkey-pill"><i></i><span></span></span>
         </div>
         <div class="keys" id="hotkey-keys"></div>
-        <p class="hotkey-hint" id="hotkey-hint">Maus im Spiel über ein Item halten und Hotkey drücken.</p>
+        <p class="hotkey-hint" id="hotkey-hint">Hover over an item in game and press the hotkey.</p>
         <p class="hotkey-error" id="hotkey-error" role="alert"></p>
         <div class="hotkey-actions">
-          <button class="btn primary" id="hotkey-change">Hotkey ändern</button>
-          <button class="btn ghost" id="hotkey-cancel" hidden>Abbrechen</button>
-          <button class="btn ghost" id="hotkey-reset">Standard (Strg + D)</button>
+          <button class="btn primary" id="hotkey-change">Change hotkey</button>
+          <button class="btn ghost" id="hotkey-cancel" hidden>Cancel</button>
+          <button class="btn ghost" id="hotkey-reset">Default (Ctrl + D)</button>
         </div>
       </div>
 
@@ -49,11 +49,11 @@
           <strong id="stat-rate">–</strong>
         </div>
         <div class="stat">
-          <span class="eyebrow">Kurse</span>
+          <span class="eyebrow">Prices</span>
           <strong id="stat-count">–</strong>
           <span class="stat-sub">
             <span id="stat-age">–</span>
-            <button class="icon-btn" id="refresh" title="Kurse neu laden" aria-label="Kurse neu laden">
+            <button class="icon-btn" id="refresh" title="Reload prices" aria-label="Reload prices">
               <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
           </span>
@@ -62,13 +62,13 @@
       <p class="banner error" id="error-banner" hidden></p>
 
       <div class="section-head">
-        <h2>Verlauf</h2>
-        <button class="link" id="history-clear" hidden>Leeren</button>
+        <h2>History</h2>
+        <button class="link" id="history-clear" hidden>Clear</button>
       </div>
       <ul class="history" id="history"></ul>
       <div class="empty" id="history-empty">
         <div class="empty-keys" id="empty-keys"></div>
-        <p>Noch keine Preischecks.<br />Im Spiel über ein Item hovern und den Hotkey drücken.</p>
+        <p>No price checks yet.<br />Hover over an item in game and press the hotkey.</p>
       </div>
     </section>
 
@@ -76,49 +76,49 @@
     <section class="page" data-page="settings">
       <div class="field">
         <label for="league">League</label>
-        <p class="help">Aus welcher League die Preise von poe.ninja kommen.</p>
+        <p class="help">Which league the poe.ninja prices come from.</p>
         <div class="select-wrap"><select id="league"></select></div>
       </div>
 
       <div class="field">
-        <label for="scale">Overlay-Größe <output id="scale-out"></output></label>
-        <p class="help">Skaliert Schrift und Fenster des Preis-Overlays. Mit „Test-Overlay anzeigen“ weiter unten direkt prüfen.</p>
+        <label for="scale">Overlay size <output id="scale-out"></output></label>
+        <p class="help">Scales text and window of the price overlay. Check it right away with "Show test overlay" below.</p>
         <input type="range" id="scale" min="80" max="160" step="5" />
       </div>
 
       <div class="field">
-        <label>Overlay-Position <output id="pos-out"></output></label>
-        <p class="help">Das Preisfenster bleibt offen, bis du es mit × (oder Esc) schließt. Zum Verschieben an einer beliebigen freien Stelle im Overlay ziehen – die Stelle wird für alle weiteren Preischecks gemerkt.</p>
-        <button class="btn" id="pos-reset">Position zurücksetzen (wieder neben dem Mauszeiger)</button>
+        <label>Overlay position <output id="pos-out"></output></label>
+        <p class="help">The price window stays open until you close it with × (or Esc). Drag it anywhere on the overlay to move it – the position is remembered for all further price checks.</p>
+        <button class="btn" id="pos-reset">Reset position (back next to the mouse cursor)</button>
       </div>
 
       <div class="field">
-        <label for="gpu">Leistung</label>
-        <p class="help">Ohne GPU-Beschleunigung zeichnet das Tool seine Fenster auf der CPU und nimmt dem Spiel keine Grafikleistung weg. Empfohlen: aus.</p>
-        <label class="check"><input type="checkbox" id="gpu" /> <span>GPU-Beschleunigung verwenden</span></label>
-        <button class="btn" id="gpu-restart" hidden>Jetzt neu starten, um es zu übernehmen</button>
+        <label for="gpu">Performance</label>
+        <p class="help">Without GPU acceleration the tool draws its windows on the CPU and takes no graphics power away from the game. Recommended: off.</p>
+        <label class="check"><input type="checkbox" id="gpu" /> <span>Use GPU acceleration</span></label>
+        <button class="btn" id="gpu-restart" hidden>Restart now to apply</button>
       </div>
 
       <div class="field">
-        <label>Overlay testen</label>
-        <p class="help">Zeigt eine Divine Orb an der Overlay-Position, um Aussehen und Platz zu prüfen.</p>
-        <button class="btn" id="overlay-test">Test-Overlay anzeigen</button>
+        <label>Test overlay</label>
+        <p class="help">Shows a Divine Orb at the overlay position to check its look and placement.</p>
+        <button class="btn" id="overlay-test">Show test overlay</button>
       </div>
 
       <div class="field">
-        <label>Hinweise</label>
+        <label>Notes</label>
         <ul class="notes">
-          <li>Spiel im Modus <b>Fenster</b> oder <b>Vollbild-Fenster</b> spielen, sonst liegt das Overlay unter dem Spiel.</li>
-          <li>Pro Hotkey-Druck wird genau ein Strg+Alt+C (erweitertes Kopieren, liefert die Tiers) ans Spiel gesendet, sonst nichts.</li>
-          <li>Rares und Magic-Items werden über die offizielle Trade-Seite gesucht: pro Preischeck eine Suche, Limits von GGG werden eingehalten.</li>
-          <li>Fehler werden protokolliert in <code id="log-path"></code></li>
+          <li>Play in <b>windowed</b> or <b>windowed fullscreen</b> mode, otherwise the overlay ends up behind the game.</li>
+          <li>Each hotkey press sends exactly one Ctrl+Alt+C (advanced copy, provides the tiers) to the game, nothing else.</li>
+          <li>Rares and magic items are searched on the official trade site: one search per price check, GGG's rate limits are respected.</li>
+          <li>Errors are logged to <code id="log-path"></code></li>
         </ul>
       </div>
     </section>
   </main>
 
   <footer>
-    <span>Preise von <a href="https://poe.ninja/poe2/economy" target="_blank">poe.ninja</a></span>
+    <span>Prices from <a href="https://poe.ninja/poe2/economy" target="_blank">poe.ninja</a></span>
     <span class="disclaimer">This product isn't affiliated with or endorsed by Grinding Gear Games in any way.</span>
   </footer>
 

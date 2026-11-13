@@ -194,8 +194,14 @@ export function buildSearchQuery(item: ParsedItem, mods: TradeMod[], opts: Searc
   const category = categoryFor(item.itemClass);
   if (!opts.useBaseType && category) typeFilters.category = { option: category };
   const equipment: Record<string, { min: number }> = {};
+  const misc: Record<string, { option: string }> = {};
   for (const m of mods) {
-    if (!m.enabled || !m.filter || m.min === undefined) continue;
+    if (!m.enabled || !m.filter) continue;
+    if (m.filter === 'corrupted') {
+      misc.corrupted = { option: item.corrupted ? 'true' : 'false' };
+      continue;
+    }
+    if (m.min === undefined) continue;
     if (m.filter === 'ilvl') typeFilters.ilvl = { min: m.min };
     else if (m.filter === 'sockets') equipment.rune_sockets = { min: m.min };
     else equipment[m.filter] = { min: m.min };
@@ -213,6 +219,7 @@ export function buildSearchQuery(item: ParsedItem, mods: TradeMod[], opts: Searc
       filters: {
         type_filters: { filters: typeFilters },
         ...(Object.keys(equipment).length ? { equipment_filters: { filters: equipment } } : {}),
+        ...(Object.keys(misc).length ? { misc_filters: { filters: misc } } : {}),
       },
     },
     sort: { price: 'asc' },

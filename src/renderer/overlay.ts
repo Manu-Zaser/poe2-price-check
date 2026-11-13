@@ -15,7 +15,7 @@ function trend(change?: number): HTMLElement | null {
   if (change === undefined || !Number.isFinite(change)) return null;
   const dir = change > 0.5 ? 'up' : change < -0.5 ? 'down' : 'flat';
   const arrow = dir === 'up' ? '▲' : dir === 'down' ? '▼' : '■';
-  return el('span', `trend ${dir}`, `${arrow} ${amount(Math.abs(change))} %`);
+  return el('span', `trend ${dir}`, `${arrow} ${amount(Math.abs(change))}%`);
 }
 
 function bigPrice(value: string, unit: string, prefix?: string, meta?: HTMLElement | null): HTMLElement {
@@ -31,7 +31,7 @@ function ninjaPrice(m: PriceMatch): HTMLElement {
   const meta = el('div', 'price-meta');
   if (p.alt) meta.append(el('span', '', p.alt));
   const t = trend(m.change7d);
-  if (t) meta.append(t, el('span', 'faint', '7 Tage'));
+  if (t) meta.append(t, el('span', 'faint', '7 days'));
   return bigPrice(p.value, p.unit, undefined, meta);
 }
 
@@ -41,7 +41,7 @@ function candidateRow(m: PriceMatch): HTMLElement {
 
 function closeButton(): HTMLElement {
   const b = el('button', 'close', '×');
-  b.title = 'Schließen (Esc)';
+  b.title = 'Close (Esc)';
   b.addEventListener('click', () => api.hideOverlay());
   return b;
 }
@@ -55,19 +55,22 @@ function header(r: Result | null, icon?: string, title?: string): HTMLElement {
   if (r) {
     const item = r.item;
     const tags: string[] = [];
+    // Corrupted-Status bei Ausrüstung immer zeigen – er ändert den Preis deutlich.
+    const gear = ['Normal', 'Magic', 'Rare', 'Unique'].includes(item.rarity);
     if (item.corrupted) tags.push('Corrupted');
-    if (item.unidentified) tags.push('Unidentifiziert');
+    else if (gear) tags.push('Not corrupted');
+    if (item.unidentified) tags.push('Unidentified');
     if (item.itemLevel) tags.push(`iLvl ${item.itemLevel}`);
     text.append(
       el('div', `title rarity-${item.rarity.toLowerCase()}`, item.name ?? item.baseType),
       el('div', 'sub', item.name ? item.baseType : item.itemClass),
     );
-    if (tags.length) text.append(el('div', 'tags', ...tags.map((t) => el('span', `tag ${t === 'Corrupted' ? 'tag-bad' : ''}`, t))));
+    if (tags.length) text.append(el('div', 'tags', ...tags.map((t) => el('span', `tag ${t === 'Corrupted' ? 'tag-bad' : t === 'Not corrupted' ? 'tag-ok' : ''}`, t))));
   } else {
     text.append(el('div', 'title', title ?? ''));
   }
   const grip = el('span', 'grip', '⠿');
-  grip.title = 'Overlay lässt sich an jeder freien Stelle verschieben';
+  grip.title = 'Drag anywhere on the overlay to move it';
   return el('div', 'head', icon ? itemIcon(icon, 'head-icon') : null, text, grip, closeButton());
 }
 
@@ -80,18 +83,18 @@ function renderNinja(r: Extract<PriceResult, { kind: 'priced' }>): HTMLElement {
   card.append(header(r, unidentified ? undefined : first.icon));
 
   if (unidentified) {
-    card.append(el('div', 'label', 'Mögliche Uniques'));
+    card.append(el('div', 'label', 'Possible uniques'));
     card.append(el('div', 'cands', ...r.matches.slice(0, 5).map(candidateRow)));
-    if (r.matches.length > 5) card.append(el('div', 'note', `+ ${r.matches.length - 5} weitere`));
+    if (r.matches.length > 5) card.append(el('div', 'note', `+ ${r.matches.length - 5} more`));
   } else {
     card.append(ninjaPrice(first));
     if (r.stackSize && r.stackSize > 1) {
-      card.append(el('div', 'stack', el('span', '', `Stapel × ${r.stackSize}`), el('strong', '', priceText(first, r.stackSize))));
+      card.append(el('div', 'stack', el('span', '', `Stack × ${r.stackSize}`), el('strong', '', priceText(first, r.stackSize))));
     }
   }
-  if (r.item.corrupted && r.item.rarity === 'Unique') card.append(el('div', 'note', 'Preis gilt für nicht-corrupted Exemplare.'));
+  if (r.item.corrupted && r.item.rarity === 'Unique') card.append(el('div', 'note', 'Price applies to non-corrupted copies.'));
 
-  const listings = !unidentified && first.listingCount !== undefined ? `${first.listingCount} Angebote · ` : '';
+  const listings = !unidentified && first.listingCount !== undefined ? `${first.listingCount} listings · ` : '';
   card.append(el('div', 'foot', `${listings}poe.ninja · ${r.league}`));
   return card;
 }
@@ -122,7 +125,7 @@ const KIND_LABEL: Partial<Record<TradeMod['kind'], string>> = {
 
 function formatMin(n: number | undefined): string {
   if (n === undefined) return '';
-  return Number.isInteger(n) ? String(n) : n.toLocaleString('de-DE', { maximumFractionDigits: 2 });
+  return Number.isInteger(n) ? String(n) : n.toLocaleString('en-US', { maximumFractionDigits: 2 });
 }
 
 /** Schrittweite fürs Mausrad, abhängig von der Größenordnung des ursprünglichen Wertes. */
@@ -157,7 +160,7 @@ function resultsContent(r: TradeResult): HTMLElement[] {
   if (r.pending) {
     // Platzhalter in Größe des späteren Ergebnisses, damit das Overlay beim Nachladen kaum springt.
     out.push(
-      el('div', 'loading', el('span', 'spinner'), el('span', '', 'Suche auf pathofexile.com …')),
+      el('div', 'loading', el('span', 'spinner'), el('span', '', 'Searching pathofexile.com …')),
       el('div', 'lsts skeleton', ...Array.from({ length: 4 }, () => el('div', 'lst', el('span', 'bar w40'), el('span', 'bar w20'), el('span', 'bar w30')))),
     );
   } else if (s && s.listings.length > 0) {
@@ -170,14 +173,14 @@ function resultsContent(r: TradeResult): HTMLElement[] {
     }
     if (avg) {
       const p = priceParts(avg.divine, avg.exalted);
-      meta.append(el('span', '', `Ø ${Math.min(5, s.listings.length)} günstigste ≈ ${p.value} ${p.unit}`));
+      meta.append(el('span', '', `avg of ${Math.min(5, s.listings.length)} cheapest ≈ ${p.value} ${p.unit}`));
     }
-    meta.append(el('span', 'faint', `${s.total} Treffer`));
-    out.push(bigPrice(amount(cheapest.amount), currencyShort(cheapest.currency), 'ab', meta));
+    meta.append(el('span', 'faint', `${s.total} results`));
+    out.push(bigPrice(amount(cheapest.amount), currencyShort(cheapest.currency), 'from', meta));
     if (s.suggestion) out.push(suggestionRow(s.suggestion));
     out.push(el('div', 'lsts', ...s.listings.slice(0, 6).map(listingRow)));
   } else if (s) {
-    out.push(el('div', 'empty-result', 'Keine Angebote mit diesen Mods. Weniger Mods anhaken, Werte senken oder Basistyp lockern.'));
+    out.push(el('div', 'empty-result', 'No listings with these mods. Tick fewer mods, lower values or untick the base type.'));
   }
   if (r.error) out.push(el('div', 'alert', r.error));
   return out;
@@ -185,31 +188,31 @@ function resultsContent(r: TradeResult): HTMLElement[] {
 
 /** Verkaufspreis-Vorschlag mit Kopier-Button für die Stash-Notiz. */
 function suggestionRow(sg: PriceSuggestion): HTMLElement {
-  const btn = el('button', 'btn-xs', 'Kopieren');
-  btn.title = 'Als Notiz für den Stash-Tab in die Zwischenablage kopieren';
+  const btn = el('button', 'btn-xs', 'Copy');
+  btn.title = 'Copy as a stash tab note to the clipboard';
   btn.addEventListener('click', () => {
     api.copyText(sg.note);
-    btn.textContent = 'Kopiert ✓';
+    btn.textContent = 'Copied ✓';
     btn.classList.add('done');
     setTimeout(() => {
-      btn.textContent = 'Kopieren';
+      btn.textContent = 'Copy';
       btn.classList.remove('done');
     }, 1500);
   });
   const unit = sg.currency === 'divine' ? 'Div' : 'Ex';
-  const hint = sg.basedOn < 3 ? ' · wenig Daten' : '';
+  const hint = sg.basedOn < 3 ? ' · little data' : '';
   return el(
     'div', 'suggest',
-    el('span', 'suggest-label', 'Verkaufen für'),
+    el('span', 'suggest-label', 'Sell for'),
     el('strong', 'suggest-value', `${amount(sg.amount)} `, el('span', `unit unit-${unit.toLowerCase()}`, unit)),
     el('code', 'suggest-note', sg.note),
     btn,
-    el('span', 'suggest-hint', `knapp unter dem Median der ${sg.basedOn} günstigsten${hint}`),
+    el('span', 'suggest-hint', `just below the median of the ${sg.basedOn} cheapest${hint}`),
   );
 }
 
 const AFFIX: Record<string, { short: string; long: string }> = {
-  prefix: { short: 'P', long: 'Präfix' },
+  prefix: { short: 'P', long: 'Prefix' },
   suffix: { short: 'S', long: 'Suffix' },
   implicit: { short: 'I', long: 'Implicit' },
   other: { short: '', long: 'Mod' },
@@ -219,7 +222,7 @@ const AFFIX: Record<string, { short: string; long: string }> = {
 function tierBadge(t: NonNullable<TradeMod['tiers']>[number]): HTMLElement {
   const a = AFFIX[t.affix] ?? AFFIX.other;
   const badge = el('span', `tier tier-${t.affix}`, a.short ? el('span', 'tier-affix', a.short) : null, `T${t.tier}`);
-  badge.title = `${a.long}, Tier ${t.tier} – in PoE2 gilt: höher = besser`;
+  badge.title = `${a.long}, tier ${t.tier} – in PoE2 higher is better`;
   return badge;
 }
 
@@ -248,12 +251,17 @@ function modRow(m: TradeMod, onChange: () => void): HTMLElement {
   for (const t of m.tiers ?? []) side.append(tierBadge(t));
   if (KIND_LABEL[m.kind]) side.append(el('span', 'mod-kind', KIND_LABEL[m.kind]!));
   if (m.combined) {
-    side.append(el('span', 'mod-kind', 'addiert'));
-    row.title = 'Mehrere Zeilen mit demselben Stat – die Trade-Suche rechnet mit der Summe.';
+    side.append(el('span', 'mod-kind', 'summed'));
+    row.title = 'Several lines with the same stat – the trade search uses the sum.';
   }
   if (m.coveredBy) {
     side.append(el('span', 'mod-kind covered', `in ${m.coveredBy}`));
-    row.title = m.coveredBy === 'DPS' ? 'Schon in den DPS oben enthalten – daher abgewählt.' : 'Schon in einer Summe oben enthalten – daher abgewählt.';
+    row.title =
+      m.coveredBy === 'DPS'
+        ? 'Already included in the DPS above – unticked.'
+        : m.coveredBy === 'defence'
+          ? 'Already included in the defences above – unticked.'
+          : 'Already included in a total above – unticked.';
   }
 
   if (searchable && m.value !== null) {
@@ -262,7 +270,7 @@ function modRow(m: TradeMod, onChange: () => void): HTMLElement {
     input.inputMode = 'decimal';
     input.value = formatMin(m.min);
     input.placeholder = 'min';
-    input.title = 'Mindestwert – Mausrad zum Ändern, Klick zum Eintippen, leer = ohne Minimum';
+    input.title = 'Minimum – scroll to change, click to type, empty = no minimum';
     let committed = input.value;
 
     const commit = () => {
@@ -312,8 +320,8 @@ function modRow(m: TradeMod, onChange: () => void): HTMLElement {
     side.append(el('span', 'min-wrap', el('span', 'min-prefix', '≥'), input));
   }
   if (!searchable) {
-    row.title = 'Nicht in der Trade-Suche gefunden';
-    side.append(el('span', 'mod-kind', 'n. v.'));
+    row.title = 'Not found in the trade search';
+    side.append(el('span', 'mod-kind', 'n/a'));
   }
   row.append(box, text, side);
   return row;
@@ -328,18 +336,18 @@ function renderTrade(r: TradeResult): HTMLElement {
   const baseBox = el('input');
   baseBox.type = 'checkbox';
   baseBox.checked = r.useBaseType;
-  const baseToggle = el('label', 'toggle', baseBox, el('span', '', `Nur Basis „${r.item.baseType}“`));
+  const baseToggle = el('label', 'toggle', baseBox, el('span', '', `Only base "${r.item.baseType}"`));
 
   const allBox = el('input');
   allBox.type = 'checkbox';
   allBox.checked = r.matchAll;
   const countHint = el('span', 'faint');
-  const allToggle = el('label', 'toggle', allBox, el('span', '', 'Alle angehakten Mods müssen passen ', countHint));
+  const allToggle = el('label', 'toggle', allBox, el('span', '', 'All ticked mods must match ', countHint));
 
   const instantBox = el('input');
   instantBox.type = 'checkbox';
   instantBox.checked = r.instantOnly;
-  const instantToggle = el('label', 'toggle', instantBox, el('span', '', 'Nur Sofortkauf ', el('span', 'faint', '(Instant Buyout, aktuelle Preise)')));
+  const instantToggle = el('label', 'toggle', instantBox, el('span', '', 'Instant buyout only ', el('span', 'faint', '(current prices)')));
 
   // Alle Zeilen (Summen, Waffe, Mods, Filter) liegen in einem Container – die Auswahl wird daraus gelesen.
   const mods = el('div', 'mod-sections');
@@ -362,11 +370,11 @@ function renderTrade(r: TradeResult): HTMLElement {
   // Der "mind. N von M"-Modus zählt nur Stat-Zeilen (Mods und Summen), nicht DPS/Item-Level/Sockel.
   const updateCountHint = () => {
     const n = mods.querySelectorAll('.mod[data-stat] input[type=checkbox]:checked').length;
-    countHint.textContent = !allBox.checked && n > 2 ? `(sonst mind. ${defaultMatchCount(n)} von ${n})` : '';
+    countHint.textContent = !allBox.checked && n > 2 ? `(otherwise at least ${defaultMatchCount(n)} of ${n})` : '';
   };
 
-  const searchBtn = el('button', 'btn-sm primary', 'Suchen');
-  const openBtn = el('button', 'btn-sm', 'Trade-Seite ↗');
+  const searchBtn = el('button', 'btn-sm primary', 'Search');
+  const openBtn = el('button', 'btn-sm', 'Trade site ↗');
 
   // Änderungen werden nur gesammelt; gesucht wird erst mit Klick auf "Suchen".
   const onChange = () => {
@@ -385,13 +393,14 @@ function renderTrade(r: TradeResult): HTMLElement {
         )
       : null;
   const ofKind = (...kinds: TradeMod['kind'][]) => r.mods.filter((m) => kinds.includes(m.kind));
-  const plain = r.mods.filter((m) => m.kind !== 'pseudo' && m.kind !== 'weapon' && m.kind !== 'misc');
+  const plain = r.mods.filter((m) => m.kind !== 'pseudo' && m.kind !== 'weapon' && m.kind !== 'defence' && m.kind !== 'misc');
 
   const sections = [
-    section('Summen', ofKind('pseudo'), 'Mausrad über Wert = ändern'),
-    section('Waffe', ofKind('weapon')),
-    section('Mods', plain, ofKind('pseudo').length ? undefined : 'Mausrad über Wert = ändern'),
-    section('Filter', ofKind('misc')),
+    section('Totals', ofKind('pseudo'), 'scroll over a value to change it'),
+    section('Weapon', ofKind('weapon')),
+    section('Defences', ofKind('defence')),
+    section('Mods', plain, ofKind('pseudo').length ? undefined : 'scroll over a value to change it'),
+    section('Filters', ofKind('misc')),
   ].filter((s): s is HTMLDivElement => s !== null);
   mods.append(...sections);
   const runSearch = () => {
@@ -440,7 +449,7 @@ function renderTrade(r: TradeResult): HTMLElement {
     refresh: () => {
       // "Suchen" ist hervorgehoben, sobald etwas geändert wurde; nach Fehlern (z. B. Rate-Limit) immer klickbar.
       searchBtn.disabled = v.searching;
-      searchBtn.textContent = v.searching ? 'Suche …' : 'Suchen';
+      searchBtn.textContent = v.searching ? 'Searching …' : 'Search';
       searchBtn.classList.toggle('dirty', v.dirty && !v.searching);
       openBtn.disabled = !v.url;
     },
@@ -464,7 +473,7 @@ function updateTrade(v: TradeView, r: TradeResult) {
 
 function render(r: PriceResult): HTMLElement {
   if (r.kind === 'error') {
-    return el('div', 'card card-error', header(null, undefined, 'Preischeck'), el('div', 'msg', el('span', 'msg-icon', '!'), el('span', '', r.message)));
+    return el('div', 'card card-error', header(null, undefined, 'Price check'), el('div', 'msg', el('span', 'msg-icon', '!'), el('span', '', r.message)));
   }
   if (r.kind === 'priced') return renderNinja(r);
   if (r.kind === 'trade') return renderTrade(r);
@@ -536,7 +545,7 @@ api.onResult((r) => {
   } catch (e) {
     // Lieber eine Fehlerkarte als ein leeres, unsichtbares Fenster über dem Spiel.
     view = null;
-    root.replaceChildren(render({ kind: 'error', message: `Anzeigefehler: ${e instanceof Error ? e.message : String(e)}` }));
+    root.replaceChildren(render({ kind: 'error', message: `Display error: ${e instanceof Error ? e.message : String(e)}` }));
   }
   reportSize();
 });

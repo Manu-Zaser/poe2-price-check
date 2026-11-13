@@ -28,7 +28,7 @@ export function parseState(header: string | null | undefined): { hits: number; p
 
 export class RateLimitError extends Error {
   constructor(readonly waitMs: number) {
-    super(`Trade-API: Rate-Limit erreicht – bitte ${Math.ceil(waitMs / 1000)} s warten.`);
+    super(`Trade API: rate limit reached – please wait ${Math.ceil(waitMs / 1000)} s.`);
   }
 }
 

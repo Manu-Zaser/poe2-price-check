@@ -25,9 +25,10 @@ describe('parseModLine', () => {
 describe('buildTradeMods – Handschuhe (Grim Claw)', () => {
   const item = parseItemText(fixture('rare-gloves-grim-claw.txt'))!;
   const mods = buildTradeMods(item, stats);
-  const byText = (t: string) => mods.find((m) => m.text.includes(t))!;
+  // Nur Einzel-Mods, nicht die Summen (deren englische Texte enthalten z. B. auch "maximum Life")
+  const byText = (t: string) => mods.find((m) => m.kind !== 'pseudo' && m.text.includes(t))!;
 
-  const plain = mods.filter((m) => !["pseudo", "weapon", "misc"].includes(m.kind));
+  const plain = mods.filter((m) => !["pseudo", "weapon", "defence", "misc"].includes(m.kind));
 
   it('findet alle Mods inklusive Rune', () => {
     expect(plain).toHaveLength(7);
@@ -35,8 +36,8 @@ describe('buildTradeMods – Handschuhe (Grim Claw)', () => {
   });
 
   it('ordnet Stat-IDs korrekt zu', () => {
-    // Leben ist jetzt in der Summe "Leben gesamt" enthalten und deshalb abgewählt.
-    expect(byText('maximum Life')).toMatchObject({ statId: 'explicit.stat_3299347043', value: 10, enabled: false, coveredBy: 'Summe' });
+    // Leben ist jetzt in der Summe "total maximum Life" enthalten und deshalb abgewählt.
+    expect(byText('maximum Life')).toMatchObject({ statId: 'explicit.stat_3299347043', value: 10, enabled: false, coveredBy: 'total' });
     expect(byText('Cold damage to Attacks')).toMatchObject({ statId: 'explicit.stat_4067062424', value: 18 });
     expect(byText('Dexterity')).toMatchObject({ statId: 'explicit.stat_3261801346', value: 30, min: 30 });
     expect(byText('Fire Resistance')).toMatchObject({ kind: 'rune', statId: 'rune.stat_3372524247', enabled: false });
@@ -46,7 +47,8 @@ describe('buildTradeMods – Handschuhe (Grim Claw)', () => {
 describe('buildTradeMods – Bogen (Morbid Stinger)', () => {
   const item = parseItemText(fixture('rare-bow-morbid-stinger.txt'))!;
   const mods = buildTradeMods(item, stats);
-  const byText = (t: string) => mods.find((m) => m.text.includes(t))!;
+  // Nur Einzel-Mods, nicht die Summen (deren englische Texte enthalten z. B. auch "maximum Life")
+  const byText = (t: string) => mods.find((m) => m.kind !== 'pseudo' && m.text.includes(t))!;
 
   it('erkennt den Implicit ohne Marker und negiert "reduced"', () => {
     expect(byText('Projectile Range')).toMatchObject({ kind: 'implicit', statId: 'implicit.stat_3398402065', value: -50, enabled: false });
@@ -122,7 +124,7 @@ describe('Tiers im Overlay', () => {
   it('übernimmt Tier und Präfix/Suffix in die Mod-Zeilen', () => {
     const item = parseItemText(fixture('rare-gloves-advanced.txt'))!;
     const mods = buildTradeMods(item, stats);
-    expect(mods.find((m) => m.text.includes('maximum Life'))?.tiers).toEqual([{ affix: 'prefix', tier: 2 }]);
+    expect(mods.find((m) => m.kind !== 'pseudo' && m.text.includes('maximum Life'))?.tiers).toEqual([{ affix: 'prefix', tier: 2 }]);
     expect(mods.find((m) => m.text.includes('Dexterity') && m.kind === 'explicit')?.tiers).toEqual([{ affix: 'suffix', tier: 8 }]);
     // Rune ohne Kopfzeile → kein Tier
     expect(mods.find((m) => m.kind === 'rune')?.tiers).toBeUndefined();

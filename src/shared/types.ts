@@ -46,7 +46,7 @@ export interface TradeMod {
   key: string;
   text: string;
   /** pseudo = Summe (z. B. Resistenzen gesamt), weapon = DPS, misc = Item-Level/Sockel. */
-  kind: 'explicit' | 'implicit' | 'rune' | 'enchant' | 'crafted' | 'fractured' | 'desecrated' | 'pseudo' | 'weapon' | 'misc';
+  kind: 'explicit' | 'implicit' | 'rune' | 'enchant' | 'crafted' | 'fractured' | 'desecrated' | 'pseudo' | 'weapon' | 'defence' | 'misc';
   /** null = nicht in der Trade-Suche gefunden (wird ausgegraut). */
   statId: string | null;
   value: number | null;
@@ -55,9 +55,9 @@ export interface TradeMod {
   /** Aus mehreren Zeilen mit derselben Stat-ID zusammengefasst. */
   combined?: boolean;
   /** Kein Stat, sondern ein Item-Filter der Trade-Suche. */
-  filter?: 'dps' | 'pdps' | 'edps' | 'ilvl' | 'sockets';
+  filter?: 'dps' | 'pdps' | 'edps' | 'ar' | 'ev' | 'es' | 'block' | 'spirit' | 'ilvl' | 'sockets' | 'corrupted';
   /** Abgewählt, weil schon in einer Summe bzw. den DPS enthalten. */
-  coveredBy?: 'Summe' | 'DPS';
+  coveredBy?: 'total' | 'DPS' | 'defence';
   /** Tier(s) laut Spiel (bei zusammengefassten Mods mehrere). In PoE2: höher = besser. */
   tiers?: { affix: ModMeta['affix']; tier: number }[];
 }

@@ -57,7 +57,7 @@ export type FetchJson = (url: string) => Promise<unknown>;
 export function makeFetchJson(userAgent: string): FetchJson {
   return async (url) => {
     const res = await fetch(url, { headers: { 'User-Agent': userAgent, Accept: 'application/json' } });
-    if (!res.ok) throw new Error(`poe.ninja antwortet mit HTTP ${res.status} für ${url}`);
+    if (!res.ok) throw new Error(`poe.ninja responded with HTTP ${res.status} for ${url}`);
     return res.json();
   };
 }
@@ -65,7 +65,7 @@ export function makeFetchJson(userAgent: string): FetchJson {
 /** Alle Leagues; der erste Eintrag ist laut poe.ninja-Doku die aktuelle Challenge-League. */
 export async function fetchLeagues(fetchJson: FetchJson): Promise<string[]> {
   const leagues = (await fetchJson(`${BASE}/leagues`)) as { id: string }[];
-  if (!Array.isArray(leagues) || leagues.length === 0) throw new Error('poe.ninja liefert keine Leagues');
+  if (!Array.isArray(leagues) || leagues.length === 0) throw new Error('poe.ninja returned no leagues');
   return leagues.map((l) => l.id);
 }
 
@@ -165,14 +165,14 @@ export function lookupPrice(index: PriceIndex, item: ParsedItem): PriceResult {
       const sameBase = all.filter((m) => m.baseType?.toLowerCase() === item.baseType.toLowerCase());
       const matches = sameBase.length > 0 ? sameBase : all;
       if (matches.length > 0) return { kind: 'priced', item, source: 'poe.ninja', league, matches };
-      return { kind: 'not-found', item, league, reason: `Unique "${item.name}" ist bei poe.ninja nicht gelistet.` };
+      return { kind: 'not-found', item, league, reason: `Unique "${item.name}" is not listed on poe.ninja.` };
     }
     const candidates = index.uniquesByBase.get(item.baseType.toLowerCase()) ?? [];
     if (candidates.length > 0) {
       const matches = [...candidates].sort((a, b) => b.divine - a.divine);
       return { kind: 'priced', item, source: 'poe.ninja', league, matches };
     }
-    return { kind: 'not-found', item, league, reason: `Kein Unique auf Basis "${item.baseType}" gefunden.` };
+    return { kind: 'not-found', item, league, reason: `No unique found on base "${item.baseType}".` };
   }
 
   // Währung, Fragmente, Runen, Essenzen, ungeschliffene Gemmen usw.
@@ -182,7 +182,7 @@ export function lookupPrice(index: PriceIndex, item: ParsedItem): PriceResult {
   }
 
   if (item.rarity === 'Rare' || item.rarity === 'Magic' || item.rarity === 'Normal') {
-    return { kind: 'unsupported', item, reason: 'Rare/Magic/Normal-Items brauchen die Trade-Suche (kommt in Phase 2).' };
+    return { kind: 'unsupported', item, reason: 'Normal items are not priced (no poe.ninja data).' };
   }
-  return { kind: 'not-found', item, league, reason: `"${item.baseType}" ist bei poe.ninja nicht gelistet.` };
+  return { kind: 'not-found', item, league, reason: `"${item.baseType}" is not listed on poe.ninja.` };
 }

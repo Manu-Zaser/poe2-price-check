@@ -26,6 +26,7 @@ html, body { background: transparent; overflow: hidden; user-select: none; }
 .tags { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
 .tag { font-size: 10.5px; padding: 1px 6px; border-radius: 4px; background: var(--surface-3); color: var(--muted); }
 .tag-bad { background: rgba(217,112,95,.15); color: #f0a597; }
+.tag-ok { background: rgba(127,176,105,.12); color: #b5d3a6; }
 
 /* Preis */
 .price-block { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
@@ -178,7 +179,7 @@ input[type="checkbox"]:disabled { opacity: .35; cursor: default; }
 .card-trade::-webkit-scrollbar { width: 8px; }
 .card-trade::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 8px; }
 .mod-section .label-row { margin-top: 12px; }
-.mod-weapon .mod-text, .mod-pseudo .mod-text { color: var(--text); font-weight: 600; }
+.mod-weapon .mod-text, .mod-defence .mod-text, .mod-pseudo .mod-text { color: var(--text); font-weight: 600; }
 .mod-misc .mod-text { color: var(--muted); }
 .mod-kind.covered { background: none; border: 1px dashed var(--line-strong); }
 .toggles { margin-top: 10px; display: flex; flex-direction: column; gap: 2px; }

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { pseudoContributions, suggestPrice, weaponStats } from '../src/shared/extras';
+import { defenceStats, pseudoContributions, suggestPrice, weaponStats } from '../src/shared/extras';
 import { parseItemText } from '../src/shared/parser';
 import { buildSearchQuery, buildTradeMods, StatIndex, type StatsData } from '../src/shared/stats';
 import type { Listing } from '../src/shared/types';
@@ -30,7 +30,7 @@ describe('Pseudo-Summen (Grim Claw)', () => {
     expect(get('p:ele')).toMatchObject({ statId: 'pseudo.pseudo_total_elemental_resistance', value: 18, min: 18, enabled: true });
     expect(get('p:life')).toMatchObject({ value: 10, min: 10, enabled: true });
     expect(get('p:dex')).toMatchObject({ value: 30, min: 30, enabled: true });
-    expect(mods.find((m) => m.text.includes('to Dexterity') && m.kind === 'explicit')).toMatchObject({ enabled: false, coveredBy: 'Summe' });
+    expect(mods.find((m) => m.text.includes('to Dexterity') && m.kind === 'explicit')).toMatchObject({ enabled: false, coveredBy: 'total' });
   });
 
   it('bietet Item-Level und Sockel als (abgeschaltete) Filter an', () => {
@@ -49,7 +49,9 @@ describe('Pseudo-Summen (Grim Claw)', () => {
   it('sucht ohne Sofortkauf-Filter auch "In Person"-Angebote', () => {
     const q = buildSearchQuery(item, mods, { useBaseType: true, matchAll: false, instantOnly: false });
     expect(q.query.status).toEqual({ option: 'available' });
-    expect(q.query.filters).not.toHaveProperty('equipment_filters');
+    // Handschuhe: Ausweichen 196 ist als Verteidigungswert aktiv, sonst keine Equipment-Filter
+    expect(q.query.filters).toMatchObject({ equipment_filters: { filters: { ev: { min: 196 } } } });
+    expect(Object.keys((q.query.filters as { equipment_filters: { filters: object } }).equipment_filters.filters)).toEqual(['ev']);
   });
 });
 
@@ -104,5 +106,69 @@ describe('sortByValue', () => {
     const mk = (amount: number, currency: string, exalted: number | null): Listing => ({ amount, currency, divine: null, exalted, indexed: '' });
     const sorted = sortByValue([mk(1, 'chaos', 61), mk(25, 'exalted', 25), mk(3, 'mirror', null), mk(3, 'chaos', 183)]);
     expect(sorted.map((l) => `${l.amount} ${l.currency}`)).toEqual(['25 exalted', '1 chaos', '3 chaos', '3 mirror']);
+  });
+});
+
+describe('Verteidigung (Rüstungen)', () => {
+  const item = parseItemText(fixture('rare-body-armour-hybrid.txt'))!;
+  const mods = buildTradeMods(item, stats);
+  const get = (key: string) => mods.find((m) => m.key === key);
+
+  it('liest die angezeigten Verteidigungswerte (nur aus den Eigenschaften)', () => {
+    expect(defenceStats(item)).toEqual({ ar: 0, ev: 812, es: 245, block: 0, spirit: 0 });
+    expect(defenceStats(parseItemText(fixture('rare-bow-morbid-stinger.txt'))!)).toBeNull();
+  });
+
+  it('sucht nach Ausweichen und Energieschild und wählt die lokalen Verteidigungs-Mods ab', () => {
+    expect(get('d:ev')).toMatchObject({ kind: 'defence', filter: 'ev', value: 812, min: 812, enabled: true });
+    expect(get('d:es')).toMatchObject({ filter: 'es', value: 245, min: 245, enabled: true });
+    expect(get('d:ar')).toBeUndefined();
+    expect(mods.find((m) => m.text.includes('increased Evasion and Energy Shield'))).toMatchObject({ enabled: false, coveredBy: 'defence' });
+    expect(mods.find((m) => m.text.includes('to Evasion Rating'))).toMatchObject({ enabled: false, coveredBy: 'defence' });
+    // Leben und Resistenzen sind keine Verteidigungswerte – die laufen über die Summen.
+    expect(get('p:life')).toMatchObject({ enabled: true, value: 112 });
+    expect(get('p:ele')).toMatchObject({ enabled: true, value: 33 });
+  });
+
+  it('schreibt Verteidigungswerte als Equipment-Filter in die Suche', () => {
+    const q = buildSearchQuery(item, mods, { useBaseType: true, matchAll: false, instantOnly: true });
+    expect(q.query.filters).toMatchObject({ equipment_filters: { filters: { ev: { min: 812 }, es: { min: 245 } } } });
+  });
+});
+
+describe('coveredByDefence', () => {
+  it('erkennt lokale Verteidigungs-Mods, aber nicht Sonder-Mods', async () => {
+    const { coveredByDefence } = await import('../src/shared/extras');
+    for (const t of ['# to Armour', '# to Evasion Rating', '# to maximum Energy Shield', '#% increased Armour and Evasion',
+      '#% increased Evasion and Energy Shield', '#% increased Armour, Evasion and Energy Shield', '#% increased Energy Shield']) {
+      expect(coveredByDefence(t), t).toBe(true);
+    }
+    for (const t of ['#% increased Energy Shield Recharge Rate', 'Break #% increased Armour', '# to maximum Life']) {
+      expect(coveredByDefence(t), t).toBe(false);
+    }
+  });
+});
+
+describe('Corrupted-Status', () => {
+  it('sucht standardmäßig nur Items mit demselben Status', () => {
+    const clean = parseItemText(fixture('rare-gloves-grim-claw.txt'))!;
+    const cleanMods = buildTradeMods(clean, stats);
+    expect(cleanMods.find((m) => m.key === 'f:corrupted')).toMatchObject({ text: 'Not corrupted', filter: 'corrupted', enabled: true });
+    expect(buildSearchQuery(clean, cleanMods, { useBaseType: true, matchAll: false }).query.filters).toMatchObject({
+      misc_filters: { filters: { corrupted: { option: 'false' } } },
+    });
+
+    const corrupted = parseItemText(fixture('rare-gloves-grim-claw.txt') + '\n--------\nCorrupted')!;
+    const corruptedMods = buildTradeMods(corrupted, stats);
+    expect(corruptedMods.find((m) => m.key === 'f:corrupted')).toMatchObject({ text: 'Corrupted' });
+    expect(buildSearchQuery(corrupted, corruptedMods, { useBaseType: true, matchAll: false }).query.filters).toMatchObject({
+      misc_filters: { filters: { corrupted: { option: 'true' } } },
+    });
+  });
+
+  it('lässt den Filter weg, wenn er abgewählt ist', () => {
+    const item = parseItemText(fixture('rare-gloves-grim-claw.txt'))!;
+    const mods = buildTradeMods(item, stats).map((m) => (m.filter === 'corrupted' ? { ...m, enabled: false } : m));
+    expect(buildSearchQuery(item, mods, { useBaseType: true, matchAll: false }).query.filters).not.toHaveProperty('misc_filters');
   });
 });

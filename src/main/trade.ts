@@ -57,7 +57,7 @@ export class TradeClient {
       } catch {
         // kein JSON
       }
-      throw new TradeApiError(`Trade-API: ${message}`);
+      throw new TradeApiError(`Trade API: ${message}`);
     }
     return (await res.json()) as T;
   }
@@ -65,7 +65,7 @@ export class TradeClient {
   /** Stat-Liste für die Zuordnung von Mods (ändert sich nur mit Patches). */
   async loadStats(): Promise<StatsData> {
     const res = await this.fetchImpl(`${BASE}/data/stats`, { headers: { 'User-Agent': this.userAgent } });
-    if (!res.ok) throw new TradeApiError(`Trade-API: Stat-Liste nicht ladbar (HTTP ${res.status})`);
+    if (!res.ok) throw new TradeApiError(`Trade API: could not load stat list (HTTP ${res.status})`);
     return (await res.json()) as StatsData;
   }
 

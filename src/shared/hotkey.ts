@@ -61,19 +61,19 @@ export function validateHotkey(acc: string): string | null {
   const parts = normalize(acc);
   const key = parts[parts.length - 1];
   const mods = parts.slice(0, -1);
-  if (!key || MODIFIERS.has(key)) return 'Bitte eine Taste zusätzlich zu Strg/Alt/Umschalt drücken.';
-  if (mods.includes('Super')) return 'Die Windows-Taste ist für Windows reserviert.';
-  if (BLOCKED.has(parts.join('+'))) return `${formatHotkey(acc).join('+')} wird vom Spiel oder von Windows benötigt.`;
+  if (!key || MODIFIERS.has(key)) return 'Press a key in addition to Ctrl/Alt/Shift.';
+  if (mods.includes('Super')) return 'The Windows key is reserved by Windows.';
+  if (BLOCKED.has(parts.join('+'))) return `${formatHotkey(acc).join('+')} is needed by the game or by Windows.`;
   const isFKey = /^F\d{1,2}$/.test(key);
   const hasRealMod = mods.some((m) => m === 'Ctrl' || m === 'Alt');
-  if (!isFKey && !hasRealMod) return 'Bitte mit Strg oder Alt kombinieren (sonst blockiert der Hotkey den Chat). F-Tasten gehen auch allein.';
+  if (!isFKey && !hasRealMod) return 'Combine with Ctrl or Alt (otherwise the hotkey blocks typing in chat). F-keys also work on their own.';
   return null;
 }
 
 const LABELS: Record<string, string> = {
-  Ctrl: 'Strg', Shift: 'Umschalt', Alt: 'Alt', Super: 'Win', Space: 'Leertaste',
-  Up: '↑', Down: '↓', Left: '←', Right: '→', Delete: 'Entf', Insert: 'Einfg', Home: 'Pos1', End: 'Ende',
-  PageUp: 'Bild↑', PageDown: 'Bild↓', numadd: 'Num +', numsub: 'Num -', nummult: 'Num *', numdiv: 'Num /', numdec: 'Num ,',
+  Ctrl: 'Ctrl', Shift: 'Shift', Alt: 'Alt', Super: 'Win', Space: 'Space',
+  Up: '↑', Down: '↓', Left: '←', Right: '→', Delete: 'Del', Insert: 'Ins', Home: 'Home', End: 'End',
+  PageUp: 'PgUp', PageDown: 'PgDn', numadd: 'Num +', numsub: 'Num -', nummult: 'Num *', numdiv: 'Num /', numdec: 'Num .',
 };
 
 /** Accelerator → Beschriftungen der Tastenkappen, z. B. ["Strg", "D"]. */

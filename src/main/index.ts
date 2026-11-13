@@ -15,8 +15,8 @@ import { foregroundWindowTitle, isLeftButtonDown, sendCopy } from './win32';
 // Ohne diese Handler zeigt Electron bei einem Fehler einen modalen Dialog. Der liegt hinter dem
 // Spiel, blockiert die App – und das Overlay bleibt als unsichtbares Fenster über dem Spiel hängen.
 // Mit eigenem Handler entfällt der Dialog; der Fehler landet im Protokoll.
-process.on('uncaughtException', (err) => log('error', 'Unbehandelter Fehler', err));
-process.on('unhandledRejection', (reason) => log('error', 'Unbehandelte Promise-Ablehnung', reason));
+process.on('uncaughtException', (err) => log('error', 'Uncaught exception', err));
+process.on('unhandledRejection', (reason) => log('error', 'Unhandled promise rejection', reason));
 
 /** IPC-Handler so kapseln, dass ein Fehler darin nie die App lahmlegt. */
 function safe<A extends unknown[]>(name: string, fn: (...args: A) => unknown) {
@@ -74,7 +74,7 @@ function saveConfig(c: Config) {
   try {
     writeFileSync(configFile(), JSON.stringify(c, null, 2));
   } catch (e) {
-    log('error', 'Konfiguration konnte nicht gespeichert werden', e);
+    log('error', 'Could not save configuration', e);
   }
 }
 
@@ -177,7 +177,7 @@ function refreshIndex(): Promise<PriceIndex> {
       })
       .catch((e: unknown) => {
         lastError = e instanceof Error ? e.message : String(e);
-        log('warn', 'Kurse konnten nicht geladen werden', e);
+        log('warn', 'Could not load prices', e);
         throw e;
       })
       .finally(() => {
@@ -202,7 +202,7 @@ function registerHotkey(acc: string): boolean {
 
 function activateHotkey() {
   hotkeyActive = registerHotkey(config.hotkey);
-  lastError = hotkeyActive ? lastError : `Hotkey ${config.hotkey} ist von einem anderen Programm belegt.`;
+  lastError = hotkeyActive ? lastError : `Hotkey ${config.hotkey} is already used by another program.`;
 }
 
 async function saveSettings(patch: Partial<Settings>): Promise<SaveResult> {
@@ -211,7 +211,7 @@ async function saveSettings(patch: Partial<Settings>): Promise<SaveResult> {
     if (invalid) return { ok: false, error: invalid };
     if (!registerHotkey(patch.hotkey)) {
       activateHotkey(); // alten Hotkey wiederherstellen
-      return { ok: false, error: 'Diese Kombination ist schon von einem anderen Programm belegt.' };
+      return { ok: false, error: 'This combination is already used by another program.' };
     }
     config.hotkey = patch.hotkey;
     hotkeyActive = true;
@@ -270,7 +270,7 @@ function createMainWindow() {
     height: 720,
     minWidth: 460,
     minHeight: 560,
-    title: 'PoE2 Preischeck',
+    title: 'PoE2 Price Check',
     backgroundColor: '#100e0c',
     titleBarStyle: 'hidden',
     titleBarOverlay: { color: '#100e0c', symbolColor: '#c9a85c', height: 40 },
@@ -286,7 +286,7 @@ function createMainWindow() {
   });
   for (const ev of ['restore', 'show'] as const) mainWin.on(ev as 'show', () => stateDirty && pushState());
   mainWin.webContents.on('render-process-gone', (_e, details) => {
-    log('error', `Hauptfenster abgestürzt (${details.reason}) – wird neu geladen`);
+    log('error', `Main window crashed (${details.reason}) – reloading`);
     if (alive(mainWin) && !quitting) void mainWin.loadFile(join(__dirname, 'app.html'));
   });
   // Externe Links (poe.ninja) im Standardbrowser öffnen.
@@ -330,13 +330,13 @@ function createOverlayWindow() {
 
   // Stürzt der Inhalt ab oder hängt, darf kein unsichtbares Fenster über dem Spiel zurückbleiben.
   const recover = (why: string) => {
-    log('error', `Overlay ${why} – wird neu erstellt`);
+    log('error', `Overlay ${why} – recreating`);
     if (quitting) return;
     if (alive(win)) win.destroy();
     if (overlayWin === win) createOverlayWindow();
   };
-  win.webContents.on('render-process-gone', (_e, d) => recover(`abgestürzt (${d.reason})`));
-  win.on('unresponsive', () => recover('reagiert nicht'));
+  win.webContents.on('render-process-gone', (_e, d) => recover(`crashed (${d.reason})`));
+  win.on('unresponsive', () => recover('not responding'));
 }
 
 /** true, während wir das Fenster selbst positionieren (nicht als "vom Nutzer verschoben" werten). */
@@ -449,7 +449,7 @@ function tradeClient(): TradeClient {
 function getStatIndex(): Promise<StatIndex> {
   statIndex ??= loadStatIndex(tradeClient(), join(app.getPath('userData'), 'trade-stats.json')).catch((e) => {
     statIndex = null; // beim nächsten Mal erneut versuchen
-    log('warn', 'Stat-Liste konnte nicht geladen werden', e);
+    log('warn', 'Could not load trade stat list', e);
     throw e;
   });
   return statIndex;
@@ -511,7 +511,7 @@ async function priceCheck() {
     const text = await readItemText();
     const item = parseItemText(text);
     if (!item) {
-      showOverlay({ kind: 'error', message: 'Kein Item in der Zwischenablage. Maus über ein Item halten und erneut drücken.' });
+      showOverlay({ kind: 'error', message: 'No item in the clipboard. Hover over an item and press the hotkey again.' });
       return;
     }
     const isRareLike = item.rarity === 'Rare' || item.rarity === 'Magic';
@@ -523,7 +523,7 @@ async function priceCheck() {
       addHistory(result);
     }
   } catch (e) {
-    log('error', 'Preischeck fehlgeschlagen', e);
+    log('error', 'Price check failed', e);
     showOverlay({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
   } finally {
     busy = false;
@@ -551,11 +551,11 @@ app.on('second-instance', () => {
 });
 
 app.on('before-quit', () => (quitting = true));
-app.on('child-process-gone', (_e, d) => log('warn', `Hilfsprozess beendet: ${d.type} (${d.reason})`));
+app.on('child-process-gone', (_e, d) => log('warn', `Child process gone: ${d.type} (${d.reason})`));
 
 app.whenReady().then(() => {
   config = loadConfig();
-  log('info', `Start ${app.getVersion()}, GPU ${config.gpuAcceleration ? 'an' : 'aus'}`);
+  log('info', `Start ${app.getVersion()}, GPU ${config.gpuAcceleration ? 'on' : 'off'}`);
 
   ipcMain.handle('state:get', safe('state:get', () => state()));
   ipcMain.handle('settings:save', safe('settings:save', (_e, patch: Partial<Settings>) => saveSettings(patch)));
