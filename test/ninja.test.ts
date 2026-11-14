@@ -6,12 +6,19 @@ const fakeFetch: FetchJson = async (url) => {
   const type = new URL(url).searchParams.get('type');
   const core = { rates: { exalted: 600 }, primary: 'divine' };
   if (url.includes('/exchange/')) {
+    if (type === 'UncutGems') {
+      return {
+        core,
+        lines: [{ id: 'uncut-skill-gem-12', primaryValue: 0.0067 }],
+        items: [{ id: 'uncut-skill-gem-12', name: 'Uncut Skill Gem (Level 12)' }],
+      };
+    }
     if (type !== 'Currency') return { core, lines: [], items: [] };
     return {
       core,
       lines: [
-        { id: 'divine', primaryValue: 1, sparkline: { totalChange: 10 } },
-        { id: 'exalted', primaryValue: 1 / 600 },
+        { id: 'divine', primaryValue: 1, sparkline: { totalChange: 10, data: [1, null, 4, 10] } },
+        { id: 'exalted', primaryValue: 1 / 600, sparkline: { totalChange: 0, data: [0] } },
       ],
       items: [
         { id: 'divine', name: 'Divine Orb' },
@@ -58,5 +65,21 @@ describe('poe.ninja-Preisindex', () => {
     const index = await buildPriceIndex(fakeFetch, 'Test');
     const r = lookupPrice(index, item('Item Class: Rings\nRarity: Rare\nGale Spiral\nSapphire Ring'));
     expect(r.kind).toBe('unsupported');
+  });
+});
+
+describe('poe.ninja: trend and uncut gems', () => {
+  it('keeps the daily price change for the trend graphic, without gaps', async () => {
+    const index = await buildPriceIndex(fakeFetch, 'Test');
+    expect(index.currency.get('divine orb')?.sparkline).toEqual([1, 4, 10]);
+    expect(index.currency.get('exalted orb')?.sparkline).toBeUndefined(); // one point is not a line
+  });
+
+  it('prices uncut gems by level', async () => {
+    const index = await buildPriceIndex(fakeFetch, 'Test');
+    const gem = item('Item Class: Uncut Skill Gems\nRarity: Currency\nUncut Skill Gem\n--------\nLevel: 12\n--------\nCreates a Skill Gem or Levels up an existing Skill Gem to level 12');
+    expect(gem.gemLevel).toBe(12);
+    const r = lookupPrice(index, gem);
+    expect(r.kind === 'priced' && r.matches[0].name).toBe('Uncut Skill Gem (Level 12)');
   });
 });

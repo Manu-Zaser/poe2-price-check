@@ -408,6 +408,48 @@ $<HTMLInputElement>('gpu').addEventListener('change', (e) => {
 });
 $('gpu-restart').addEventListener('click', () => api.restartApp());
 
+// ---------- Währungsrechner ----------
+
+type Unit = 'divine' | 'exalted' | 'chaos' | 'mirror';
+const UNIT_NAMES: Record<Unit, string> = { divine: 'Divine', exalted: 'Exalted', chaos: 'Chaos', mirror: 'Mirror' };
+let rates: Partial<Record<Unit, number>> = {};
+
+/** Betrag in einer Währung → die beiden anderen (über den Wert in Exalted). */
+function renderConverter() {
+  const out = $('conv-out');
+  const input = $<HTMLInputElement>('conv-amount');
+  const unit = $<HTMLSelectElement>('conv-unit').value as Unit;
+  const value = Number(input.value.replace(',', '.'));
+  input.classList.toggle('invalid', input.value.trim() !== '' && !Number.isFinite(value));
+  const from = rates[unit];
+  if (!from) {
+    out.replaceChildren(el('span', 'conv-none', 'Rates not loaded yet'));
+    return;
+  }
+  if (!Number.isFinite(value) || input.value.trim() === '') {
+    out.replaceChildren(el('span', 'conv-none', 'Enter an amount'));
+    return;
+  }
+  const exalted = value * from;
+  out.replaceChildren(
+    ...(Object.keys(UNIT_NAMES) as Unit[])
+      .filter((u) => u !== unit && rates[u])
+      .map((u) => el('span', 'conv-val', el('strong', '', amount(exalted / rates[u]!)), ` ${UNIT_NAMES[u]}`)),
+  );
+}
+
+function renderRates(s: AppState) {
+  rates = s.status.currencyRates;
+  // Währungen ohne Kurs (z. B. Mirror noch nicht gehandelt) nicht auswählbar machen
+  for (const unit of ['chaos', 'mirror'] as const) {
+    $<HTMLSelectElement>('conv-unit').querySelector<HTMLOptionElement>(`option[value="${unit}"]`)!.disabled = !rates[unit];
+  }
+  renderConverter();
+}
+
+$<HTMLInputElement>('conv-amount').addEventListener('input', renderConverter);
+$<HTMLSelectElement>('conv-unit').addEventListener('change', renderConverter);
+
 // ---------- Start, Infobereich ----------
 
 function renderStartup(s: AppState) {
@@ -510,6 +552,7 @@ function render(s: AppState) {
   renderUpdate(s);
   renderStartup(s);
   renderDangerMods(s);
+  renderRates(s);
 }
 
 api.onState(render);

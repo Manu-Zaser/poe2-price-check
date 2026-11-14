@@ -279,3 +279,21 @@ input[type="checkbox"]:disabled { opacity: .35; cursor: default; }
 .stat-danger { background: rgba(217,112,95,.08); }
 .stat-danger .stat-text { color: #ffb4a6 !important; }
 .kind-danger { color: #2a0d08; background: #f0907e; text-shadow: none; }
+
+/* ---------- Q20 und Element-Auswahl (Waffen) ---------- */
+.q20, .el-btn {
+  padding: 0 6px; border-radius: 3px; cursor: pointer;
+  font: 700 9.5px var(--font); letter-spacing: .03em; color: var(--muted);
+  background: none; border: 1px solid var(--line-strong);
+}
+.q20:hover, .el-btn:hover { color: var(--text); border-color: var(--gold-deep); }
+.q20.on, .el-btn.on { color: #1a140a; background: var(--gold); border-color: var(--gold); text-shadow: none; }
+.el-choice { display: inline-flex; gap: 3px; }
+
+/* ---------- Kursverlauf (poe.ninja) ---------- */
+.spark { width: 72px; height: 22px; flex: none; }
+.spark-zero { stroke: var(--line-strong); stroke-width: 1; stroke-dasharray: 2 2; }
+.spark-line { fill: none; stroke: var(--muted); stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
+.spark.up .spark-line { stroke: var(--ok); }
+.spark.down .spark-line { stroke: var(--bad); }
+.stats[hidden], .stats-bar[hidden] { display: none; }

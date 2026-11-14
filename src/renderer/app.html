@@ -107,6 +107,24 @@
           <p class="banner error" id="error-banner" hidden></p>
         </div>
 
+        <div class="card converter-card">
+          <div class="card-head">
+            <h2>Currency converter</h2>
+            <span class="card-note">current poe.ninja rates</span>
+          </div>
+          <div class="converter">
+            <input type="text" id="conv-amount" inputmode="decimal" value="1" aria-label="Amount" />
+            <div class="select-wrap"><select id="conv-unit" aria-label="Currency">
+              <option value="divine">Divine Orb</option>
+              <option value="exalted">Exalted Orb</option>
+              <option value="chaos">Chaos Orb</option>
+              <option value="mirror">Mirror of Kalandra</option>
+            </select></div>
+            <span class="conv-eq">=</span>
+            <div class="conv-out" id="conv-out"></div>
+          </div>
+        </div>
+
         <div class="section-head">
           <h2>Recent checks</h2>
           <button class="link" id="history-clear" hidden>Clear</button>
@@ -140,8 +158,8 @@
             <span class="step-no">3</span>
             <div>
               <h3>Read the price</h3>
-              <p><b>Currency, fragments, runes, gems, unidentified uniques:</b> the poe.ninja price appears right away.</p>
-              <p><b>Rare, magic and normal items, identified uniques:</b> check the ticked stats and values, then click <b>Search</b> – the tool searches the official trade site.</p>
+              <p><b>Currency, fragments, runes, uncut gems (by level), unidentified uniques:</b> the poe.ninja price appears right away, with a 7-day trend.</p>
+              <p><b>Rare, magic and normal items, skill gems, identified uniques:</b> check the ticked stats and values, then click <b>Search</b> – the tool searches the official trade site.</p>
             </div>
           </li>
           <li class="step">
@@ -161,6 +179,8 @@
             <dd>Category or this base only, corrupted state, item level, sockets and whether all ticked stats must match. Click to switch, scroll over item level/sockets to change the value.</dd>
             <dt>Stats with Min / Max</dt>
             <dd>Tick the stats to search for. Values start at your item's own value – scroll over a field to change it or click to type. Under each mod you see where it comes from (Explicit, Implicit, Augment …) and its tier.</dd>
+            <dt>Weapons</dt>
+            <dd>Below 20% quality, the DPS rows offer <b>Q20</b>: the DPS the weapon would have at 20% quality, as minimum. Elemental DPS lets you pick the element (Any, Cold …).</dd>
             <dt>Hidden &amp; Collapse</dt>
             <dd>Mods already counted in a total, the DPS or the defences are hidden; <b>Hidden</b> shows them. <b>Collapse</b> folds the stat list away.</dd>
             <dt>Search &amp; Trade ↗</dt>

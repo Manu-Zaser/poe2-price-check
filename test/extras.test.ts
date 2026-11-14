@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { defenceStats, isStale, marketPrice, priceWarnings, pricingBasis, pseudoContributions, suggestPrice, weaponStats } from '../src/shared/extras';
+import { defenceStats, isStale, marketPrice, priceWarnings, pricingBasis, pseudoContributions, q20Dps, suggestPrice, weaponStats } from '../src/shared/extras';
 import { parseItemText } from '../src/shared/parser';
 import { buildSearchQuery, buildTradeMods, StatIndex, type StatsData } from '../src/shared/stats';
 import type { Listing } from '../src/shared/types';
@@ -231,5 +231,41 @@ describe('summed defence mods (Vengeance Wrap)', () => {
     expect(mods.find((m) => m.key === 'd:ev')).toMatchObject({ value: 2849, enabled: true });
     expect(mods.find((m) => m.text === '384 to Evasion Rating')).toMatchObject({ combined: true, enabled: false, coveredBy: 'defence' });
     expect(mods.find((m) => m.text === '142% increased Evasion Rating')).toMatchObject({ combined: true, enabled: false, coveredBy: 'defence' });
+  });
+});
+
+describe('DPS at 20% quality', () => {
+  const w = { aps: 1, pdps: 300, edps: 50, cdps: 0, dps: 350, crit: 5 };
+  const lines = [{ template: '#% increased Physical Damage', values: [80] }, { template: '#% increased Physical Damage', values: [20] }];
+
+  it('scales physical damage like increased physical damage', () => {
+    // 300 × (100 + 100 + 20) / (100 + 100 + 0) = 330; elemental DPS stays the same
+    expect(q20Dps({ quality: 0 }, lines, w)).toEqual({ pdps: 330, dps: 380 });
+    expect(q20Dps({ quality: 10 }, lines, w)).toEqual({ pdps: 314.3, dps: 364.3 });
+  });
+
+  it('does nothing at 20% quality or without physical damage', () => {
+    expect(q20Dps({ quality: 20 }, lines, w)).toBeNull();
+    expect(q20Dps({ quality: 0 }, lines, { ...w, pdps: 0, dps: 50 })).toBeNull();
+  });
+
+  it('is offered on the weapon rows of a weapon below 20% quality', () => {
+    const bow = parseItemText(fixture('rare-bow-morbid-stinger.txt').replace('Quality: +20% (augmented)', 'Quality: +10% (augmented)'))!;
+    const mods = buildTradeMods(bow, stats);
+    expect(mods.find((m) => m.key === 'w:pdps')?.q20).toBeGreaterThan(380);
+    expect(mods.find((m) => m.key === 'w:edps')?.q20).toBeUndefined();
+  });
+});
+
+describe('skill gems via trade search', () => {
+  const gem = parseItemText('Item Class: Skill Gems\nRarity: Gem\nFireball\n--------\nSpell, Projectile, Fire\nLevel: 18\nQuality: +20% (augmented)\n--------\nRequires: Level 72')!;
+
+  it('searches the gem by name with level and quality, without rarity', () => {
+    expect(gem).toMatchObject({ rarity: 'Gem', baseType: 'Fireball', gemLevel: 18, quality: 20 });
+    const mods = buildTradeMods(gem, stats).filter((m) => m.kind === 'misc');
+    const q = buildSearchQuery(gem, mods, { useBaseType: true, matchAll: true });
+    expect(q.query).toMatchObject({ type: 'Fireball' });
+    expect(q.query.filters.type_filters.filters).toEqual({ quality: { min: 20 } });
+    expect(q.query.filters.misc_filters?.filters).toMatchObject({ gem_level: { min: 18 } });
   });
 });

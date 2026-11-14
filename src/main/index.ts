@@ -160,6 +160,20 @@ function status(): AppStatus {
     hotkeyActive,
     hotkeysActive,
     canStartWithWindows: app.isPackaged,
+    currencyRates: currencyRates(),
+  };
+}
+
+/** Für den Währungsrechner: Wert je Einheit in Exalted. */
+function currencyRates(): AppStatus['currencyRates'] {
+  if (!index?.exaltedPerDivine) return {};
+  const chaos = index.currencyById.get('chaos');
+  const mirror = index.currencyById.get('mirror');
+  return {
+    divine: index.exaltedPerDivine,
+    exalted: 1,
+    ...(chaos ? { chaos: chaos * index.exaltedPerDivine } : {}),
+    ...(mirror ? { mirror: mirror * index.exaltedPerDivine } : {}),
   };
 }
 
@@ -789,7 +803,8 @@ async function priceCheck() {
     // Weiße Items: was poe.ninja kennt (z. B. Währung mit "Rarity: Normal"), bleibt dort,
     // alles andere (Basen, Waystones …) geht wie Rares über die Trade-Suche.
     const ninja = isRareLike ? null : lookupPrice(await getIndex(), item);
-    if (isRareLike || (item.rarity === 'Normal' && ninja?.kind !== 'priced')) {
+    // Weiße Items und (geschliffene) Gemmen, die poe.ninja nicht kennt → Trade-Suche.
+    if (isRareLike || ((item.rarity === 'Normal' || item.rarity === 'Gem') && ninja?.kind !== 'priced')) {
       addHistory(await rareCheck(item)); // rareCheck zeigt das Overlay selbst
     } else if (ninja) {
       showOverlay(ninja);
@@ -829,7 +844,7 @@ async function withItem(action: (item: ParsedItem) => Promise<void> | void) {
 function tradeHotkey() {
   return withItem(async (item) => {
     const idx = await getIndex();
-    const priceable = item.rarity === 'Rare' || item.rarity === 'Magic' || item.rarity === 'Normal' || isNamedUnique(item);
+    const priceable = item.rarity === 'Rare' || item.rarity === 'Magic' || item.rarity === 'Normal' || item.rarity === 'Gem' || isNamedUnique(item);
     let query: unknown;
     if (priceable) {
       const req = newRareRequest(item, await getStatIndex());

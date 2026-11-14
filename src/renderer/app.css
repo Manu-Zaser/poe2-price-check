@@ -289,3 +289,20 @@ textarea:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 @media (max-width: 860px) {
   .extra-keys { grid-template-columns: 1fr; }
 }
+
+/* ---------- Währungsrechner ---------- */
+.converter-card { padding: 16px 18px 18px; }
+.card-note { font-size: 12px; color: var(--faint); }
+.converter { display: grid; grid-template-columns: 110px 200px auto 1fr; gap: 10px; align-items: center; }
+#conv-amount {
+  width: 100%; padding: 9px 12px; border-radius: 8px; text-align: right;
+  font: 600 15px var(--font-display); font-variant-numeric: tabular-nums;
+  background: var(--surface-2); border: 1px solid var(--line-strong); color: var(--text);
+}
+#conv-amount:hover { border-color: var(--gold-deep); }
+#conv-amount.invalid { border-color: var(--bad); }
+.conv-eq { color: var(--faint); font-size: 18px; }
+.conv-out { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+.conv-val { color: var(--muted); white-space: nowrap; }
+.conv-val strong { color: var(--gold-bright); font: 600 17px var(--font-display); font-variant-numeric: tabular-nums; }
+.conv-none { color: var(--faint); font-size: 13px; }

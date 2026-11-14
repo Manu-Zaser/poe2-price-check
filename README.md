@@ -33,7 +33,7 @@ npm start
 ## Main window
 
 - **Home:** the hotkey, the price data (league, exchange rate, how many items poe.ninja prices and when they were
-  updated) and your **recent checks** – click one to open it in the overlay again, without scanning or searching again.
+  updated), a **currency converter** (Divine / Exalted / Chaos / Mirror of Kalandra at current rates) and your **recent checks** – click one to open it in the overlay again, without scanning or searching again.
 - **How to use:** a short guide to the hotkeys, the overlay, waystones and selling.
 - **Settings:** hotkeys, startup, overlay size/background/position, league, map mods, updates, GPU acceleration.
 
@@ -60,7 +60,9 @@ switches back to automatic.
 
 ## Features
 
-- **Currency, fragments, runes, essences, gems, etc.** → price per unit and for the whole stack (poe.ninja)
+- **Currency, fragments, runes, essences, uncut gems (by level) etc.** → price per unit and for the whole stack, with the
+  7-day trend as a small graph (poe.ninja)
+- **Skill gems** → trade search by name with gem level and quality as filters (poe.ninja has no prices for cut gems)
 - **Unidentified uniques** → all possible uniques for that base with their prices (poe.ninja)
 - **Identified uniques** → trade search by name and base, with the same mod list as for rares. By default no mod is
   ticked, so you see the cheapest copies; tick a roll to search for copies that are at least as good as yours (all
@@ -84,6 +86,8 @@ switches back to automatic.
     Tick or untick (clicking the text works too), change values with the **mouse wheel** or click and type them
     (empty = no limit). Default minimum = your item's own value (rounded down to one decimal place).
     "Reduced" mods (e.g. "50% reduced Projectile Range") are shown and edited as on the item; the search converts them.
+  - **Weapons below 20% quality:** the DPS rows offer **Q20** – the DPS at 20% quality, as minimum with one click.
+    **Elemental DPS** lets you pick the element (Any, Fire, Cold, Lightning – whatever the weapon has).
   - Order: weapon DPS (total/physical/elemental, calculated from the item's properties) and the weapon's overall
     **critical hit chance** (as displayed, including base value, local mods and quality – the local
     "+#% to Critical Hit Chance" mod is hidden because it is already part of it), defences (armour, evasion,

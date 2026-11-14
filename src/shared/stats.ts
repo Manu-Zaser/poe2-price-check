@@ -239,13 +239,14 @@ export function buildSearchQuery(item: ParsedItem, mods: TradeMod[], opts: Searc
   const unique = isNamedUnique(item);
   // Weiße Basen nur mit weißen Basen vergleichen; Magic/Rare untereinander.
   const rarity = unique ? 'unique' : item.rarity === 'Normal' ? 'normal' : 'nonunique';
-  const typeFilters: Record<string, unknown> = { rarity: { option: rarity } };
+  // Gemmen haben keine Seltenheit im üblichen Sinn – dort ohne Filter.
+  const typeFilters: Record<string, unknown> = item.rarity === 'Gem' ? {} : { rarity: { option: rarity } };
   const category = categoryFor(item.itemClass);
   // Unbekannte Item-Klasse: ohne Kategorie würde über alle Items gesucht – dann doch die Basis.
   const byBase = unique || opts.useBaseType || !category;
   if (!byBase) typeFilters.category = { option: category };
   const equipment: Record<string, { min?: number; max?: number }> = {};
-  const misc: Record<string, { option: string }> = {};
+  const misc: Record<string, unknown> = {};
   for (const m of mods) {
     if (!m.enabled || !m.filter) continue;
     if (m.filter === 'corrupted') {
@@ -255,6 +256,8 @@ export function buildSearchQuery(item: ParsedItem, mods: TradeMod[], opts: Searc
     const range = statRange(m);
     if (!range) continue;
     if (m.filter === 'ilvl') typeFilters.ilvl = range;
+    else if (m.filter === 'quality') typeFilters.quality = range;
+    else if (m.filter === 'gem_level') misc.gem_level = range;
     else if (m.filter === 'sockets') equipment.rune_sockets = range;
     else equipment[m.filter] = range;
   }

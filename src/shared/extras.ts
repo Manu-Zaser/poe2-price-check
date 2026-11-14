@@ -83,6 +83,19 @@ export function weaponStats(item: ParsedItem): WeaponStats | null {
   return { aps, pdps: round(phys * aps), edps: round(ele * aps), cdps: round(chaos * aps), dps: round((phys + ele + chaos) * aps), crit };
 }
 
+/**
+ * pDPS und Gesamt-DPS so, als hätte die Waffe 20 % Qualität. Qualität zählt bei Waffen wie
+ * "increased Physical Damage": angezeigt = (Basis + flach) × (100 + inc + Q) / 100.
+ * null, wenn die Waffe schon 20 % (oder mehr) hat oder keinen physischen Schaden.
+ */
+export function q20Dps(item: Pick<ParsedItem, 'quality'>, lines: Pick<ModLine, 'template' | 'values'>[], w: WeaponStats): { pdps: number; dps: number } | null {
+  const q = item.quality ?? 0;
+  if (q >= 20 || w.pdps <= 0) return null;
+  const inc = lines.filter((l) => l.template === '#% increased Physical Damage').reduce((sum, l) => sum + (l.values[0] ?? 0), 0);
+  const pdps = Math.round(w.pdps * ((100 + inc + 20) / (100 + inc + q)) * 10) / 10;
+  return { pdps, dps: Math.round((w.dps - w.pdps + pdps) * 10) / 10 };
+}
+
 /** Lokale Schadens-Mods, die in den DPS schon enthalten sind. */
 const DPS_MODS = [/^#% increased Physical Damage$/, /^Adds # to # (Physical|Fire|Cold|Lightning|Chaos) Damage$/, /^#% increased Attack Speed$/];
 
@@ -184,9 +197,15 @@ export function buildExtraMods(item: ParsedItem, lines: ModLine[], mods: TradeMo
       ['pdps', `${w.pdps} physical DPS`, w.pdps],
       ['edps', `${w.edps} elemental DPS`, w.edps],
     ];
+    // DPS bei 20 % Qualität: Qualität erhöht den physischen Schaden wie "increased Physical Damage".
+    const q20 = q20Dps(item, lines, w);
     for (const [filter, text, value] of rows) {
       if (value <= 0) continue;
-      extras.push({ key: `w:${filter}`, text, kind: 'weapon', statId: null, filter, value, min: minOf(value), enabled: filter === main });
+      const atQ20 = filter === 'pdps' ? q20?.pdps : filter === 'dps' ? q20?.dps : undefined;
+      extras.push({
+        key: `w:${filter}`, text, kind: 'weapon', statId: null, filter, value, min: minOf(value), enabled: filter === main,
+        ...(atQ20 !== undefined && atQ20 > value ? { q20: atQ20 } : {}),
+      });
     }
   }
   // Gesamte Crit-Chance der Waffe statt des einzelnen "+#% to Critical Hit Chance"-Mods.
@@ -208,6 +227,13 @@ export function buildExtraMods(item: ParsedItem, lines: ModLine[], mods: TradeMo
       if (value <= 0) continue;
       extras.push({ key: `d:${filter}`, text, kind: 'defence', statId: null, filter, value, min: minOf(value), enabled: on });
     }
+  }
+
+  // Gemmen: Stufe (an) und Qualität (an, falls vorhanden) als Filter
+  if (item.rarity === 'Gem') {
+    if (item.gemLevel) extras.push({ key: 'f:gem_level', text: 'Gem level', kind: 'misc', statId: null, filter: 'gem_level', value: item.gemLevel, min: item.gemLevel, enabled: true });
+    const q = item.quality ?? 0;
+    extras.push({ key: 'f:quality', text: 'Quality', kind: 'misc', statId: null, filter: 'quality', value: q, min: q || undefined, enabled: q > 0 });
   }
 
   // Corrupted-Status: standardmäßig nur Items mit demselben Status suchen (wichtig für den Preis)

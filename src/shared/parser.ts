@@ -26,6 +26,7 @@ const PATTERNS = {
   itemLevel: /^(?:Item Level|Gegenstandsstufe):\s*(\d+)/i,
   quality: /^(?:Quality|Qualität)[^:]*:\s*\+?(\d+)%/i,
   stackSize: /^(?:Stack Size|Stapelgröße):\s*([\d.,\s]+)\//i,
+  gemLevel: /^(?:Level|Stufe):\s*(\d+)/i,
   corrupted: /^(?:Corrupted|Verderbt)$/i,
   unidentified: /^(?:Unidentified|Nicht identifiziert)$/i,
 };
@@ -130,6 +131,9 @@ export function parseItemText(text: string): ParsedItem | null {
   if (q) item.quality = toInt(q[1]);
   const stack = find(PATTERNS.stackSize);
   if (stack) item.stackSize = toInt(stack[1]);
+  // "Level: 18" steht nur bei Gemmen ("Requires: Level 78" beginnt anders).
+  const gem = find(PATTERNS.gemLevel);
+  if (gem && (rarity === 'Gem' || /gem/i.test(itemClass))) item.gemLevel = toInt(gem[1]);
 
   return item;
 }

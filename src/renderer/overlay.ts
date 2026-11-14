@@ -26,11 +26,44 @@ function bigPrice(value: string, unit: string, prefix?: string, meta?: HTMLEleme
   );
 }
 
+/**
+ * Mini-Grafik des Kursverlaufs (poe.ninja: Änderung in % je Tag). Die Null-Linie ist der Stand
+ * vor einer Woche – darüber teurer, darunter günstiger geworden.
+ */
+function sparkline(points: number[], change?: number): SVGSVGElement {
+  const W = 72;
+  const H = 22;
+  const lo = Math.min(0, ...points);
+  const hi = Math.max(0, ...points);
+  const span = hi - lo || 1;
+  const x = (i: number) => (i / (points.length - 1)) * (W - 2) + 1;
+  const y = (v: number) => H - 1 - ((v - lo) / span) * (H - 2);
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('class', `spark ${change === undefined ? '' : change > 0.5 ? 'up' : change < -0.5 ? 'down' : 'flat'}`);
+  const zero = document.createElementNS(ns, 'line');
+  zero.setAttribute('x1', '0');
+  zero.setAttribute('x2', String(W));
+  zero.setAttribute('y1', String(y(0)));
+  zero.setAttribute('y2', String(y(0)));
+  zero.setAttribute('class', 'spark-zero');
+  const line = document.createElementNS(ns, 'polyline');
+  line.setAttribute('points', points.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' '));
+  line.setAttribute('class', 'spark-line');
+  svg.append(zero, line);
+  const title = document.createElementNS(ns, 'title');
+  title.textContent = `Price change over the last ${points.length} days (poe.ninja)`;
+  svg.append(title);
+  return svg;
+}
+
 function ninjaPrice(m: PriceMatch): HTMLElement {
   const p = priceParts(m.divine, m.exalted);
   const meta = el('div', 'price-meta');
   if (p.alt) meta.append(el('span', '', p.alt));
   const t = trend(m.change7d);
+  if (m.sparkline) meta.append(sparkline(m.sparkline, m.change7d));
   if (t) meta.append(t, el('span', 'faint', '7 days'));
   return bigPrice(p.value, p.unit, undefined, meta);
 }
@@ -286,14 +319,86 @@ function statRow(m: TradeMod, onChange: () => void): HTMLElement {
     sync();
     onChange();
   };
+  const minInput = withValue ? numInput(m, 'min', onValue) : null;
+  const maxInput = withValue ? numInput(m, 'max', onValue) : null;
+
+  // Waffen unter 20 % Qualität: per Klick den DPS-Wert bei 20 % als Minimum nehmen.
+  if (m.q20 !== undefined && minInput) {
+    const q20 = m.q20;
+    const btn = el('button', 'q20', `Q20: ${formatNum(q20)}`);
+    btn.type = 'button';
+    btn.title = `DPS at 20% quality – this weapon has less. Click to use it as the minimum, click again for ${formatNum(m.min)}.`;
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const on = !btn.classList.contains('on');
+      btn.classList.toggle('on', on);
+      minInput.value = formatNum(on ? Math.floor(q20 * 10) / 10 : m.min);
+      minInput.dispatchEvent(new Event('blur')); // übernehmen wie nach dem Tippen
+    });
+    tags.append(btn);
+  }
+
   row.append(
     box,
     el('div', 'stat-main', text, tags.childElementCount ? tags : null),
-    withValue ? numInput(m, 'min', onValue) : el('span', 'num-empty'),
-    withValue ? numInput(m, 'max', onValue) : el('span', 'num-empty'),
+    minInput ?? el('span', 'num-empty'),
+    maxInput ?? el('span', 'num-empty'),
   );
   sync();
   return row;
+}
+
+/**
+ * Elemental DPS: Element wählen ("Any" oder z. B. "Cold"). Die Wahl hakt den passenden
+ * "Adds # to # Cold Damage"-Mod an (ohne Mindestwert) – so passen nur Waffen mit diesem Element.
+ */
+function elementChoice(stats: HTMLElement, mods: TradeMod[], onChange: () => void) {
+  const row = stats.querySelector<HTMLElement>('.stat[data-key="w:edps"]');
+  if (!row) return;
+  const byElement = new Map<string, string>(); // Element → Mod-Key
+  for (const m of mods) {
+    const hit = (m.template ?? '').match(/^Adds # to # (Fire|Cold|Lightning) Damage$/);
+    if (hit && m.statId) byElement.set(hit[1], m.key);
+  }
+  if (!byElement.size) return;
+
+  const main = row.querySelector<HTMLElement>('.stat-main')!;
+  let tags = main.querySelector<HTMLElement>('.stat-tags');
+  if (!tags) {
+    tags = el('div', 'stat-tags');
+    main.append(tags);
+  }
+  const group = el('span', 'el-choice');
+  const buttons: HTMLButtonElement[] = [];
+  const pick = (element: string | null) => {
+    for (const [name, key] of byElement) {
+      const modRow = stats.querySelector<HTMLElement>(`.stat[data-key="${key}"]`);
+      const box = modRow?.querySelector<HTMLInputElement>('input[type=checkbox]');
+      const min = modRow?.querySelector<HTMLInputElement>('.num-min');
+      if (!modRow || !box) continue;
+      const on = name === element;
+      if (on && min) min.value = ''; // nur das Element zählt, nicht die Höhe des Schadens
+      if (box.checked !== on) {
+        box.checked = on;
+        box.dispatchEvent(new Event('change'));
+      }
+    }
+    for (const b of buttons) b.classList.toggle('on', (b.dataset.element || null) === element);
+    onChange();
+  };
+  for (const name of ['Any', ...byElement.keys()]) {
+    const b = el('button', `el-btn${name === 'Any' ? ' on' : ''}`, name);
+    b.type = 'button';
+    b.dataset.element = name === 'Any' ? '' : name;
+    b.title = name === 'Any' ? 'Any elemental damage' : `Only weapons with added ${name.toLowerCase()} damage`;
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      pick(name === 'Any' ? null : name);
+    });
+    buttons.push(b);
+    group.append(b);
+  }
+  tags.append(group);
 }
 
 function listingRow(l: Listing, now: number): HTMLElement {
@@ -454,6 +559,7 @@ function renderTrade(r: TradeResult): HTMLElement {
   };
 
   stats.append(...statMods.map((m) => statRow(m, onChange)));
+  elementChoice(stats, r.mods, onChange);
 
   // --- Chips ---
   // Standard ist die ganze Kategorie; ohne bekannte Kategorie geht nur die Basis.
@@ -475,11 +581,16 @@ function renderTrade(r: TradeResult): HTMLElement {
   }
   for (const f of misc) {
     const c = chip();
-    const isValue = f.mod.filter === 'ilvl' || f.mod.filter === 'sockets';
+    const isValue = f.mod.filter === 'ilvl' || f.mod.filter === 'sockets' || f.mod.filter === 'gem_level' || f.mod.filter === 'quality';
     c.title = isValue ? 'Click to use this filter · scroll to change the value' : 'Click to use this filter';
     updaters.push(() => {
       c.classList.toggle('on', f.on);
-      c.textContent = f.mod.filter === 'ilvl' ? `Item level ${f.min ?? '–'}+` : f.mod.filter === 'sockets' ? `Sockets ${f.min ?? '–'}+` : f.mod.text;
+      c.textContent =
+        f.mod.filter === 'ilvl' ? `Item level ${f.min ?? '–'}+`
+        : f.mod.filter === 'sockets' ? `Sockets ${f.min ?? '–'}+`
+        : f.mod.filter === 'gem_level' ? `Gem level ${f.min ?? '–'}+`
+        : f.mod.filter === 'quality' ? `Quality ${f.min ?? 0}%+`
+        : f.mod.text;
     });
     c.addEventListener('click', () => {
       f.on = !f.on;
@@ -499,7 +610,7 @@ function renderTrade(r: TradeResult): HTMLElement {
     }
     chips.append(c);
   }
-  {
+  if (statMods.length) {
     const c = chip();
     c.title = 'Click to switch between "all ticked stats must match" and "most of them"';
     updaters.push(() => {
@@ -544,6 +655,10 @@ function renderTrade(r: TradeResult): HTMLElement {
     reportSize();
   });
   const statsBar = el('div', 'stats-bar', collapseBtn, hiddenBtn, wheelHint);
+  if (!statMods.length) {
+    stats.hidden = true;
+    statsBar.hidden = true;
+  }
 
   // --- Ergebnisleiste ---
   const matched = el('span', 'matched', matchedText(r));

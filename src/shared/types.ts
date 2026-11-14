@@ -9,6 +9,8 @@ export interface ParsedItem {
   baseType: string;
   itemLevel?: number;
   quality?: number;
+  /** Gemmen und ungeschliffene Gemmen: Stufe aus der Zeile "Level: 18". */
+  gemLevel?: number;
   stackSize?: number;
   corrupted: boolean;
   unidentified: boolean;
@@ -37,6 +39,8 @@ export interface PriceMatch {
   listingCount?: number;
   /** Kursänderung der letzten 7 Tage in Prozent. */
   change7d?: number;
+  /** Verlauf der letzten Tage (Änderung in % je Tag, poe.ninja) – für die Mini-Grafik. */
+  sparkline?: number[];
   /** Absolute Bild-URL (web.poecdn.com). */
   icon?: string;
 }
@@ -64,9 +68,11 @@ export interface TradeMod {
   /** Aus mehreren Zeilen mit derselben Stat-ID zusammengefasst. */
   combined?: boolean;
   /** Kein Stat, sondern ein Item-Filter der Trade-Suche. */
-  filter?: 'dps' | 'pdps' | 'edps' | 'crit' | 'ar' | 'ev' | 'es' | 'block' | 'spirit' | 'ilvl' | 'sockets' | 'corrupted';
+  filter?: 'dps' | 'pdps' | 'edps' | 'crit' | 'gem_level' | 'quality' | 'ar' | 'ev' | 'es' | 'block' | 'spirit' | 'ilvl' | 'sockets' | 'corrupted';
   /** Waystones/Tablets: Mod steht auf der Liste gefährlicher Mods (Einstellungen). */
   danger?: boolean;
+  /** Waffen: DPS bei 20 % Qualität (nur wenn die Waffe weniger hat). */
+  q20?: number;
   /** Abgewählt, weil schon in einer Summe bzw. den DPS enthalten. */
   coveredBy?: 'total' | 'DPS' | 'crit' | 'defence';
   /** Tier(s) laut Spiel (bei zusammengefassten Mods mehrere). In PoE2: höher = besser. */
@@ -176,6 +182,8 @@ export interface AppStatus {
   hotkeysActive: Partial<Record<HotkeySetting, boolean>>;
   /** Start mit Windows ist möglich (nur in der gepackten App). */
   canStartWithWindows: boolean;
+  /** Für den Währungsrechner: Wert je Einheit in Exalted (fehlt = unbekannt). */
+  currencyRates: Partial<Record<'divine' | 'exalted' | 'chaos' | 'mirror', number>>;
 }
 
 export interface HistoryEntry {

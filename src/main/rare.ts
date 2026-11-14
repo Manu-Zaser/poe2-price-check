@@ -81,6 +81,8 @@ export function newRareRequest(item: ParsedItem, stats: StatIndex, reference?: P
   const mods = buildTradeMods(item, stats);
   // Uniques: alle angehakten Rolls müssen passen ("4 von 6" ergibt bei festen Mods keinen Sinn).
   if (isNamedUnique(item)) return { id: nextRequestId++, item, mods: uniqueDefaults(mods), useBaseType: true, matchAll: true, instantOnly: true, reference };
+  // Gemmen: nur Stufe, Qualität und Corrupted – die Beschreibungszeilen sind keine Mods.
+  if (item.rarity === 'Gem') return { id: nextRequestId++, item, mods: mods.filter((m) => m.kind === 'misc'), useBaseType: true, matchAll: true, instantOnly: true };
   // Weiße Items: Basis zählt (nicht die Kategorie), dazu Item-Level.
   if (item.rarity === 'Normal') return { id: nextRequestId++, item, mods: normalDefaults(mods), useBaseType: true, matchAll: true, instantOnly: true };
   // Standard: ganze Item-Kategorie (z. B. alle Bögen, nicht nur "Obliterator Bow") – bei Rares zählen
@@ -124,7 +126,7 @@ export async function runRareSearch(client: TradeClient, index: PriceIndex, req:
   const base = baseResult(index, req);
 
   // Uniques und weiße Basen lassen sich auch ganz ohne Mods suchen (Name bzw. Basis reichen).
-  if (!isNamedUnique(req.item) && req.item.rarity !== 'Normal' && !req.mods.some((m) => m.enabled && (m.statId || m.filter))) {
+  if (!isNamedUnique(req.item) && req.item.rarity !== 'Normal' && req.item.rarity !== 'Gem' && !req.mods.some((m) => m.enabled && (m.statId || m.filter))) {
     return { ...base, search: null, error: 'No mods selected. Tick at least one mod and search again.' };
   }
 

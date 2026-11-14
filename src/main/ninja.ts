@@ -17,7 +17,7 @@ export const UNIQUE_TYPES = [
 
 // --- Antwortformate (nur die Felder, die wir nutzen) ---
 
-interface Sparkline { totalChange?: number }
+interface Sparkline { totalChange?: number; data?: (number | null)[] }
 interface ExchangeResponse {
   core: { rates: { exalted?: number }; primary: string };
   lines: { id: string; primaryValue: number; sparkline?: Sparkline }[];
@@ -29,6 +29,12 @@ interface UniqueResponse {
 }
 
 const IMAGE_HOST = 'https://web.poecdn.com';
+
+/** Verlauf ohne Lücken; zu wenige Punkte = keine Grafik. */
+function cleanSparkline(data: (number | null)[] | undefined): number[] | undefined {
+  const points = (data ?? []).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+  return points.length >= 2 ? points : undefined;
+}
 
 /** poe.ninja liefert Währungsbilder als relativen Pfad auf web.poecdn.com. */
 function absoluteImage(src: string | undefined): string | undefined {
@@ -130,6 +136,7 @@ export async function buildPriceIndex(fetchJson: FetchJson, league: string): Pro
         divine: line.primaryValue,
         exalted: line.primaryValue * (rate || index.exaltedPerDivine),
         change7d: line.sparkline?.totalChange,
+        sparkline: cleanSparkline(line.sparkline?.data),
       });
     }
   }
@@ -144,6 +151,7 @@ export async function buildPriceIndex(fetchJson: FetchJson, league: string): Pro
         exalted: line.primaryValue * rate,
         listingCount: line.listingCount,
         change7d: line.sparkLine?.totalChange,
+        sparkline: cleanSparkline(line.sparkLine?.data),
         icon: absoluteImage(line.icon),
       };
       push(index.uniquesByName, line.name.toLowerCase(), match);
@@ -175,7 +183,13 @@ export function lookupPrice(index: PriceIndex, item: ParsedItem): PriceResult {
     return { kind: 'not-found', item, league, reason: `No unique found on base "${item.baseType}".` };
   }
 
-  // Währung, Fragmente, Runen, Essenzen, ungeschliffene Gemmen usw.
+  // Ungeschliffene Gemmen stehen je Stufe bei poe.ninja: "Uncut Skill Gem (Level 12)".
+  if (item.gemLevel) {
+    const uncut = index.currency.get(`${item.baseType} (level ${item.gemLevel})`.toLowerCase());
+    if (uncut) return { kind: 'priced', item, source: 'poe.ninja', league, matches: [uncut], stackSize: item.stackSize };
+  }
+
+  // Währung, Fragmente, Runen, Essenzen usw.
   const currency = index.currency.get(item.baseType.toLowerCase());
   if (currency) {
     return { kind: 'priced', item, source: 'poe.ninja', league, matches: [currency], stackSize: item.stackSize };
