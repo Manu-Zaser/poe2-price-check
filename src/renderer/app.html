@@ -8,125 +8,244 @@
   <link rel="stylesheet" href="app.css" />
 </head>
 <body>
-  <header class="titlebar">
-    <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
-      <path d="M16 2 L28 9 V23 L16 30 L4 23 V9 Z" fill="none" stroke="currentColor" stroke-width="1.6" />
-      <path d="M16 8 L22 11.5 V20.5 L16 24 L10 20.5 V11.5 Z" fill="currentColor" opacity=".25" />
-      <circle cx="16" cy="16" r="3.2" fill="currentColor" />
-    </svg>
-    <span class="app-name">PoE2 <b>Price Check</b></span>
-    <nav class="tabs" role="tablist">
-      <button class="tab active" role="tab" data-tab="overview">Overview</button>
-      <button class="tab" role="tab" data-tab="settings">Settings</button>
+  <!-- ---------- Seitenleiste ---------- -->
+  <aside class="sidebar">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+        <path d="M16 2 L28 9 V23 L16 30 L4 23 V9 Z" fill="none" stroke="currentColor" stroke-width="1.6" />
+        <path d="M16 8 L22 11.5 V20.5 L16 24 L10 20.5 V11.5 Z" fill="currentColor" opacity=".25" />
+        <circle cx="16" cy="16" r="3.2" fill="currentColor" />
+      </svg>
+      <div class="brand-text">
+        <span class="brand-name">Price Check</span>
+        <span class="brand-sub">for Path of Exile 2</span>
+      </div>
+    </div>
+
+    <nav class="nav" aria-label="Pages">
+      <button class="nav-item active" data-page="home">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5h-5v5H5a1 1 0 0 1-1-1z" /></svg>
+        <span>Home</span>
+      </button>
+      <button class="nav-item" data-page="guide">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h5.5a2 2 0 0 1 2 2V20a1.5 1.5 0 0 0-1.5-1.5H5zM19 4.5h-5.5a2 2 0 0 0-2 2V20a1.5 1.5 0 0 1 1.5-1.5H19z" /></svg>
+        <span>How to use</span>
+      </button>
+      <button class="nav-item" data-page="settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-2.6-1.1l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.1-2.6l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 2.6-1.1V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z" /></svg>
+        <span>Settings</span>
+      </button>
     </nav>
-  </header>
 
-  <main>
-    <!-- ÜBERSICHT -->
-    <section class="page active" data-page="overview">
-      <div class="hotkey-card" id="hotkey-card">
-        <div class="hotkey-head">
-          <span class="eyebrow">Price check hotkey</span>
-          <span class="pill" id="hotkey-pill"><i></i><span></span></span>
-        </div>
-        <div class="keys" id="hotkey-keys"></div>
-        <p class="hotkey-hint" id="hotkey-hint">Hover over an item in game and press the hotkey.</p>
-        <p class="hotkey-error" id="hotkey-error" role="alert"></p>
-        <div class="hotkey-actions">
-          <button class="btn primary" id="hotkey-change">Change hotkey</button>
-          <button class="btn ghost" id="hotkey-cancel" hidden>Cancel</button>
-          <button class="btn ghost" id="hotkey-reset">Default (Ctrl + D)</button>
-        </div>
+    <div class="sidebar-foot">
+      <div class="update-card" id="update-card" hidden>
+        <span class="update-title" id="update-title"></span>
+        <span class="update-text" id="update-text"></span>
+        <div class="progress" id="update-progress" hidden><i></i></div>
+        <button class="btn primary sm" id="update-action" hidden></button>
       </div>
+      <div class="status-line" id="status-line"><i></i><span></span></div>
+      <p class="fineprint">
+        Prices by <a href="https://poe.ninja/poe2/economy" target="_blank">poe.ninja</a> and the official trade site.
+        Not affiliated with or endorsed by Grinding Gear Games.
+      </p>
+    </div>
+  </aside>
 
-      <div class="stats">
-        <div class="stat">
-          <span class="eyebrow">League</span>
-          <strong id="stat-league">–</strong>
+  <!-- ---------- Inhalt ---------- -->
+  <div class="content">
+    <header class="page-head">
+      <div>
+        <h1 id="page-title">Home</h1>
+        <p id="page-sub">Price checks at a glance</p>
+      </div>
+    </header>
+
+    <main>
+      <!-- STARTSEITE -->
+      <section class="page active" data-page="home" data-title="Home" data-sub="Price checks at a glance">
+        <div class="card hotkey-card" id="hotkey-card">
+          <div class="hotkey-top">
+            <span class="eyebrow">Price check hotkey</span>
+            <span class="pill" id="hotkey-pill"><i></i><span></span></span>
+          </div>
+          <div class="keys" id="hotkey-keys"></div>
+          <p class="hotkey-hint" id="hotkey-hint">Hover over an item in game and press the hotkey.</p>
+          <p class="hotkey-error" id="hotkey-error" role="alert"></p>
+          <div class="hotkey-actions">
+            <button class="btn" id="hotkey-change">Change hotkey</button>
+            <button class="btn ghost" id="hotkey-cancel" hidden>Cancel</button>
+            <button class="btn ghost" id="hotkey-reset">Default (Ctrl + D)</button>
+          </div>
         </div>
-        <div class="stat">
-          <span class="eyebrow">1 Divine</span>
-          <strong id="stat-rate">–</strong>
-        </div>
-        <div class="stat">
-          <span class="eyebrow">Prices</span>
-          <strong id="stat-count">–</strong>
-          <span class="stat-sub">
-            <span id="stat-age">–</span>
-            <button class="icon-btn" id="refresh" title="Reload prices" aria-label="Reload prices">
-              <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+
+        <div class="card data-card">
+          <div class="card-head">
+            <h2>Price data</h2>
+            <button class="btn ghost sm" id="refresh" title="Reload prices from poe.ninja">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" /></svg>
+              <span>Refresh</span>
             </button>
-          </span>
+          </div>
+          <div class="data-grid">
+            <div class="datum">
+              <span class="datum-label">League</span>
+              <strong id="data-league">–</strong>
+              <span class="datum-sub" id="data-league-sub">–</span>
+            </div>
+            <div class="datum">
+              <span class="datum-label">Exchange rate</span>
+              <strong id="data-rate">–</strong>
+              <span class="datum-sub">Divine Orb in Exalted Orbs</span>
+            </div>
+            <div class="datum">
+              <span class="datum-label">Price list</span>
+              <strong id="data-count">–</strong>
+              <span class="datum-sub" id="data-age">–</span>
+            </div>
+          </div>
+          <p class="banner error" id="error-banner" hidden></p>
         </div>
-      </div>
-      <p class="banner error" id="error-banner" hidden></p>
 
-      <div class="section-head">
-        <h2>History</h2>
-        <button class="link" id="history-clear" hidden>Clear</button>
-      </div>
-      <ul class="history" id="history"></ul>
-      <div class="empty" id="history-empty">
-        <div class="empty-keys" id="empty-keys"></div>
-        <p>No price checks yet.<br />Hover over an item in game and press the hotkey.</p>
-      </div>
-    </section>
+        <div class="section-head">
+          <h2>Recent checks</h2>
+          <button class="link" id="history-clear" hidden>Clear</button>
+        </div>
+        <p class="section-hint" id="history-hint" hidden>Click a check to open it in the overlay again.</p>
+        <ul class="history" id="history"></ul>
+        <div class="empty" id="history-empty">
+          <div class="empty-keys" id="empty-keys"></div>
+          <p>No price checks yet. Hover over an item in game and press the hotkey.</p>
+        </div>
+      </section>
 
-    <!-- EINSTELLUNGEN -->
-    <section class="page" data-page="settings">
-      <div class="field">
-        <label for="league">League</label>
-        <p class="help">Which league the poe.ninja prices come from.</p>
-        <div class="select-wrap"><select id="league"></select></div>
-      </div>
+      <!-- ANLEITUNG -->
+      <section class="page guide" data-page="guide" data-title="How to use" data-sub="From hotkey to selling price in a few seconds">
+        <ol class="steps">
+          <li class="step">
+            <span class="step-no">1</span>
+            <div>
+              <h3>Play in windowed fullscreen</h3>
+              <p>Set PoE2 to <b>Windowed</b> or <b>Windowed Fullscreen</b> – in exclusive fullscreen the overlay ends up behind the game.</p>
+            </div>
+          </li>
+          <li class="step">
+            <span class="step-no">2</span>
+            <div>
+              <h3>Hover an item and press <span class="inline-keys" id="guide-keys"></span></h3>
+              <p>The tool copies the item text (one copy keystroke per press, nothing else) and opens the overlay next to your cursor.</p>
+            </div>
+          </li>
+          <li class="step">
+            <span class="step-no">3</span>
+            <div>
+              <h3>Read the price</h3>
+              <p><b>Currency, fragments, runes, gems, unidentified uniques:</b> the poe.ninja price appears right away.</p>
+              <p><b>Rare, magic and normal items, identified uniques:</b> check the ticked stats and values, then click <b>Search</b> – the tool searches the official trade site.</p>
+            </div>
+          </li>
+          <li class="step">
+            <span class="step-no">4</span>
+            <div>
+              <h3>Sell it</h3>
+              <p><b>Sell for</b> suggests a price just below the cheapest current offers. <b>Copy</b> puts it on your clipboard as a stash note, e.g. <code>~b/o 67 divine</code>.</p>
+            </div>
+          </li>
+        </ol>
 
-      <div class="field">
-        <label for="scale">Overlay size <output id="scale-out"></output></label>
-        <p class="help">Scales text and window of the price overlay. Check it right away with "Show test overlay" below.</p>
-        <input type="range" id="scale" min="80" max="160" step="5" />
-      </div>
+        <h2 class="guide-h">The overlay</h2>
+        <div class="overlay-explained">
+          <img src="guide-overlay.png" alt="Price check overlay for a rare bow" />
+          <dl class="legend">
+            <dt>Chips</dt>
+            <dd>Category or this base only, corrupted state, item level, sockets and whether all ticked stats must match. Click to switch, scroll over item level/sockets to change the value.</dd>
+            <dt>Stats with Min / Max</dt>
+            <dd>Tick the stats to search for. Values start at your item's own value – scroll over a field to change it or click to type. Under each mod you see where it comes from (Explicit, Implicit, Augment …) and its tier.</dd>
+            <dt>Hidden &amp; Collapse</dt>
+            <dd>Mods already counted in a total, the DPS or the defences are hidden; <b>Hidden</b> shows them. <b>Collapse</b> folds the stat list away.</dd>
+            <dt>Search &amp; Trade ↗</dt>
+            <dd>Nothing is searched until you click <b>Search</b>. <b>Trade ↗</b> opens the same search on pathofexile.com.</dd>
+            <dt>Typical price</dt>
+            <dd>The median of the 3 cheapest current offers – the single cheapest offer is often a forgotten or mispriced item.</dd>
+            <dt>Listings</dt>
+            <dd>The 20 cheapest offers. Faded rows have been listed for more than 14 days and are ignored for the typical price.</dd>
+          </dl>
+        </div>
 
-      <div class="field">
-        <label for="opacity">Overlay background <output id="opacity-out"></output></label>
-        <p class="help">How opaque the background of the price overlay is – lower values let the game show through. Text stays fully visible. Check it right away with "Show test overlay" below.</p>
-        <input type="range" id="opacity" min="40" max="100" step="5" />
-      </div>
-
-      <div class="field">
-        <label>Overlay position <output id="pos-out"></output></label>
-        <p class="help">The price window stays open until you close it with × (or Esc). Drag it anywhere on the overlay to move it – the position is remembered for all further price checks.</p>
-        <button class="btn" id="pos-reset">Reset position (back next to the mouse cursor)</button>
-      </div>
-
-      <div class="field">
-        <label for="gpu">Performance</label>
-        <p class="help">Without GPU acceleration the tool draws its windows on the CPU and takes no graphics power away from the game. Recommended: off.</p>
-        <label class="check"><input type="checkbox" id="gpu" /> <span>Use GPU acceleration</span></label>
-        <button class="btn" id="gpu-restart" hidden>Restart now to apply</button>
-      </div>
-
-      <div class="field">
-        <label>Test overlay</label>
-        <p class="help">Shows a Divine Orb at the overlay position to check its look and placement.</p>
-        <button class="btn" id="overlay-test">Show test overlay</button>
-      </div>
-
-      <div class="field">
-        <label>Notes</label>
-        <ul class="notes">
-          <li>Play in <b>windowed</b> or <b>windowed fullscreen</b> mode, otherwise the overlay ends up behind the game.</li>
-          <li>Each hotkey press sends exactly one Ctrl+Alt+C (advanced copy, provides the tiers) to the game, nothing else.</li>
-          <li>Rares and magic items are searched on the official trade site: one search per price check, GGG's rate limits are respected.</li>
-          <li>Errors are logged to <code id="log-path"></code></li>
+        <h2 class="guide-h">Good to know</h2>
+        <ul class="tips">
+          <li><b>Move</b> the overlay by dragging any empty spot – it stays there for the next checks. <b>Close</b> it with × or Esc.</li>
+          <li><b>Recent checks</b> on the Home page reopen a check in the overlay without searching again.</li>
+          <li>GGG allows only a few trade searches per minute. If you search too often, the overlay asks you to wait a few seconds.</li>
+          <li>The league is chosen automatically – after a league start the tool switches within an hour.</li>
         </ul>
-      </div>
-    </section>
-  </main>
+      </section>
 
-  <footer>
-    <span>Prices from <a href="https://poe.ninja/poe2/economy" target="_blank">poe.ninja</a></span>
-    <span class="disclaimer">This product isn't affiliated with or endorsed by Grinding Gear Games in any way.</span>
-  </footer>
+      <!-- EINSTELLUNGEN -->
+      <section class="page" data-page="settings" data-title="Settings" data-sub="Overlay, prices and updates">
+        <h2 class="group-h">Overlay</h2>
+        <div class="card group">
+          <div class="field">
+            <label for="scale">Size <output id="scale-out"></output></label>
+            <p class="help">Scales text and window of the price overlay.</p>
+            <input type="range" id="scale" min="80" max="160" step="5" />
+          </div>
+          <div class="field">
+            <label for="opacity">Background <output id="opacity-out"></output></label>
+            <p class="help">Lower values let the game show through. Text stays fully visible.</p>
+            <input type="range" id="opacity" min="40" max="100" step="5" />
+          </div>
+          <div class="field row">
+            <div>
+              <label>Position <output id="pos-out"></output></label>
+              <p class="help">Drag the overlay anywhere to move it – the position is remembered.</p>
+            </div>
+            <button class="btn" id="pos-reset">Reset</button>
+          </div>
+          <div class="field row">
+            <div>
+              <label>Test overlay</label>
+              <p class="help">Shows a Divine Orb to check size, background and position.</p>
+            </div>
+            <button class="btn" id="overlay-test">Show</button>
+          </div>
+        </div>
+
+        <h2 class="group-h">Prices</h2>
+        <div class="card group">
+          <div class="field">
+            <label for="league">League</label>
+            <p class="help">Automatic follows the current challenge league on poe.ninja – including new leagues.</p>
+            <div class="select-wrap"><select id="league"></select></div>
+          </div>
+        </div>
+
+        <h2 class="group-h">Updates</h2>
+        <div class="card group">
+          <div class="field row">
+            <div>
+              <label>Version <output id="version-out"></output></label>
+              <p class="help" id="update-help">–</p>
+            </div>
+            <button class="btn" id="update-check">Check now</button>
+          </div>
+        </div>
+
+        <h2 class="group-h">Advanced</h2>
+        <div class="card group">
+          <div class="field">
+            <label class="check"><input type="checkbox" id="gpu" /> <span>Use GPU acceleration</span></label>
+            <p class="help">Off draws the tool's windows on the CPU and takes no graphics power away from the game. Recommended: off.</p>
+            <button class="btn" id="gpu-restart" hidden>Restart now to apply</button>
+          </div>
+          <div class="field">
+            <label>Log file</label>
+            <p class="help">Errors and overlay events are written to <code id="log-path"></code></p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
 
   <script src="app.js"></script>
 </body>

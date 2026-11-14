@@ -10,11 +10,18 @@ A small overlay for Path of Exile 2: hover over an item, press **Ctrl+D**, and t
 
 ## Download
 
-Get **`PoE2-Price-Check-<version>.exe`** from the [latest release](https://github.com/Manu-Zaser/poe2-price-check/releases/latest)
-and run it – a portable file, no installation needed. Settings are stored in `%APPDATA%\poe2-pricecheck`.
+From the [latest release](https://github.com/Manu-Zaser/poe2-price-check/releases/latest), pick one:
 
-The exe is not signed: on first launch Windows shows "Windows protected your PC" → "More info" → "Run anyway".
+| File | |
+|---|---|
+| **`PoE2-Price-Check-Setup-<version>.exe`** (recommended) | Installs for your Windows user (no admin rights) and **updates itself**: new versions are downloaded in the background and installed when you close the tool – or right away with "Restart now". |
+| `PoE2-Price-Check-<version>.exe` | Portable, no installation. Cannot replace itself – the tool tells you when a new version is available and opens the download page. |
+
+Settings are stored in `%APPDATA%\poe2-pricecheck` for both. The exe files are not signed: on first launch Windows
+shows "Windows protected your PC" → "More info" → "Run anyway".
 Play PoE2 in **windowed / windowed fullscreen** mode, otherwise the overlay ends up behind the game.
+
+Update checks only ask github.com for the latest release – no data is sent.
 
 ## Running from source
 
@@ -23,11 +30,21 @@ npm install
 npm start
 ```
 
-The main window shows the hotkey, league, exchange rates and the history of your price checks. Closing it quits the tool.
+## Main window
 
-**Changing the hotkey:** Overview → "Change hotkey" → press the new combination. Allowed are Ctrl/Alt + key or a single
+- **Home:** the hotkey, the price data (league, exchange rate, how many items poe.ninja prices and when they were
+  updated) and your **recent checks** – click one to open it in the overlay again, without scanning or searching again.
+- **How to use:** a short guide to the hotkey, the overlay and selling.
+- **Settings:** overlay size, background and position, league, updates, GPU acceleration.
+
+Closing the main window quits the tool.
+
+**Changing the hotkey:** Home → "Change hotkey" → press the new combination. Allowed are Ctrl/Alt + key or a single
 F key. Combinations such as Ctrl+C are rejected because the game needs them. Esc cancels.
-Play PoE2 in **windowed / windowed fullscreen** mode, otherwise the overlay ends up behind the game.
+
+**League:** "Automatic" follows the current challenge league on poe.ninja. Prices are refreshed every hour, so after a
+league start the tool switches to the new league within an hour. A league you picked by hand that no longer exists
+switches back to automatic.
 
 ## Features
 
@@ -138,9 +155,14 @@ Hotkey, league and overlay settings are set in the UI. Everything is stored in
 npm run dist
 ```
 
-Creates `release/PoE2-Price-Check-<version>.exe` — a portable file that needs no installation and can be shared.
-The exe is not signed: on first launch Windows shows "Windows protected your PC" → "More info" → "Run anyway".
-Settings live in `%APPDATA%\poe2-pricecheck`.
+Creates in `release/`:
+
+- `PoE2-Price-Check-Setup-<version>.exe` – installer with automatic updates
+- `PoE2-Price-Check-<version>.exe` – portable exe
+- `latest.yml` and `PoE2-Price-Check-Setup-<version>.exe.blockmap` – needed by the auto-updater
+
+To publish a version, raise `version` in `package.json`, build, and attach all four files to a GitHub release tagged
+`v<version>`. Installed copies pick it up automatically; portable copies show a notice.
 
 ## Development
 
@@ -152,7 +174,7 @@ npm run typecheck  # tsc
 Layout: `src/shared/parser.ts` (item text), `src/shared/hotkey.ts` (hotkey capture and validation),
 `src/shared/mods.ts` + `src/shared/stats.ts` (mods → trade stats, search query), `src/main/trade.ts` +
 `src/main/ratelimit.ts` (trade API), `src/main/rare.ts` (rare price check), `src/main/ninja.ts` (prices),
-`src/main/win32.ts` (copy keystroke via SendInput), `src/main/index.ts` (hotkey, windows, IPC),
+`src/main/win32.ts` (copy keystroke and window focus), `src/main/updater.ts` (updates), `src/main/index.ts` (hotkey, windows, IPC),
 `src/renderer/` (main window `app.*`, overlay `overlay.*`).
 
 Debug output of the results: set the environment variable `POE2PC_DEBUG=1`.

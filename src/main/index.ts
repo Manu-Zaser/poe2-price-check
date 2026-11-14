@@ -9,6 +9,7 @@ import { log, logFile } from './log';
 import { buildPriceIndex, CACHE_TTL_MS, fetchLeagues, lookupPrice, makeFetchJson, type PriceIndex } from './ninja';
 import { applySelection, idleRareResult, loadStatIndex, newRareRequest, runRareSearch, type RareRequest } from './rare';
 import { TradeClient } from './trade';
+import { checkForUpdates, initUpdates, installUpdate, openReleasePage, updateState } from './updater';
 import { focusWindowByTitle, foregroundWindowHandle, foregroundWindowTitle, sendCopy } from './win32';
 
 // Fester Datenordner (%APPDATA%\poe2-pricecheck), egal ob per `npm start` oder als gebaute .exe
@@ -146,6 +147,8 @@ function state(): AppState {
   const { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity } = config;
   return {
     status: status(),
+    update: updateState(),
+    leagueAuto: !league,
     settings: { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity },
     overlayPositionSaved: config.overlayPosition !== null,
     logFile: logFile(),
@@ -184,7 +187,14 @@ function refreshIndex(): Promise<PriceIndex> {
     loading = (async () => {
       const fetchJson = makeFetchJson(userAgent());
       leagues = await fetchLeagues(fetchJson);
+      // Eine von Hand gewählte League, die es nicht mehr gibt (League vorbei), auf "Automatisch" stellen.
+      if (config.league && !leagues.includes(config.league)) {
+        log('info', `League "${config.league}" is no longer listed – switching to automatic (${leagues[0]})`);
+        config.league = '';
+        saveConfig(config);
+      }
       const league = config.league || leagues[0];
+      if (index && index.league !== league) log('info', `League changed: ${index.league} → ${league}`);
       return buildPriceIndex(fetchJson, league);
     })()
       .then((i) => {
@@ -310,14 +320,15 @@ async function readItemText(): Promise<string> {
 
 function createMainWindow() {
   mainWin = new BrowserWindow({
-    width: 560,
-    height: 720,
-    minWidth: 460,
+    width: 900,
+    height: 680,
+    minWidth: 760,
     minHeight: 560,
     title: 'PoE2 Price Check',
     backgroundColor: '#100e0c',
     titleBarStyle: 'hidden',
-    titleBarOverlay: { color: '#100e0c', symbolColor: '#c9a85c', height: 40 },
+    // Nur die Fenster-Buttons oben rechts, ohne eigene Leiste – Navigation sitzt in der Seitenleiste.
+    titleBarOverlay: { color: '#100e0c', symbolColor: '#9a8f7c', height: 40 },
     show: false,
     webPreferences: { preload: join(__dirname, 'preload.js') },
   });
@@ -596,6 +607,7 @@ async function rareCheck(item: NonNullable<ReturnType<typeof parseItemText>>): P
   const ninja = item.rarity === 'Unique' ? lookupPrice(idx, item) : null;
   const req = newRareRequest(item, stats, ninja?.kind === 'priced' ? ninja.matches[0] : undefined);
   rareRequest = req;
+  rememberRequest(req);
   // Keine automatische Suche – erst der Klick auf "Search" fragt pathofexile.com an.
   const result = idleRareResult(idx, req);
   showOverlay(result);
@@ -618,6 +630,7 @@ async function rareResearch(selection: TradeSelection) {
     while (next) {
       queuedSelection = null;
       rareRequest = applySelection(rareRequest, next);
+      rememberRequest(rareRequest);
       const result = await runRareSearch(tradeClient(), await getIndex(), rareRequest);
       next = queuedSelection;
       if (!next) {
@@ -634,9 +647,31 @@ async function rareResearch(selection: TradeSelection) {
 
 let busy = false;
 
+const HISTORY_SIZE = 15;
+
 function addHistory(result: PriceResult) {
-  history = [{ id: ++historyId, time: Date.now(), result }, ...history].slice(0, 25);
+  history = [{ id: ++historyId, time: Date.now(), result }, ...history].slice(0, HISTORY_SIZE);
   pushState();
+}
+
+/**
+ * Suchanfragen der letzten Preischecks – damit ein Eintrag aus "Recent checks" wieder im Overlay
+ * geöffnet und dort erneut gesucht werden kann.
+ */
+const recentRequests = new Map<number, RareRequest>();
+
+function rememberRequest(req: RareRequest) {
+  recentRequests.set(req.id, req);
+  while (recentRequests.size > HISTORY_SIZE) recentRequests.delete(recentRequests.keys().next().value!);
+}
+
+/** Eintrag aus "Recent checks" im Overlay öffnen (ohne neue Anfrage). */
+function openHistoryEntry(id: number) {
+  const entry = history.find((h) => h.id === id);
+  if (!entry) return;
+  const r = entry.result;
+  if (r.kind === 'trade') rareRequest = recentRequests.get(r.requestId) ?? rareRequest;
+  showOverlay(r);
 }
 
 /** Ergebnis einer Suche im Verlauf beim zugehörigen Preischeck eintragen (gleiche requestId). */
@@ -719,6 +754,10 @@ app.whenReady().then(() => {
     pushState();
   }));
   ipcMain.on('overlay:test', safe('overlay:test', () => testOverlay()));
+  ipcMain.on('history:open', safe('history:open', (_e, id: number) => openHistoryEntry(Number(id))));
+  ipcMain.on('update:check', safe('update:check', () => void checkForUpdates()));
+  ipcMain.on('update:install', safe('update:install', () => installUpdate()));
+  ipcMain.on('update:open', safe('update:open', () => openReleasePage()));
   ipcMain.on('overlay:resetPosition', safe('overlay:resetPosition', () => {
     config.overlayPosition = null;
     saveConfig(config);
@@ -752,6 +791,7 @@ app.whenReady().then(() => {
   }));
 
   createMainWindow();
+  initUpdates({ userAgent: userAgent(), onChange: pushState });
   createOverlayWindow();
   activateHotkey();
   // Alles, was der erste Preischeck braucht, schon beim Start laden.

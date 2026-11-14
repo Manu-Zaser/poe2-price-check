@@ -1,6 +1,6 @@
 {
   "name": "poe2-pricecheck",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Clipboard-Preischeck-Overlay für Path of Exile 2 (nur lesend, ein Tastendruck = eine Aktion)",
   "license": "MIT",
   "repository": {
@@ -16,7 +16,7 @@
     "start": "node build.mjs && electron .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "dist": "node build.mjs && electron-builder --win portable --x64"
+    "dist": "node build.mjs && electron-builder --win --x64 --publish never"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
@@ -27,6 +27,7 @@
     "vitest": "^5.1.0"
   },
   "dependencies": {
+    "electron-updater": "^6.8.11",
     "koffi": "^3.3.8"
   },
   "allowScripts": {
@@ -55,6 +56,12 @@
     "win": {
       "target": [
         {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
           "target": "portable",
           "arch": [
             "x64"
@@ -65,6 +72,21 @@
     },
     "portable": {
       "artifactName": "PoE2-Price-Check-${version}.exe"
-    }
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "artifactName": "PoE2-Price-Check-Setup-${version}.${ext}",
+      "shortcutName": "PoE2 Price Check",
+      "deleteAppDataOnUninstall": false
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Manu-Zaser",
+        "repo": "poe2-price-check",
+        "releaseType": "release"
+      }
+    ]
   }
 }

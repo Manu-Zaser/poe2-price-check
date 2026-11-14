@@ -10,6 +10,13 @@ const api = {
   suspendHotkey: (suspend: boolean) => ipcRenderer.send('hotkey:suspend', suspend),
   refreshPrices: () => ipcRenderer.send('prices:refresh'),
   clearHistory: () => ipcRenderer.send('history:clear'),
+  /** Preischeck aus "Recent checks" wieder im Overlay öffnen. */
+  openHistory: (id: number) => ipcRenderer.send('history:open', id),
+  checkUpdates: () => ipcRenderer.send('update:check'),
+  /** Heruntergeladenes Update installieren (Neustart). */
+  installUpdate: () => ipcRenderer.send('update:install'),
+  /** Download-Seite des neuesten Releases öffnen (portable Version). */
+  openReleasePage: () => ipcRenderer.send('update:open'),
   testOverlay: () => ipcRenderer.send('overlay:test'),
   restartApp: () => ipcRenderer.send('app:restart'),
   /** Overlay erscheint wieder neben dem Mauszeiger statt an der gemerkten Stelle. */

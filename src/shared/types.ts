@@ -166,8 +166,26 @@ export interface HistoryEntry {
   result: PriceResult;
 }
 
+/** Stand der Update-Prüfung (GitHub-Releases). */
+export interface UpdateState {
+  status: 'idle' | 'checking' | 'none' | 'available' | 'downloading' | 'ready' | 'error';
+  /** Laufende Version. */
+  current: string;
+  /** Neue Version (bei available/downloading/ready). */
+  version?: string;
+  /** Download-Fortschritt in % (installierte Version). */
+  percent?: number;
+  error?: string;
+  checkedAt?: number;
+  /** true = installierte Version, aktualisiert sich selbst; false = portable exe (nur Hinweis + Download-Seite). */
+  selfUpdating: boolean;
+}
+
 export interface AppState {
   status: AppStatus;
+  update: UpdateState;
+  /** true = League automatisch (aktuelle Challenge-League laut poe.ninja). */
+  leagueAuto: boolean;
   settings: Settings;
   /** true = Overlay wurde verschoben und erscheint immer an dieser Stelle. */
   overlayPositionSaved: boolean;

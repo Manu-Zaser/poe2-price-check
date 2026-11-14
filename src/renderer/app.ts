@@ -1,5 +1,5 @@
 import { acceleratorFromEvent, formatHotkey, validateHotkey } from '../shared/hotkey';
-import type { AppState, HistoryEntry } from '../shared/types';
+import type { AppState, HistoryEntry, UpdateState } from '../shared/types';
 import { api, el, itemIcon } from './api';
 import { amount, clock, currencyShort, priceParts, timeAgo } from './format';
 
@@ -7,14 +7,24 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 
 let current: AppState | null = null;
 
-// ---------- Tabs ----------
+// ---------- Navigation ----------
 
-for (const tab of document.querySelectorAll<HTMLButtonElement>('.tab')) {
-  tab.addEventListener('click', () => {
-    for (const t of document.querySelectorAll('.tab')) t.classList.toggle('active', t === tab);
-    for (const p of document.querySelectorAll<HTMLElement>('.page')) p.classList.toggle('active', p.dataset.page === tab.dataset.tab);
-    if (recording) stopRecording();
-  });
+function showPage(name: string) {
+  for (const n of document.querySelectorAll<HTMLElement>('.nav-item')) n.classList.toggle('active', n.dataset.page === name);
+  for (const p of document.querySelectorAll<HTMLElement>('.page')) {
+    const active = p.dataset.page === name;
+    p.classList.toggle('active', active);
+    if (active) {
+      $('page-title').textContent = p.dataset.title ?? '';
+      $('page-sub').textContent = p.dataset.sub ?? '';
+    }
+  }
+  document.querySelector('main')!.scrollTop = 0;
+  if (recording) stopRecording();
+}
+
+for (const item of document.querySelectorAll<HTMLButtonElement>('.nav-item')) {
+  item.addEventListener('click', () => showPage(item.dataset.page!));
 }
 
 // ---------- Tastenkappen ----------
@@ -139,6 +149,12 @@ function renderHotkey(s: AppState) {
   if (recording) return;
   $('hotkey-keys').replaceChildren(...keycaps(formatHotkey(s.settings.hotkey)));
   $('empty-keys').replaceChildren(...keycaps(formatHotkey(s.settings.hotkey), 'sm'));
+  $('guide-keys').replaceChildren(...keycaps(formatHotkey(s.settings.hotkey), 'sm'));
+  const line = $('status-line');
+  line.className = `status-line ${s.status.hotkeyActive ? 'ok' : 'bad'}`;
+  line.querySelector('span')!.textContent = s.status.hotkeyActive
+    ? `Ready · ${formatHotkey(s.settings.hotkey).join(' + ')}`
+    : 'Hotkey inactive';
   $('hotkey-hint').textContent = 'Hover over an item in game and press the hotkey.';
   const pill = $('hotkey-pill');
   pill.className = `pill ${s.status.hotkeyActive ? 'ok' : 'bad'}`;
@@ -148,23 +164,47 @@ function renderHotkey(s: AppState) {
 
 function renderStats(s: AppState) {
   const st = s.status;
-  $('stat-league').textContent = st.league ?? '–';
-  $('stat-rate').textContent = st.exaltedPerDivine ? `${amount(st.exaltedPerDivine)} Ex` : '–';
-  $('stat-count').textContent = st.fetchedAt ? `${st.currencyCount + st.uniqueCount}` : '–';
-  $('stat-count').title = `${st.currencyCount} currency & co., ${st.uniqueCount} uniques`;
-  $('stat-age').textContent = st.loading ? 'loading …' : st.fetchedAt ? timeAgo(st.fetchedAt) : 'not loaded';
+  $('data-league').textContent = st.league ?? '–';
+  $('data-league-sub').textContent = s.leagueAuto ? 'Automatic · current league' : 'Chosen in settings';
+  $('data-rate').textContent = st.exaltedPerDivine ? `1 Div = ${amount(st.exaltedPerDivine)} Ex` : '–';
+  const count = st.currencyCount + st.uniqueCount;
+  $('data-count').textContent = st.fetchedAt ? `${count.toLocaleString('en-US')} items` : '–';
+  $('data-count').title = `${st.currencyCount} currency, fragments, runes … and ${st.uniqueCount} uniques priced by poe.ninja`;
+  $('data-age').textContent = st.loading ? 'Loading from poe.ninja …' : st.fetchedAt ? `poe.ninja · updated ${timeAgo(st.fetchedAt)}` : 'Not loaded yet';
   $('refresh').classList.toggle('spinning', st.loading);
+  ($('refresh') as HTMLButtonElement).disabled = st.loading;
 
   const banner = $('error-banner');
   banner.hidden = !st.lastError;
   banner.textContent = st.lastError ?? '';
 }
 
+/** Kleiner Pfeil "öffnen" am Zeilenende. */
+function openIcon(): SVGSVGElement {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('class', 'h-open');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', 'M9 5l7 7-7 7');
+  svg.append(path);
+  return svg;
+}
+
+/** Ein Eintrag ist ein Knopf: Klick öffnet den Preischeck wieder im Overlay. */
 function historyRow(h: HistoryEntry): HTMLElement {
+  const inner = historyContent(h);
+  const btn = el('button', inner.className, ...inner.children, openIcon());
+  btn.type = 'button';
+  btn.title = 'Open in the overlay again';
+  btn.addEventListener('click', () => api.openHistory(h.id));
+  return el('li', '', btn);
+}
+
+function historyContent(h: HistoryEntry): { className: string; children: Node[] } {
   const r = h.result;
   const time = el('span', 'h-time', clock(h.time));
   if (r.kind === 'error') {
-    return el('li', 'h-row muted', itemIcon(undefined, 'h-icon'), el('div', 'h-main', el('span', 'h-name', 'Error'), el('span', 'h-sub', r.message)), time);
+    return { className: 'h-row muted', children: [itemIcon(undefined, 'h-icon'), el('div', 'h-main', el('span', 'h-name', 'Error'), el('span', 'h-sub', r.message)), el('span', ''), time] };
   }
   const item = r.item;
   const name = el('span', `h-name rarity-${item.rarity.toLowerCase()}`, item.name ?? item.baseType);
@@ -174,17 +214,17 @@ function historyRow(h: HistoryEntry): HTMLElement {
     const price = cheapest
       ? el('div', 'h-price', el('span', 'h-value', `from ${amount(cheapest.amount)}`), el('span', `unit unit-${currencyShort(cheapest.currency).toLowerCase()}`, currencyShort(cheapest.currency)))
       : el('div', 'h-price muted', '–');
-    return el('li', `h-row ${cheapest ? '' : 'muted'}`, itemIcon(r.search?.icon, 'h-icon'), el('div', 'h-main', name, el('span', 'h-sub', sub)), price, time);
+    return { className: `h-row ${cheapest ? '' : 'muted'}`, children: [itemIcon(r.search?.icon, 'h-icon'), el('div', 'h-main', name, el('span', 'h-sub', sub)), price, time] };
   }
   if (r.kind !== 'priced') {
-    return el('li', 'h-row muted', itemIcon(undefined, 'h-icon'), el('div', 'h-main', name, el('span', 'h-sub', r.reason)), time);
+    return { className: 'h-row muted', children: [itemIcon(undefined, 'h-icon'), el('div', 'h-main', name, el('span', 'h-sub', r.reason)), el('span', ''), time] };
   }
   const m = r.matches[0];
   const unidentified = !item.name && r.matches.length > 1;
   const sub = unidentified ? `Unidentified · ${r.matches.length} candidates` : item.name ? item.baseType : item.itemClass;
   const p = priceParts(m.divine, m.exalted);
   const price = el('div', 'h-price', el('span', 'h-value', unidentified ? `up to ${p.value}` : p.value), el('span', `unit unit-${p.unit.toLowerCase()}`, p.unit));
-  return el('li', 'h-row', itemIcon(m.icon, 'h-icon'), el('div', 'h-main', name, el('span', 'h-sub', sub)), price, time);
+  return { className: 'h-row', children: [itemIcon(m.icon, 'h-icon'), el('div', 'h-main', name, el('span', 'h-sub', sub)), price, time] };
 }
 
 let historySig = '';
@@ -207,6 +247,7 @@ function renderHistory(s: AppState) {
   );
   $('history-empty').hidden = s.history.length > 0;
   $('history-clear').hidden = s.history.length === 0;
+  $('history-hint').hidden = s.history.length === 0;
 }
 
 $('refresh').addEventListener('click', () => api.refreshPrices());
@@ -242,7 +283,7 @@ function renderSettings(s: AppState) {
   if (document.activeElement !== opacity) opacity.value = String(Math.round(s.settings.overlayOpacity * 100));
   $('opacity-out').textContent = `${opacity.value}%`;
 
-  $('pos-out').textContent = s.overlayPositionSaved ? 'saved' : 'at mouse cursor';
+  $('pos-out').textContent = s.overlayPositionSaved ? 'saved' : 'next to the cursor';
   ($('pos-reset') as HTMLButtonElement).disabled = !s.overlayPositionSaved;
   $('log-path').textContent = s.logFile;
 }
@@ -275,6 +316,57 @@ $<HTMLInputElement>('gpu').addEventListener('change', (e) => {
 });
 $('gpu-restart').addEventListener('click', () => api.restartApp());
 
+// ---------- Updates ----------
+
+function updateTexts(u: UpdateState): { title: string; text: string; action: 'install' | 'download' | null } | null {
+  switch (u.status) {
+    case 'ready':
+      return { title: `Update ${u.version} ready`, text: 'Installs when you close the tool – or restart now.', action: 'install' };
+    case 'downloading':
+      return { title: `Downloading ${u.version}`, text: `${u.percent ?? 0} %`, action: null };
+    case 'available':
+      return { title: `Version ${u.version} available`, text: 'Download the new version from GitHub.', action: 'download' };
+    default:
+      return null;
+  }
+}
+
+function renderUpdate(s: AppState) {
+  const u = s.update;
+  const info = updateTexts(u);
+  $('update-card').hidden = !info;
+  if (info) {
+    $('update-title').textContent = info.title;
+    $('update-text').textContent = info.text;
+    const action = $('update-action') as HTMLButtonElement;
+    action.hidden = !info.action;
+    action.textContent = info.action === 'install' ? 'Restart now' : 'Download';
+    action.dataset.action = info.action ?? '';
+    $('update-progress').hidden = u.status !== 'downloading';
+    ($('update-progress').firstElementChild as HTMLElement).style.width = `${u.percent ?? 0}%`;
+  }
+
+  $('version-out').textContent = u.current;
+  const kind = u.selfUpdating
+    ? 'Updates are downloaded automatically and installed when you close the tool.'
+    : 'Portable version – new versions are announced here; download them from GitHub.';
+  const when = u.checkedAt ? ` Last checked ${timeAgo(u.checkedAt)}.` : '';
+  let text = kind;
+  if (u.status === 'checking') text = 'Checking for updates …';
+  else if (u.status === 'none') text = `You have the latest version.${when}`;
+  else if (u.status === 'error') text = `${u.error ?? 'Update check failed.'}${when}`;
+  else if (info) text = `${info.title}.`;
+  $('update-help').textContent = text;
+  ($('update-check') as HTMLButtonElement).disabled = u.status === 'checking' || u.status === 'downloading';
+}
+
+$('update-check').addEventListener('click', () => api.checkUpdates());
+$('update-action').addEventListener('click', (e) => {
+  const action = (e.currentTarget as HTMLElement).dataset.action;
+  if (action === 'install') api.installUpdate();
+  else if (action === 'download') api.openReleasePage();
+});
+
 // ---------- Start ----------
 
 function render(s: AppState) {
@@ -284,6 +376,7 @@ function render(s: AppState) {
   renderHistory(s);
   renderSettings(s);
   renderGpu(s);
+  renderUpdate(s);
 }
 
 api.onState(render);
