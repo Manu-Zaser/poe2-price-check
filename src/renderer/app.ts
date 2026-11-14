@@ -1,5 +1,6 @@
 import { acceleratorFromEvent, formatHotkey, validateHotkey } from '../shared/hotkey';
 import { DEFAULT_DANGER_MODS } from '../shared/maps';
+import { DEFAULT_KEY_MODS, DEFAULT_LOW_MODS } from '../shared/weights';
 import type { AppState, HistoryEntry, HotkeySetting, UpdateState } from '../shared/types';
 import { api, el, itemIcon } from './api';
 import { amount, clock, currencyShort, priceParts, timeAgo } from './format';
@@ -408,6 +409,32 @@ $<HTMLInputElement>('gpu').addEventListener('change', (e) => {
 });
 $('gpu-restart').addEventListener('click', () => api.restartApp());
 
+// ---------- Wert der Mods (Key / Low value) ----------
+
+/** Textfeld mit einer Liste (eine Regel pro Zeile), gespeichert beim Verlassen des Feldes. */
+function listEditor(areaId: string, savedId: string, resetId: string, setting: 'keyMods' | 'lowMods', defaults: string[]) {
+  const area = $<HTMLTextAreaElement>(areaId);
+  const save = async (lines: string[]) => {
+    const res = await api.saveSettings({ [setting]: lines });
+    if (res.ok) {
+      const hint = $(savedId);
+      hint.hidden = false;
+      setTimeout(() => (hint.hidden = true), 1500);
+    }
+  };
+  area.addEventListener('change', () => void save(area.value.split(/\r?\n/)));
+  $(resetId).addEventListener('click', () => {
+    area.value = defaults.join('\n');
+    void save(defaults);
+  });
+  return (s: AppState) => {
+    if (document.activeElement !== area) area.value = s.settings[setting].join('\n');
+  };
+}
+
+const renderKeyMods = listEditor('key-mods', 'key-saved', 'key-reset', 'keyMods', DEFAULT_KEY_MODS);
+const renderLowMods = listEditor('low-mods', 'low-saved', 'low-reset', 'lowMods', DEFAULT_LOW_MODS);
+
 // ---------- Währungsrechner ----------
 
 type Unit = 'divine' | 'exalted' | 'chaos' | 'mirror';
@@ -553,6 +580,8 @@ function render(s: AppState) {
   renderStartup(s);
   renderDangerMods(s);
   renderRates(s);
+  renderKeyMods(s);
+  renderLowMods(s);
 }
 
 api.onState(render);

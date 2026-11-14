@@ -73,6 +73,8 @@ export interface RareRequest {
   instantOnly: boolean;
   /** Uniques: poe.ninja-Preis als Vergleich. */
   reference?: PriceMatch;
+  /** Schlüssel-Mods dieses Slots, die auf dem Item fehlen. */
+  missingKeys?: string[];
 }
 
 let nextRequestId = 1;
@@ -96,6 +98,7 @@ function baseResult(index: PriceIndex, req: RareRequest) {
     useBaseType: req.useBaseType, matchAll: req.matchAll, instantOnly: req.instantOnly,
     ...(req.reference ? { reference: req.reference } : {}),
     ...(index.exaltedPerDivine ? { exaltedPerDivine: index.exaltedPerDivine } : {}),
+    ...(req.missingKeys?.length ? { missingKeys: req.missingKeys } : {}),
   };
 }
 

@@ -181,6 +181,8 @@
             <dd>Tick the stats to search for. Values start at your item's own value – scroll over a field to change it or click to type. Under each mod you see where it comes from (Explicit, Implicit, Augment …) and its tier.</dd>
             <dt>Weapons</dt>
             <dd>Below 20% quality, the DPS rows offer <b>Q20</b>: the DPS the weapon would have at 20% quality, as minimum. Elemental DPS lets you pick the element (Any, Cold …).</dd>
+            <dt>Key &amp; Low value</dt>
+            <dd>For rares, only the mods that usually carry the price on that item type are ticked (<b>Key</b>), e.g. movement speed on boots. <b>Low value</b> mods are faded. "ⓘ key mods … not on this item" lists what the item is missing. Adjust both lists under Settings → Mod value.</dd>
             <dt>Hidden &amp; Collapse</dt>
             <dd>Mods already counted in a total, the DPS or the defences are hidden; <b>Hidden</b> shows them. <b>Collapse</b> folds the stat list away.</dd>
             <dt>Search &amp; Trade ↗</dt>
@@ -297,6 +299,29 @@
             <label for="league">League</label>
             <p class="help">Automatic follows the current challenge league on poe.ninja – including new leagues.</p>
             <div class="select-wrap"><select id="league"></select></div>
+          </div>
+        </div>
+
+        <h2 class="group-h">Mod value</h2>
+        <div class="card group">
+          <div class="field">
+            <p class="help">For rare and magic items, only <b>key mods</b> are searched by default – the price of a rare depends on 2–3 mods, not on all of them. <b>Low value</b> mods are shown faded and never searched by default. One rule per line: <code>slot: text</code>, where text is part of the mod (upper/lower case doesn't matter) and slot is one of <code>weapon caster amulet ring belt boots gloves helmet body shield quiver jewel</code>, for attack weapons also <code>melee ranged bow crossbow</code>, or <code>*</code> for all.</p>
+          </div>
+          <div class="field">
+            <label for="key-mods">Key mods</label>
+            <textarea id="key-mods" rows="8" spellcheck="false"></textarea>
+            <div class="row-actions">
+              <span class="saved-hint" id="key-saved" hidden>Saved</span>
+              <button class="btn ghost sm" id="key-reset">Restore defaults</button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="low-mods">Low value mods</label>
+            <textarea id="low-mods" rows="5" spellcheck="false"></textarea>
+            <div class="row-actions">
+              <span class="saved-hint" id="low-saved" hidden>Saved</span>
+              <button class="btn ghost sm" id="low-reset">Restore defaults</button>
+            </div>
           </div>
         </div>
 

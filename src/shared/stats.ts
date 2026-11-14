@@ -132,6 +132,7 @@ export function buildTradeMods(item: ParsedItem, stats: StatIndex): TradeMod[] {
       same.text = line.template.replace('#', amountText(same.value));
       same.combined = true;
       if (line.tier !== undefined) same.tiers = [...(same.tiers ?? []), { affix: line.affix ?? 'other', tier: line.tier }];
+      if (line.roll) same.rolls = [...(same.rolls ?? []), line.roll];
       return;
     }
 
@@ -148,6 +149,7 @@ export function buildTradeMods(item: ParsedItem, stats: StatIndex): TradeMod[] {
       ...(invert ? { invert: true } : {}),
       enabled: m !== null && selectable && (value === null || value > 0),
       ...(line.tier !== undefined ? { tiers: [{ affix: line.affix ?? 'other', tier: line.tier }] } : {}),
+      ...(line.roll ? { rolls: [line.roll] } : {}),
     };
     if (m) byStat.set(m.id, mod);
     mods.push(mod);

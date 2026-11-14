@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { parseModLine } from '../src/shared/mods';
+import { parseModLine, rollOf } from '../src/shared/mods';
 import { parseItemText } from '../src/shared/parser';
 import { buildSearchQuery, buildTradeMods, defaultMatchCount, defaultMin, isNamedUnique, normalDefaults, StatIndex, statRange, uniqueDefaults, type StatsData } from '../src/shared/stats';
 
@@ -231,5 +231,27 @@ describe('normal (white) items', () => {
     const q = buildSearchQuery(item, mods, { useBaseType: true, matchAll: true });
     expect(q.query).toMatchObject({ type: 'Corsair Coat' });
     expect(q.query.filters.type_filters.filters).toEqual({ rarity: { option: 'normal' }, ilvl: { min: 82 } });
+  });
+});
+
+describe('roll quality', () => {
+  it('rates a value within its range from the advanced copy', () => {
+    expect(rollOf('+142(124-149) to Accuracy Rating')).toEqual({ quality: 0.72, range: '124–149', max: '149' });
+    expect(rollOf('+19(17-19)% to Critical Damage Bonus')).toEqual({ quality: 1, range: '17–19', max: '19' });
+    // several numbers: average of both
+    expect(rollOf('Adds 37(31-38) to 59(47-59) Cold Damage')).toEqual({ quality: 0.93, range: '31–38 / 47–59', max: '38 to 59' });
+    expect(rollOf('+10 to Strength')).toBeUndefined();
+    expect(parseModLine('+3.44(3.11-3.8)% to Critical Hit Chance').roll?.quality).toBe(0.48);
+  });
+
+  it('is attached to the trade mods, one entry per summed line', () => {
+    const bow = parseItemText(fixture('rare-bow-morbid-stinger.txt'))!;
+    const mods = buildTradeMods(bow, stats);
+    expect(mods.find((m) => m.text.includes('Accuracy'))?.rolls).toEqual([{ quality: 0.72, range: '124–149', max: '149' }]);
+    // 144(135-154)% + 63(55-64)% increased Physical Damage are summed into one stat
+    expect(mods.find((m) => m.text === '207% increased Physical Damage')?.rolls).toEqual([
+      { quality: 0.47, range: '135–154', max: '154' },
+      { quality: 0.89, range: '55–64', max: '64' },
+    ]);
   });
 });

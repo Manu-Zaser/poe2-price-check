@@ -214,6 +214,20 @@ function tierBadge(t: NonNullable<TradeMod['tiers']>[number]): HTMLElement {
 }
 
 /**
+ * Höchstwert des Tiers (aus dem erweiterten Kopieren), z. B. "max 149". Gold = bereits der
+ * bestmögliche Wert; der Tooltip zeigt den ganzen Bereich und die Roll-Qualität.
+ */
+function rollBadge(r: NonNullable<TradeMod['rolls']>[number]): HTMLElement {
+  const pct = Math.round(r.quality * 100);
+  const perfect = r.quality >= 1;
+  const badge = el('span', `roll${perfect ? ' roll-max' : ''}`, perfect ? 'max ✓' : `max ${r.max}`);
+  badge.title = perfect
+    ? `Perfect roll – the highest value of this tier (${r.range})`
+    : `Highest value of this tier: ${r.max} · range ${r.range} · your roll: ${pct}%`;
+  return badge;
+}
+
+/**
  * Min- oder Max-Feld: Mausrad ändert den Wert ohne Fokuswechsel (das Spiel behält die Tastatur),
  * Klick erlaubt Eintippen, leer = ohne Grenze.
  */
@@ -275,7 +289,7 @@ function numInput(m: TradeMod, which: 'min' | 'max', onCommit: () => void): HTML
 function statRow(m: TradeMod, onChange: () => void): HTMLElement {
   const searchable = m.statId !== null || !!m.filter;
   const reason = hiddenReason(m);
-  const row = el('div', `stat stat-${m.kind}${searchable ? '' : ' stat-off'}${reason ? ' stat-hidden' : ''}${m.danger ? ' stat-danger' : ''}`);
+  const row = el('div', `stat stat-${m.kind}${searchable ? '' : ' stat-off'}${reason ? ' stat-hidden' : ''}${m.danger ? ' stat-danger' : ''}${m.low ? ' stat-low' : ''}`);
   row.dataset.key = m.key;
   if (m.statId) row.dataset.stat = '1';
   if (reason) row.title = reason;
@@ -303,10 +317,26 @@ function statRow(m: TradeMod, onChange: () => void): HTMLElement {
   const tags = el('div', 'stat-tags');
   const coveredLabel: Record<NonNullable<TradeMod['coveredBy']>, string> = { total: 'total', DPS: 'DPS', crit: 'crit chance', defence: 'defences' };
   if (m.danger) tags.append(el('span', 'kind kind-danger', '⚠ Dangerous'));
+  if (m.keyMod) {
+    const k = el('span', 'kind kind-key', 'Key');
+    k.title = 'Usually carries the price on this item type – searched by default (Settings → Mod value)';
+    tags.append(k);
+  }
+  if (m.low) {
+    const l = el('span', 'kind kind-low', 'Low value');
+    l.title = 'Rarely affects the price – not searched by default (Settings → Mod value)';
+    tags.append(l);
+  }
   if (reason) tags.append(el('span', 'tag-hidden', m.coveredBy ? `◌ in ${coveredLabel[m.coveredBy]}` : '◌ not searchable'));
   const kind = KIND_LABEL[m.kind];
   if (kind && m.kind !== 'pseudo') tags.append(el('span', `kind kind-${m.kind}`, kind));
-  for (const t of m.tiers ?? []) tags.append(tierBadge(t));
+  // Tier und Roll paarweise: bei zusammengefassten Mods gehört jeder Roll zu "seinem" Tier.
+  const tiers = m.tiers ?? [];
+  const rolls = m.rolls ?? [];
+  for (let i = 0; i < Math.max(tiers.length, rolls.length); i++) {
+    if (tiers[i]) tags.append(tierBadge(tiers[i]));
+    if (rolls[i]) tags.append(rollBadge(rolls[i]));
+  }
   if (m.combined) {
     const s = el('span', 'kind', 'summed');
     s.title = 'Several lines with the same stat – the trade search uses the sum.';
@@ -721,10 +751,28 @@ function renderTrade(r: TradeResult): HTMLElement {
         ...dangerous.map((m) => el('span', 'danger-mod', m.text)),
       )
     : null;
+  // Schlüssel-Mods dieses Slots, die dem Item fehlen: kurzer Hinweis, Tooltip und Klick zeigen die Liste.
+  const missing = r.missingKeys ?? [];
+  let missingBox: HTMLElement | null = null;
+  if (missing.length) {
+    const toggle = el('button', 'missing-toggle', `ⓘ ${missing.length} key mod${missing.length === 1 ? '' : 's'} for ${r.item.itemClass.toLowerCase()} not on this item`);
+    toggle.type = 'button';
+    toggle.title = `Key mods for this item type that this item doesn't have:\n${missing.map((t) => `• ${t}`).join('\n')}`;
+    const list = el('ul', 'missing-list', ...missing.map((t) => el('li', '', t)));
+    list.hidden = true;
+    toggle.addEventListener('click', () => {
+      list.hidden = !list.hidden;
+      toggle.classList.toggle('open', !list.hidden);
+      reportSize();
+    });
+    missingBox = el('div', 'missing', toggle, list);
+  }
+
   card.append(
     head,
     ...(dangerBox ? [dangerBox] : []),
     chips,
+    ...(missingBox ? [missingBox] : []),
     stats,
     statsBar,
     el('div', 'results-bar', matched, instantChip, el('span', 'spacer'), searchBtn, openBtn),

@@ -306,3 +306,5 @@ textarea:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .conv-val { color: var(--muted); white-space: nowrap; }
 .conv-val strong { color: var(--gold-bright); font: 600 17px var(--font-display); font-variant-numeric: tabular-nums; }
 .conv-none { color: var(--faint); font-size: 13px; }
+
+.help code { word-break: normal; white-space: nowrap; }

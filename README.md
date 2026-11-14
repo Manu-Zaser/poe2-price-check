@@ -85,6 +85,17 @@ switches back to automatic.
     Augment = rune/soul core, Desecrated, Fractured …) and its tier (e.g. "P T7"; in PoE2 a higher tier is better).
     Tick or untick (clicking the text works too), change values with the **mouse wheel** or click and type them
     (empty = no limit). Default minimum = your item's own value (rounded down to one decimal place).
+    **Key mods and low value:** a rare's price depends on 2–3 mods, not on all of them, so for rare and magic items
+    only the **key mods** of the item type are ticked by default (e.g. movement speed on boots, skill levels and
+    Spirit on amulets, flat attack damage and rarity on rings) – together with the totals for life and resistances.
+    **Low value** mods (light radius, thorns, stun threshold, attribute requirements …) are faded and not searched.
+    "ⓘ key mods … not on this item" lists the key mods the item is missing (tooltip, click to expand). Both lists can
+    be edited under Settings → Mod value (`slot: text`, e.g. `boots: increased Movement Speed`; for attack weapons
+    also `melee`, `ranged`, `bow`, `crossbow`). If an item has none of them, all other mods are ticked as before.
+    The defaults are based on research from November 2026 (poe2db mod tables for patch 0.5.x, the 0.5.0 patch notes
+    and gear/selling guides); rules with thin evidence were left out, and shields/belts have no key mods on purpose.
+    **Tier maximum:** next to each tier you see the highest value that tier can roll (e.g. "P T3 max 149"); a perfect
+    roll shows a gold "max ✓". Hover for the full range and your roll in %. Summed mods show one value per source line.
     "Reduced" mods (e.g. "50% reduced Projectile Range") are shown and edited as on the item; the search converts them.
   - **Weapons below 20% quality:** the DPS rows offer **Q20** – the DPS at 20% quality, as minimum with one click.
     **Elemental DPS** lets you pick the element (Any, Fire, Cold, Lightning – whatever the weapon has).
@@ -166,6 +177,8 @@ Hotkey, league and overlay settings are set in the UI. Everything is stored in
 | `closeToTray` | `true` | closing the window keeps the tool running in the tray |
 | `startWithWindows` | `false` | start with Windows (packaged exe only) |
 | `dangerMods` | list | text snippets of dangerous waystone/tablet mods |
+| `keyMods` | list | key mods per item type (`slot: text`) – searched by default |
+| `lowMods` | list | low-value mods (`slot: text`, `*` = all) – faded, not searched |
 | `gameWindowTitle` | `Path of Exile 2` | window title of the game |
 | `contact` | `""` | optional additional contact in the User-Agent (the project URL is always sent) |
 | `overlayScale` | `1.15` | overlay size (0.8–1.6) |

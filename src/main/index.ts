@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { validateHotkey } from '../shared/hotkey';
 import { parseItemText } from '../shared/parser';
 import { cleanDangerList, DEFAULT_DANGER_MODS, isMapItem, markDangerous, wikiUrl } from '../shared/maps';
+import { applyWeights, cleanWeightList, DEFAULT_KEY_MODS, DEFAULT_LOW_MODS, LEGACY_DEFAULTS, upgradeDefaults } from '../shared/weights';
 import { buildSearchQuery, isNamedUnique, tradeSearchUrl, type StatIndex } from '../shared/stats';
 import type { AppState, AppStatus, HistoryEntry, HotkeySetting, ParsedItem, PriceResult, SaveResult, Settings, TradeSelection } from '../shared/types';
 import { log, logFile } from './log';
@@ -67,6 +68,8 @@ const DEFAULT_CONFIG: Config = {
   closeToTray: true,
   startWithWindows: false,
   dangerMods: DEFAULT_DANGER_MODS,
+  keyMods: DEFAULT_KEY_MODS,
+  lowMods: DEFAULT_LOW_MODS,
   trayHintShown: false,
 };
 
@@ -85,6 +88,11 @@ function loadConfig(): Config {
     if (typeof loaded[key] !== 'string' || (loaded[key] && validateHotkey(loaded[key]))) loaded[key] = DEFAULT_CONFIG[key];
   }
   loaded.dangerMods = Array.isArray(loaded.dangerMods) ? cleanDangerList(loaded.dangerMods.map(String)) : [...DEFAULT_DANGER_MODS];
+  loaded.keyMods = Array.isArray(loaded.keyMods) ? cleanWeightList(loaded.keyMods.map(String)) : [...DEFAULT_KEY_MODS];
+  loaded.lowMods = Array.isArray(loaded.lowMods) ? cleanWeightList(loaded.lowMods.map(String)) : [...DEFAULT_LOW_MODS];
+  // Unveränderte frühere Vorgaben auf die aktuellen Listen heben (eigene Anpassungen bleiben).
+  loaded.keyMods = upgradeDefaults(loaded.keyMods, LEGACY_DEFAULTS.key, DEFAULT_KEY_MODS);
+  loaded.lowMods = upgradeDefaults(loaded.lowMods, LEGACY_DEFAULTS.low, DEFAULT_LOW_MODS);
   delete (loaded as Partial<Config> & { overlaySeconds?: number }).overlaySeconds; // aus älteren Versionen
   saveConfig(loaded);
   return loaded;
@@ -178,12 +186,12 @@ function currencyRates(): AppStatus['currencyRates'] {
 }
 
 function state(): AppState {
-  const { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity, hotkeyTrade, hotkeyWiki, closeToTray, startWithWindows, dangerMods } = config;
+  const { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity, hotkeyTrade, hotkeyWiki, closeToTray, startWithWindows, dangerMods, keyMods, lowMods } = config;
   return {
     status: status(),
     update: updateState(),
     leagueAuto: !league,
-    settings: { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity, hotkeyTrade, hotkeyWiki, closeToTray, startWithWindows, dangerMods },
+    settings: { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity, hotkeyTrade, hotkeyWiki, closeToTray, startWithWindows, dangerMods, keyMods, lowMods },
     overlayPositionSaved: config.overlayPosition !== null,
     logFile: logFile(),
     leagues,
@@ -330,6 +338,8 @@ async function saveSettings(patch: Partial<Settings>): Promise<SaveResult> {
     applyLoginItem();
   }
   if (Array.isArray(patch.dangerMods)) config.dangerMods = cleanDangerList(patch.dangerMods.map(String));
+  if (Array.isArray(patch.keyMods)) config.keyMods = cleanWeightList(patch.keyMods.map(String));
+  if (Array.isArray(patch.lowMods)) config.lowMods = cleanWeightList(patch.lowMods.map(String));
 
   if (patch.gpuAcceleration !== undefined) config.gpuAcceleration = patch.gpuAcceleration; // wirkt nach Neustart
 
@@ -711,6 +721,7 @@ async function rareCheck(item: NonNullable<ReturnType<typeof parseItemText>>): P
   const req = newRareRequest(item, stats, ninja?.kind === 'priced' ? ninja.matches[0] : undefined);
   // Waystones/Tablets: gefährliche Mods markieren (Liste in den Einstellungen).
   if (isMapItem(item)) req.mods = markDangerous(req.mods, config.dangerMods);
+  else weighRequest(req);
   rareRequest = req;
   rememberRequest(req);
   // Keine automatische Suche – erst der Klick auf "Search" fragt pathofexile.com an.
@@ -818,6 +829,17 @@ async function priceCheck() {
   }
 }
 
+/**
+ * Rares und Magic-Items: nur die Schlüssel-Mods des Slots standardmäßig suchen, Low-Value-Mods
+ * markieren und fehlende Schlüssel-Mods merken (Listen in den Einstellungen).
+ */
+function weighRequest(req: RareRequest) {
+  if (req.item.rarity !== 'Rare' && req.item.rarity !== 'Magic') return;
+  const w = applyWeights(req.mods, req.item.itemClass, config.keyMods, config.lowMods);
+  req.mods = w.mods;
+  req.missingKeys = w.missingKeys;
+}
+
 /** Gemeinsamer Ablauf der Zusatz-Hotkeys: Item kopieren (eine Aktion), dann etwas damit tun. */
 async function withItem(action: (item: ParsedItem) => Promise<void> | void) {
   if (busy) return;
@@ -848,6 +870,7 @@ function tradeHotkey() {
     let query: unknown;
     if (priceable) {
       const req = newRareRequest(item, await getStatIndex());
+      if (!isMapItem(item)) weighRequest(req);
       query = buildSearchQuery(req.item, req.mods, { useBaseType: req.useBaseType, matchAll: req.matchAll, instantOnly: req.instantOnly });
     } else {
       // Währung, Gemmen, unidentifizierte Uniques …: nach dem Namen der Basis suchen.

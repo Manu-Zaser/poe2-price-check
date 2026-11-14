@@ -73,6 +73,12 @@ export interface TradeMod {
   danger?: boolean;
   /** Waffen: DPS bei 20 % Qualität (nur wenn die Waffe weniger hat). */
   q20?: number;
+  /** Trägt typischerweise den Preis dieses Slots (Liste in den Einstellungen). */
+  keyMod?: boolean;
+  /** Macht kaum Preis (Liste in den Einstellungen) – standardmäßig nicht gesucht. */
+  low?: boolean;
+  /** Roll-Qualität je Quell-Zeile (bei zusammengefassten Mods mehrere), 0–1. */
+  rolls?: { quality: number; range: string; max: string }[];
   /** Abgewählt, weil schon in einer Summe bzw. den DPS enthalten. */
   coveredBy?: 'total' | 'DPS' | 'crit' | 'defence';
   /** Tier(s) laut Spiel (bei zusammengefassten Mods mehrere). In PoE2: höher = besser. */
@@ -137,6 +143,8 @@ export type PriceResult =
       reference?: PriceMatch;
       /** Kurs zum Zeitpunkt der Suche (für die Anzeige "1 Div = 640 Ex"). */
       exaltedPerDivine?: number;
+      /** Schlüssel-Mods dieses Slots, die auf dem Item fehlen. */
+      missingKeys?: string[];
     }
   | { kind: 'not-found'; item: ParsedItem; league: string; reason: string }
   | { kind: 'unsupported'; item: ParsedItem; reason: string }
@@ -164,6 +172,10 @@ export interface Settings {
   startWithWindows: boolean;
   /** Waystones/Tablets: Textstücke gefährlicher Mods. */
   dangerMods: string[];
+  /** Schlüssel-Mods je Slot ("boots: increased Movement Speed"). */
+  keyMods: string[];
+  /** Mods mit wenig Wert ("*: Light Radius"). */
+  lowMods: string[];
 }
 
 export type HotkeySetting = 'hotkey' | 'hotkeyTrade' | 'hotkeyWiki';

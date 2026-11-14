@@ -14,6 +14,35 @@ export interface ModLine {
   /** Aus der Kopfzeile des erweiterten Kopierens (falls vorhanden). */
   affix?: ModMeta['affix'];
   tier?: number;
+  /** Wie gut der Wert innerhalb seines Bereichs gerollt ist (0–1); nur beim erweiterten Kopieren. */
+  roll?: ModRoll;
+}
+
+export interface ModRoll {
+  /** 0 = schlechtester, 1 = bester möglicher Wert (bei mehreren Zahlen der Durchschnitt). */
+  quality: number;
+  /** Möglicher Bereich, z. B. "124–149" oder "14–15 / 22–24". */
+  range: string;
+  /** Höchstwert dieses Tiers, z. B. "149" bzw. "38 to 59" bei "Adds # to #". */
+  max: string;
+}
+
+const RANGE = /(-?\d+(?:\.\d+)?)\((-?\d+(?:\.\d+)?)-(-?\d+(?:\.\d+)?)\)/g;
+
+/**
+ * Roll-Qualität aus den Wertebereichen des erweiterten Kopierens: "+142(124-149)" → 72 %.
+ * Bei "reduced"-Mods ist ein größerer Wert ebenfalls der bessere Roll des Mods.
+ */
+export function rollOf(raw: string): ModRoll | undefined {
+  const ranges = [...raw.matchAll(RANGE)].map((m) => ({ v: Number(m[1]), lo: Number(m[2]), hi: Number(m[3]) }));
+  if (!ranges.length) return undefined;
+  const parts = ranges.map(({ v, lo, hi }) => (hi === lo ? 1 : Math.min(1, Math.max(0, (v - lo) / (hi - lo)))));
+  const quality = Math.round((parts.reduce((a, b) => a + b, 0) / parts.length) * 100) / 100;
+  return {
+    quality,
+    range: ranges.map(({ lo, hi }) => `${lo}–${hi}`).join(' / '),
+    max: ranges.map(({ hi }) => String(hi)).join(' to '),
+  };
 }
 
 const MARKERS: Record<string, ModKind> = {
@@ -45,6 +74,7 @@ export function parseModLine(raw: string, fallbackKind: ModKind = 'explicit'): M
     text = text.slice(0, marker.index).trim();
   }
 
+  const roll = rollOf(text);
   text = text
     .replace(/\s+—\s+Unscalable Value$/i, '')
     // Wertebereiche aus dem erweiterten Kopieren: "14(14-15)" → "14"
@@ -52,7 +82,7 @@ export function parseModLine(raw: string, fallbackKind: ModKind = 'explicit'): M
     .trim();
 
   const values = (text.match(NUMBER) ?? []).map(Number);
-  return { text, kind, template: toTemplate(text), values };
+  return { text, kind, template: toTemplate(text), values, ...(roll ? { roll } : {}) };
 }
 
 /**
