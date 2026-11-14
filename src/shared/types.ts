@@ -65,6 +65,8 @@ export interface TradeMod {
   combined?: boolean;
   /** Kein Stat, sondern ein Item-Filter der Trade-Suche. */
   filter?: 'dps' | 'pdps' | 'edps' | 'crit' | 'ar' | 'ev' | 'es' | 'block' | 'spirit' | 'ilvl' | 'sockets' | 'corrupted';
+  /** Waystones/Tablets: Mod steht auf der Liste gefährlicher Mods (Einstellungen). */
+  danger?: boolean;
   /** Abgewählt, weil schon in einer Summe bzw. den DPS enthalten. */
   coveredBy?: 'total' | 'DPS' | 'crit' | 'defence';
   /** Tier(s) laut Spiel (bei zusammengefassten Mods mehrere). In PoE2: höher = besser. */
@@ -146,7 +148,19 @@ export interface Settings {
   overlayScale: number;
   /** Deckkraft des Overlay-Hintergrunds (0.4–1; 1 = undurchsichtig). Text bleibt immer voll sichtbar. */
   overlayOpacity: number;
+  /** Hotkey: Item direkt auf der Trade-Seite öffnen ("" = aus). */
+  hotkeyTrade: string;
+  /** Hotkey: Item im Wiki öffnen ("" = aus). */
+  hotkeyWiki: string;
+  /** Schließen des Hauptfensters lässt das Tool im Infobereich weiterlaufen. */
+  closeToTray: boolean;
+  /** Mit Windows starten (unsichtbar, nur im Infobereich). */
+  startWithWindows: boolean;
+  /** Waystones/Tablets: Textstücke gefährlicher Mods. */
+  dangerMods: string[];
 }
+
+export type HotkeySetting = 'hotkey' | 'hotkeyTrade' | 'hotkeyWiki';
 
 export interface AppStatus {
   league: string | null;
@@ -158,6 +172,10 @@ export interface AppStatus {
   exaltedPerDivine: number | null;
   lastError: string | null;
   hotkeyActive: boolean;
+  /** Welche Hotkeys registriert sind (false = von einem anderen Programm belegt). Fehlt = aus. */
+  hotkeysActive: Partial<Record<HotkeySetting, boolean>>;
+  /** Start mit Windows ist möglich (nur in der gepackten App). */
+  canStartWithWindows: boolean;
 }
 
 export interface HistoryEntry {

@@ -34,13 +34,25 @@ npm start
 
 - **Home:** the hotkey, the price data (league, exchange rate, how many items poe.ninja prices and when they were
   updated) and your **recent checks** – click one to open it in the overlay again, without scanning or searching again.
-- **How to use:** a short guide to the hotkey, the overlay and selling.
-- **Settings:** overlay size, background and position, league, updates, GPU acceleration.
+- **How to use:** a short guide to the hotkeys, the overlay, waystones and selling.
+- **Settings:** hotkeys, startup, overlay size/background/position, league, map mods, updates, GPU acceleration.
 
-Closing the main window quits the tool.
+**Tray:** closing the main window keeps the tool running in the tray (next to the clock) – the hotkeys keep working.
+Quit with right-click on the tray icon → Quit. Turn this off under Settings → Startup, where you can also let the
+tool **start with Windows** (quietly in the tray). For the portable exe, Windows starts it from where it is when you
+tick the option – tick it again if you move the file.
 
-**Changing the hotkey:** Home → "Change hotkey" → press the new combination. Allowed are Ctrl/Alt + key or a single
-F key. Combinations such as Ctrl+C are rejected because the game needs them. Esc cancels.
+## Hotkeys
+
+| Default | Action |
+|---|---|
+| **Ctrl+D** | Price check – opens the overlay for the item under the cursor |
+| **Ctrl+Alt+D** | Opens the item on pathofexile.com/trade in your browser, with the same default filters as the overlay (one trade search) |
+| **Alt+W** | Opens the unique – or the item's base – on [poe2wiki.net](https://www.poe2wiki.net) |
+
+Each press sends exactly one copy keystroke to the game. Change them under Settings → Hotkeys (the two extra hotkeys
+can be turned off): press the new combination – Ctrl/Alt + key or a single F key. Combinations such as Ctrl+C are
+rejected because the game needs them. Esc cancels.
 
 **League:** "Automatic" follows the current challenge league on poe.ninja. Prices are refreshed every hour, so after a
 league start the tool switches to the new league within an hour. A league you picked by hand that no longer exists
@@ -56,6 +68,9 @@ switches back to automatic.
 
   <img src="docs/images/overlay-unique.png" width="360" alt="Price check overlay for a unique: rolls with min/max, listings and the poe.ninja price for comparison">
 
+- **Waystones and tablets** → dangerous mods are marked red, with a warning at the top of the overlay. Which mods count
+  as dangerous is a list of text snippets under Settings → Map mods (one per line, case-insensitive) – adapt it to
+  your build.
 - **Normal (white) items** such as crafting bases or waystones → trade search like rares, with defaults for bases:
   only white items of **this base type** with at least **your item level**, same corrupted state. Implicits and
   defences are listed but not ticked. Anything poe.ninja knows (e.g. currency) is still priced via poe.ninja.
@@ -141,7 +156,12 @@ Hotkey, league and overlay settings are set in the UI. Everything is stored in
 | Field | Default | Meaning |
 |---|---|---|
 | `league` | `""` | empty = current challenge league |
-| `hotkey` | `Ctrl+D` | Electron accelerator |
+| `hotkey` | `Ctrl+D` | price check hotkey (Electron accelerator) |
+| `hotkeyTrade` | `Ctrl+Alt+D` | open on trade site (`""` = off) |
+| `hotkeyWiki` | `Alt+W` | open in wiki (`""` = off) |
+| `closeToTray` | `true` | closing the window keeps the tool running in the tray |
+| `startWithWindows` | `false` | start with Windows (packaged exe only) |
+| `dangerMods` | list | text snippets of dangerous waystone/tablet mods |
 | `gameWindowTitle` | `Path of Exile 2` | window title of the game |
 | `contact` | `""` | optional additional contact in the User-Agent (the project URL is always sent) |
 | `overlayScale` | `1.15` | overlay size (0.8–1.6) |

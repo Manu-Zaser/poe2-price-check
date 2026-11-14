@@ -1,6 +1,6 @@
 {
   "name": "poe2-pricecheck",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Clipboard-Preischeck-Overlay für Path of Exile 2 (nur lesend, ein Tastendruck = eine Aktion)",
   "license": "MIT",
   "repository": {

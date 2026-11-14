@@ -172,17 +172,77 @@
           </dl>
         </div>
 
+        <h2 class="guide-h">More hotkeys</h2>
+        <div class="extra-keys">
+          <div class="extra-key">
+            <span class="inline-keys" id="guide-keys-trade"></span>
+            <div><b>Open on trade site</b><p>The item opens on pathofexile.com/trade in your browser, with the same filters the overlay would use.</p></div>
+          </div>
+          <div class="extra-key">
+            <span class="inline-keys" id="guide-keys-wiki"></span>
+            <div><b>Open in wiki</b><p>The unique – or the item's base – opens on poe2wiki.net.</p></div>
+          </div>
+        </div>
+        <p class="guide-note">Change or turn them off under Settings → Hotkeys.</p>
+
+        <h2 class="guide-h">Waystones and tablets</h2>
+        <p class="guide-text">Price-check a waystone or tablet and dangerous mods are marked <span class="danger-word">red</span>, with a warning at the top of the overlay – before you put it into the map device. Which mods count as dangerous is up to you: Settings → Map mods.</p>
+
         <h2 class="guide-h">Good to know</h2>
         <ul class="tips">
           <li><b>Move</b> the overlay by dragging any empty spot – it stays there for the next checks. <b>Close</b> it with × or Esc.</li>
           <li><b>Recent checks</b> on the Home page reopen a check in the overlay without searching again.</li>
           <li>GGG allows only a few trade searches per minute. If you search too often, the overlay asks you to wait a few seconds.</li>
           <li>The league is chosen automatically – after a league start the tool switches within an hour.</li>
+          <li>Closing the window keeps the tool running in the tray (bottom right, next to the clock). Quit it there with right-click → Quit.</li>
         </ul>
       </section>
 
       <!-- EINSTELLUNGEN -->
-      <section class="page" data-page="settings" data-title="Settings" data-sub="Overlay, prices and updates">
+      <section class="page" data-page="settings" data-title="Settings" data-sub="Hotkeys, overlay, prices and updates">
+        <h2 class="group-h">Hotkeys</h2>
+        <div class="card group">
+          <div class="field hk" data-hotkey="hotkey">
+            <div class="hk-main">
+              <label>Price check</label>
+              <p class="help">Shows the price overlay for the item under the cursor.</p>
+            </div>
+            <div class="hk-keys"></div>
+            <div class="hk-actions"><button class="btn sm hk-change">Change</button></div>
+            <p class="hk-error" role="alert"></p>
+          </div>
+          <div class="field hk" data-hotkey="hotkeyTrade">
+            <div class="hk-main">
+              <label>Open on trade site</label>
+              <p class="help">Opens the item on pathofexile.com/trade in your browser, with the same default filters as the overlay.</p>
+            </div>
+            <div class="hk-keys"></div>
+            <div class="hk-actions"><button class="btn sm hk-change">Change</button><button class="btn ghost sm hk-off">Turn off</button></div>
+            <p class="hk-error" role="alert"></p>
+          </div>
+          <div class="field hk" data-hotkey="hotkeyWiki">
+            <div class="hk-main">
+              <label>Open in wiki</label>
+              <p class="help">Opens the unique or the item's base on poe2wiki.net – handy for crafting and mod pools.</p>
+            </div>
+            <div class="hk-keys"></div>
+            <div class="hk-actions"><button class="btn sm hk-change">Change</button><button class="btn ghost sm hk-off">Turn off</button></div>
+            <p class="hk-error" role="alert"></p>
+          </div>
+        </div>
+
+        <h2 class="group-h">Startup</h2>
+        <div class="card group">
+          <div class="field">
+            <label class="check"><input type="checkbox" id="start-windows" /> <span>Start with Windows</span></label>
+            <p class="help" id="start-windows-help">Starts quietly in the tray when you log in, so the hotkeys are ready when you launch PoE2.</p>
+          </div>
+          <div class="field">
+            <label class="check"><input type="checkbox" id="close-tray" /> <span>Keep running in the tray when the window is closed</span></label>
+            <p class="help">The hotkeys keep working. Quit via the tray icon (right-click → Quit).</p>
+          </div>
+        </div>
+
         <h2 class="group-h">Overlay</h2>
         <div class="card group">
           <div class="field">
@@ -217,6 +277,19 @@
             <label for="league">League</label>
             <p class="help">Automatic follows the current challenge league on poe.ninja – including new leagues.</p>
             <div class="select-wrap"><select id="league"></select></div>
+          </div>
+        </div>
+
+        <h2 class="group-h">Map mods</h2>
+        <div class="card group">
+          <div class="field">
+            <label for="danger-mods">Dangerous mods on waystones and tablets</label>
+            <p class="help">Mods containing one of these texts are marked red in the overlay. One text per line, upper/lower case doesn't matter – adapt it to what your build can't handle.</p>
+            <textarea id="danger-mods" rows="8" spellcheck="false"></textarea>
+            <div class="row-actions">
+              <span class="saved-hint" id="danger-saved" hidden>Saved</span>
+              <button class="btn ghost sm" id="danger-reset">Restore defaults</button>
+            </div>
           </div>
         </div>
 

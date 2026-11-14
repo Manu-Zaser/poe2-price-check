@@ -15,3 +15,5 @@ await Promise.all([
 for (const f of ['overlay.html', 'app.html', 'base.css', 'app.css', 'overlay.css']) cpSync(`src/renderer/${f}`, `dist/${f}`);
 // Bild für die Anleitung im Hauptfenster (dasselbe wie in der README)
 cpSync('docs/images/overlay-rare.png', 'dist/guide-overlay.png');
+// Symbol für den Infobereich (Tray)
+cpSync('build/icon.png', 'dist/tray.png');

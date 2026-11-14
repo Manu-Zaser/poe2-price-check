@@ -1,10 +1,11 @@
-import { app, BrowserWindow, clipboard, globalShortcut, ipcMain, screen, shell } from 'electron';
+import { app, BrowserWindow, clipboard, globalShortcut, ipcMain, Menu, nativeImage, screen, shell, Tray } from 'electron';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { validateHotkey } from '../shared/hotkey';
 import { parseItemText } from '../shared/parser';
-import { isNamedUnique, type StatIndex } from '../shared/stats';
-import type { AppState, AppStatus, HistoryEntry, PriceResult, SaveResult, Settings, TradeSelection } from '../shared/types';
+import { cleanDangerList, DEFAULT_DANGER_MODS, isMapItem, markDangerous, wikiUrl } from '../shared/maps';
+import { buildSearchQuery, isNamedUnique, tradeSearchUrl, type StatIndex } from '../shared/stats';
+import type { AppState, AppStatus, HistoryEntry, HotkeySetting, ParsedItem, PriceResult, SaveResult, Settings, TradeSelection } from '../shared/types';
 import { log, logFile } from './log';
 import { buildPriceIndex, CACHE_TTL_MS, fetchLeagues, lookupPrice, makeFetchJson, type PriceIndex } from './ninja';
 import { applySelection, idleRareResult, loadStatIndex, newRareRequest, runRareSearch, type RareRequest } from './rare';
@@ -48,6 +49,8 @@ interface Config extends Settings {
   contact: string;
   /** Vom Nutzer verschobene Overlay-Position (linke obere Ecke); null = neben dem Mauszeiger. */
   overlayPosition: { x: number; y: number } | null;
+  /** Hinweis "läuft im Infobereich weiter" wurde schon einmal gezeigt. */
+  trayHintShown: boolean;
 }
 
 const DEFAULT_CONFIG: Config = {
@@ -59,6 +62,12 @@ const DEFAULT_CONFIG: Config = {
   overlayScale: 1.15,
   overlayOpacity: 0.96,
   overlayPosition: null,
+  hotkeyTrade: 'Ctrl+Alt+D',
+  hotkeyWiki: 'Alt+W',
+  closeToTray: true,
+  startWithWindows: false,
+  dangerMods: DEFAULT_DANGER_MODS,
+  trayHintShown: false,
 };
 
 const configFile = () => join(app.getPath('userData'), 'config.json');
@@ -71,6 +80,11 @@ function loadConfig(): Config {
     // Datei fehlt oder ist ungültig → Standardwerte.
   }
   if (validateHotkey(loaded.hotkey)) loaded.hotkey = DEFAULT_CONFIG.hotkey;
+  // Zusatz-Hotkeys: "" = bewusst aus; Ungültiges zurück auf den Standard.
+  for (const key of ['hotkeyTrade', 'hotkeyWiki'] as const) {
+    if (typeof loaded[key] !== 'string' || (loaded[key] && validateHotkey(loaded[key]))) loaded[key] = DEFAULT_CONFIG[key];
+  }
+  loaded.dangerMods = Array.isArray(loaded.dangerMods) ? cleanDangerList(loaded.dangerMods.map(String)) : [...DEFAULT_DANGER_MODS];
   delete (loaded as Partial<Config> & { overlaySeconds?: number }).overlaySeconds; // aus älteren Versionen
   saveConfig(loaded);
   return loaded;
@@ -112,6 +126,10 @@ let loading: Promise<PriceIndex> | null = null;
 let leagues: string[] = [];
 let lastError: string | null = null;
 let hotkeyActive = false;
+let hotkeysActive: Partial<Record<HotkeySetting, boolean>> = {};
+let tray: Tray | null = null;
+/** Mit Windows gestartet: Hauptfenster nicht zeigen, nur im Infobereich laufen. */
+const startHidden = process.argv.includes('--hidden');
 let history: HistoryEntry[] = [];
 let historyId = 0;
 
@@ -140,16 +158,18 @@ function status(): AppStatus {
     exaltedPerDivine: index?.exaltedPerDivine || null,
     lastError,
     hotkeyActive,
+    hotkeysActive,
+    canStartWithWindows: app.isPackaged,
   };
 }
 
 function state(): AppState {
-  const { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity } = config;
+  const { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity, hotkeyTrade, hotkeyWiki, closeToTray, startWithWindows, dangerMods } = config;
   return {
     status: status(),
     update: updateState(),
     leagueAuto: !league,
-    settings: { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity },
+    settings: { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity, hotkeyTrade, hotkeyWiki, closeToTray, startWithWindows, dangerMods },
     overlayPositionSaved: config.overlayPosition !== null,
     logFile: logFile(),
     leagues,
@@ -218,31 +238,84 @@ function refreshIndex(): Promise<PriceIndex> {
 
 // ---------- Hotkey ----------
 
-function registerHotkey(acc: string): boolean {
+const HOTKEYS: HotkeySetting[] = ['hotkey', 'hotkeyTrade', 'hotkeyWiki'];
+
+/** Was jeder Hotkey tut – jeder Druck ist genau eine Kopier-Aktion im Spiel. */
+const HOTKEY_ACTIONS: Record<HotkeySetting, () => void> = {
+  hotkey: () => void priceCheck(),
+  hotkeyTrade: () => void tradeHotkey(),
+  hotkeyWiki: () => void wikiHotkey(),
+};
+
+/** Alle Hotkeys neu registrieren; Ergebnis je Hotkey (false = von einem anderen Programm belegt). */
+function registerHotkeys(cfg: Pick<Config, HotkeySetting>): Partial<Record<HotkeySetting, boolean>> {
   globalShortcut.unregisterAll();
-  try {
-    return globalShortcut.register(acc, () => void priceCheck());
-  } catch {
-    return false; // ungültiger Accelerator
+  const result: Partial<Record<HotkeySetting, boolean>> = {};
+  for (const key of HOTKEYS) {
+    const acc = cfg[key];
+    if (!acc) continue;
+    try {
+      result[key] = globalShortcut.register(acc, HOTKEY_ACTIONS[key]);
+    } catch {
+      result[key] = false; // ungültiger Accelerator
+    }
   }
+  return result;
 }
 
 function activateHotkey() {
-  hotkeyActive = registerHotkey(config.hotkey);
+  hotkeysActive = registerHotkeys(config);
+  hotkeyActive = !!hotkeysActive.hotkey;
   lastError = hotkeyActive ? lastError : `Hotkey ${config.hotkey} is already used by another program.`;
+  for (const key of ['hotkeyTrade', 'hotkeyWiki'] as const) {
+    if (config[key] && !hotkeysActive[key]) log('warn', `Hotkey ${config[key]} (${key}) is already used by another program`);
+  }
+}
+
+/** Gleicher Hotkey trotz unterschiedlicher Schreibweise ("Ctrl+D" = "CommandOrControl+D")? */
+function sameHotkey(a: string, b: string): boolean {
+  const norm = (x: string) => x.replace(/CommandOrControl|CmdOrCtrl|Control/g, 'Ctrl').toLowerCase();
+  return norm(a) === norm(b);
+}
+
+/** Einen Hotkey ändern ("" = aus). Bei Fehlern bleibt alles wie vorher. */
+function changeHotkey(key: HotkeySetting, acc: string): SaveResult {
+  if (acc === '') {
+    if (key === 'hotkey') return { ok: false, error: 'The price check hotkey cannot be turned off.' };
+    config[key] = '';
+    activateHotkey();
+    return { ok: true };
+  }
+  const invalid = validateHotkey(acc);
+  if (invalid) return { ok: false, error: invalid };
+  if (HOTKEYS.some((k) => k !== key && config[k] && sameHotkey(config[k], acc))) {
+    return { ok: false, error: 'This combination is already used by another hotkey of this tool.' };
+  }
+  const result = registerHotkeys({ ...config, [key]: acc });
+  if (!result[key]) {
+    activateHotkey(); // alte Belegung wiederherstellen
+    return { ok: false, error: 'This combination is already used by another program.' };
+  }
+  config[key] = acc;
+  hotkeysActive = result;
+  hotkeyActive = !!result.hotkey;
+  return { ok: true };
 }
 
 async function saveSettings(patch: Partial<Settings>): Promise<SaveResult> {
-  if (patch.hotkey !== undefined && patch.hotkey !== config.hotkey) {
-    const invalid = validateHotkey(patch.hotkey);
-    if (invalid) return { ok: false, error: invalid };
-    if (!registerHotkey(patch.hotkey)) {
-      activateHotkey(); // alten Hotkey wiederherstellen
-      return { ok: false, error: 'This combination is already used by another program.' };
-    }
-    config.hotkey = patch.hotkey;
-    hotkeyActive = true;
+  for (const key of HOTKEYS) {
+    const acc = patch[key];
+    if (acc === undefined || acc === config[key]) continue;
+    const res = changeHotkey(key, acc);
+    if (!res.ok) return res;
   }
+
+  if (patch.closeToTray !== undefined) config.closeToTray = !!patch.closeToTray;
+  if (patch.startWithWindows !== undefined) {
+    config.startWithWindows = !!patch.startWithWindows;
+    applyLoginItem();
+  }
+  if (Array.isArray(patch.dangerMods)) config.dangerMods = cleanDangerList(patch.dangerMods.map(String));
 
   if (patch.gpuAcceleration !== undefined) config.gpuAcceleration = patch.gpuAcceleration; // wirkt nach Neustart
 
@@ -334,7 +407,23 @@ function createMainWindow() {
   });
   mainWin.removeMenu(); // sonst öffnet Alt bei der Hotkey-Aufnahme das Menü
   void mainWin.loadFile(join(__dirname, 'app.html'));
-  mainWin.once('ready-to-show', () => mainWin?.show());
+  // Beim Start mit Windows nur im Infobereich laufen.
+  mainWin.once('ready-to-show', () => !startHidden && mainWin?.show());
+  // Schließen = im Infobereich weiterlaufen (abschaltbar); Beenden über das Menü des Symbols.
+  mainWin.on('close', (e) => {
+    if (quitting || !config.closeToTray || !tray) return;
+    e.preventDefault();
+    mainWin?.hide();
+    if (!config.trayHintShown) {
+      tray.displayBalloon({
+        iconType: 'info',
+        title: 'PoE2 Price Check is still running',
+        content: 'The hotkeys keep working. Right-click the tray icon to quit.',
+      });
+      config.trayHintShown = true;
+      saveConfig(config);
+    }
+  });
   mainWin.on('closed', () => {
     mainWin = null;
     app.quit();
@@ -606,6 +695,8 @@ async function rareCheck(item: NonNullable<ReturnType<typeof parseItemText>>): P
   // Uniques: poe.ninja-Preis als Vergleich mitgeben (falls gelistet).
   const ninja = item.rarity === 'Unique' ? lookupPrice(idx, item) : null;
   const req = newRareRequest(item, stats, ninja?.kind === 'priced' ? ninja.matches[0] : undefined);
+  // Waystones/Tablets: gefährliche Mods markieren (Liste in den Einstellungen).
+  if (isMapItem(item)) req.mods = markDangerous(req.mods, config.dangerMods);
   rareRequest = req;
   rememberRequest(req);
   // Keine automatische Suche – erst der Klick auf "Search" fragt pathofexile.com an.
@@ -712,6 +803,55 @@ async function priceCheck() {
   }
 }
 
+/** Gemeinsamer Ablauf der Zusatz-Hotkeys: Item kopieren (eine Aktion), dann etwas damit tun. */
+async function withItem(action: (item: ParsedItem) => Promise<void> | void) {
+  if (busy) return;
+  busy = true;
+  try {
+    const item = parseItemText(await readItemText());
+    if (!item) {
+      showOverlay({ kind: 'error', message: 'No item in the clipboard. Hover over an item and press the hotkey again.' });
+      return;
+    }
+    await action(item);
+  } catch (e) {
+    log('error', 'Hotkey action failed', e);
+    showOverlay({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
+  } finally {
+    busy = false;
+  }
+}
+
+/**
+ * Item direkt auf der Trade-Seite öffnen – mit denselben Standard-Filtern wie im Overlay.
+ * Eine Suchanfrage (für die Such-ID), kein Abruf von Angeboten.
+ */
+function tradeHotkey() {
+  return withItem(async (item) => {
+    const idx = await getIndex();
+    const priceable = item.rarity === 'Rare' || item.rarity === 'Magic' || item.rarity === 'Normal' || isNamedUnique(item);
+    let query: unknown;
+    if (priceable) {
+      const req = newRareRequest(item, await getStatIndex());
+      query = buildSearchQuery(req.item, req.mods, { useBaseType: req.useBaseType, matchAll: req.matchAll, instantOnly: req.instantOnly });
+    } else {
+      // Währung, Gemmen, unidentifizierte Uniques …: nach dem Namen der Basis suchen.
+      const rarity = item.rarity === 'Unique' ? { filters: { type_filters: { filters: { rarity: { option: 'unique' } } } } } : {};
+      query = { query: { status: { option: 'securable' }, type: item.baseType, ...rarity }, sort: { price: 'asc' } };
+    }
+    const found = await tradeClient().search(idx.league, query);
+    log('info', `Opened trade search for ${item.name ?? item.baseType}`);
+    void shell.openExternal(tradeSearchUrl(idx.league, found.id));
+  });
+}
+
+/** Item im Community-Wiki öffnen (keine Anfrage an pathofexile.com). */
+function wikiHotkey() {
+  return withItem((item) => {
+    void shell.openExternal(wikiUrl(item));
+  });
+}
+
 /** Zeigt eine Divine Orb als Beispiel, damit man Position und Aussehen prüfen kann. */
 async function testOverlay() {
   try {
@@ -726,11 +866,49 @@ async function testOverlay() {
 
 if (!app.requestSingleInstanceLock()) app.quit();
 
-app.on('second-instance', () => {
+app.on('second-instance', () => showMainWindow());
+
+function showMainWindow() {
   if (!alive(mainWin)) return;
   if (mainWin.isMinimized()) mainWin.restore();
+  mainWin.show();
   mainWin.focus();
-});
+}
+
+// ---------- Infobereich (Tray) ----------
+
+function createTray() {
+  const icon = nativeImage.createFromPath(join(__dirname, 'tray.png')).resize({ width: 16, height: 16 });
+  tray = new Tray(icon);
+  tray.setToolTip('PoE2 Price Check');
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: 'Open PoE2 Price Check', click: () => showMainWindow() },
+      { label: 'Show test overlay', click: () => void testOverlay() },
+      { type: 'separator' },
+      { label: 'Check for updates', click: () => void checkForUpdates() },
+      { type: 'separator' },
+      {
+        label: 'Quit',
+        click: () => {
+          quitting = true;
+          app.quit();
+        },
+      },
+    ]),
+  );
+  tray.on('click', () => showMainWindow());
+}
+
+/**
+ * Start mit Windows (nur in der gepackten App). Die portable exe läuft aus einem temporären
+ * Ordner – eingetragen wird deshalb die exe selbst (PORTABLE_EXECUTABLE_FILE).
+ */
+function applyLoginItem() {
+  if (!app.isPackaged) return;
+  const path = process.env.PORTABLE_EXECUTABLE_FILE || process.execPath;
+  app.setLoginItemSettings({ openAtLogin: config.startWithWindows, path, args: ['--hidden'] });
+}
 
 app.on('before-quit', () => (quitting = true));
 app.on('child-process-gone', (_e, d) => log('warn', `Child process gone: ${d.type} (${d.reason})`));
@@ -791,6 +969,8 @@ app.whenReady().then(() => {
   }));
 
   createMainWindow();
+  createTray();
+  applyLoginItem();
   initUpdates({ userAgent: userAgent(), onChange: pushState });
   createOverlayWindow();
   activateHotkey();

@@ -249,3 +249,43 @@ code { font: 11.5px Consolas, monospace; color: var(--text); background: var(--s
   .overlay-explained { grid-template-columns: 1fr; }
   .overlay-explained img { max-width: 260px; }
 }
+
+/* ---------- Hotkey-Zeilen (Einstellungen) ---------- */
+.field.hk { display: grid; grid-template-columns: 1fr 190px 160px; align-items: center; gap: 4px 16px; }
+.hk-keys { display: flex; align-items: center; justify-content: flex-end; min-height: 30px; }
+.hk-keys .keys-placeholder { font-size: 13px; }
+.hk-actions { display: flex; gap: 6px; justify-content: flex-end; min-width: 150px; }
+.hk-error { grid-column: 1 / -1; margin: 0; color: var(--bad); font-size: 12.5px; }
+.hk-error:empty { display: none; }
+.hk-none { font-size: 12.5px; color: var(--faint); }
+.hk.recording .hk-keys kbd.key { border-color: var(--gold-deep); }
+.hk.recording { box-shadow: inset 3px 0 0 var(--gold); padding-left: 12px; margin-left: -12px; }
+.hk.saved { animation: saved-row .9s ease-out; }
+@keyframes saved-row { 0% { background: rgba(127,176,105,.18); } 100% { background: transparent; } }
+
+/* ---------- Map-Mods ---------- */
+textarea {
+  display: block; width: 100%; resize: vertical; min-height: 120px;
+  padding: 9px 12px; border-radius: 8px; font: 12.5px/1.55 Consolas, "Cascadia Mono", monospace;
+  background: var(--surface-2); border: 1px solid var(--line-strong); color: var(--text);
+}
+textarea:hover { border-color: var(--gold-deep); }
+textarea:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.row-actions { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 8px; }
+.saved-hint { font-size: 12px; color: var(--ok); }
+
+/* ---------- Anleitung: Zusatz-Hotkeys, Waystones ---------- */
+.extra-keys { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.extra-key {
+  display: grid; grid-template-columns: 1fr; gap: 10px; align-items: start; padding: 12px 14px; border-radius: 12px;
+  background: var(--surface); border: 1px solid var(--line);
+}
+.extra-key b { font-weight: 600; }
+.extra-key p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+.guide-note { margin: 8px 0 0; font-size: 12px; color: var(--faint); }
+.guide-text { margin: 0; color: var(--muted); font-size: 13px; }
+.danger-word { color: #f0907e; font-weight: 600; }
+
+@media (max-width: 860px) {
+  .extra-keys { grid-template-columns: 1fr; }
+}

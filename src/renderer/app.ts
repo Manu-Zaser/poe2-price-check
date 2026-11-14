@@ -1,5 +1,6 @@
 import { acceleratorFromEvent, formatHotkey, validateHotkey } from '../shared/hotkey';
-import type { AppState, HistoryEntry, UpdateState } from '../shared/types';
+import { DEFAULT_DANGER_MODS } from '../shared/maps';
+import type { AppState, HistoryEntry, HotkeySetting, UpdateState } from '../shared/types';
 import { api, el, itemIcon } from './api';
 import { amount, clock, currencyShort, priceParts, timeAgo } from './format';
 
@@ -20,7 +21,7 @@ function showPage(name: string) {
     }
   }
   document.querySelector('main')!.scrollTop = 0;
-  if (recording) stopRecording();
+  if (rec) stopRecording();
 }
 
 for (const item of document.querySelectorAll<HTMLButtonElement>('.nav-item')) {
@@ -39,8 +40,21 @@ function keycaps(labels: string[], size: 'lg' | 'sm' = 'lg'): HTMLElement[] {
 }
 
 // ---------- Hotkey-Aufnahme ----------
+//
+// Dieselbe Aufnahme für die Karte auf der Startseite und die drei Zeilen in den Einstellungen.
 
-let recording = false;
+interface Recorder {
+  key: HotkeySetting;
+  keys: HTMLElement;
+  error: HTMLElement;
+  size: 'lg' | 'sm';
+  /** Oberfläche in den Aufnahme-Zustand versetzen bzw. zurück. */
+  start(): void;
+  stop(): void;
+  saved(): void;
+}
+
+let rec: Recorder | null = null;
 
 function liveModifiers(e: KeyboardEvent): string[] {
   const mods: string[] = [];
@@ -51,39 +65,28 @@ function liveModifiers(e: KeyboardEvent): string[] {
 }
 
 function showRecordingKeys(labels: string[]) {
-  const box = $('hotkey-keys');
-  if (labels.length === 0) box.replaceChildren(el('span', 'keys-placeholder', 'Press the new key combination …'));
-  else box.replaceChildren(...keycaps([...labels, '…']));
+  if (!rec) return;
+  if (labels.length === 0) rec.keys.replaceChildren(el('span', 'keys-placeholder', 'Press the new key combination …'));
+  else rec.keys.replaceChildren(...keycaps([...labels, '…'], rec.size));
 }
 
-function setError(msg: string) {
-  $('hotkey-error').textContent = msg;
-}
-
-function startRecording() {
-  recording = true;
+function startRecording(r: Recorder) {
+  if (rec) stopRecording();
+  rec = r;
   api.suspendHotkey(true);
-  setError('');
-  $('hotkey-card').classList.add('recording');
-  $('hotkey-pill').className = 'pill rec';
-  $('hotkey-pill').querySelector('span')!.textContent = 'Recording';
-  $('hotkey-change').hidden = true;
-  $('hotkey-reset').hidden = true;
-  $('hotkey-cancel').hidden = false;
-  $('hotkey-hint').textContent = 'Ctrl or Alt plus a key – or an F-key on its own. Esc cancels.';
+  r.error.textContent = '';
+  r.start();
   showRecordingKeys([]);
   window.addEventListener('keydown', onRecordKey, true);
   window.addEventListener('keyup', onRecordKeyUp, true);
 }
 
 function stopRecording() {
-  recording = false;
+  const r = rec;
+  rec = null;
   window.removeEventListener('keydown', onRecordKey, true);
   window.removeEventListener('keyup', onRecordKeyUp, true);
-  $('hotkey-card').classList.remove('recording');
-  $('hotkey-change').hidden = false;
-  $('hotkey-reset').hidden = false;
-  $('hotkey-cancel').hidden = true;
+  r?.stop();
   api.suspendHotkey(false);
   if (current) render(current);
 }
@@ -91,9 +94,10 @@ function stopRecording() {
 async function onRecordKey(e: KeyboardEvent) {
   e.preventDefault();
   e.stopPropagation();
-  if (e.repeat) return;
+  if (e.repeat || !rec) return;
+  const r = rec;
   if (e.code === 'Escape' && !e.ctrlKey && !e.altKey && !e.shiftKey) {
-    setError('');
+    r.error.textContent = '';
     stopRecording();
     return;
   }
@@ -102,25 +106,25 @@ async function onRecordKey(e: KeyboardEvent) {
     showRecordingKeys(liveModifiers(e));
     return;
   }
-  $('hotkey-keys').replaceChildren(...keycaps(formatHotkey(acc)));
+  r.keys.replaceChildren(...keycaps(formatHotkey(acc), r.size));
   const invalid = validateHotkey(acc);
   if (invalid) {
-    setError(invalid);
+    r.error.textContent = invalid;
     return;
   }
-  const res = await api.saveSettings({ hotkey: acc });
+  const res = await api.saveSettings({ [r.key]: acc });
   if (!res.ok) {
-    setError(res.error);
+    r.error.textContent = res.error;
     return;
   }
-  setError('');
+  r.error.textContent = '';
   stopRecording();
-  flash($('hotkey-card'));
+  r.saved();
 }
 
 function onRecordKeyUp(e: KeyboardEvent) {
   e.preventDefault();
-  if (!acceleratorFromEvent(e) && $('hotkey-error').textContent === '') showRecordingKeys(liveModifiers(e));
+  if (rec && !acceleratorFromEvent(e) && rec.error.textContent === '') showRecordingKeys(liveModifiers(e));
 }
 
 function flash(node: HTMLElement) {
@@ -129,24 +133,112 @@ function flash(node: HTMLElement) {
   node.classList.add('saved');
 }
 
-$('hotkey-change').addEventListener('click', startRecording);
+/** Karte "Price check hotkey" auf der Startseite. */
+const homeRecorder: Recorder = {
+  key: 'hotkey',
+  keys: $('hotkey-keys'),
+  error: $('hotkey-error'),
+  size: 'lg',
+  start() {
+    $('hotkey-card').classList.add('recording');
+    $('hotkey-pill').className = 'pill rec';
+    $('hotkey-pill').querySelector('span')!.textContent = 'Recording';
+    $('hotkey-change').hidden = true;
+    $('hotkey-reset').hidden = true;
+    $('hotkey-cancel').hidden = false;
+    $('hotkey-hint').textContent = 'Ctrl or Alt plus a key – or an F-key on its own. Esc cancels.';
+  },
+  stop() {
+    $('hotkey-card').classList.remove('recording');
+    $('hotkey-change').hidden = false;
+    $('hotkey-cancel').hidden = true;
+  },
+  saved() {
+    flash($('hotkey-card'));
+  },
+};
+
+$('hotkey-change').addEventListener('click', () => startRecording(homeRecorder));
 $('hotkey-cancel').addEventListener('click', () => {
-  setError('');
+  homeRecorder.error.textContent = '';
   stopRecording();
 });
 $('hotkey-reset').addEventListener('click', async () => {
   const res = await api.saveSettings({ hotkey: 'Ctrl+D' });
-  setError(res.ok ? '' : res.error);
+  homeRecorder.error.textContent = res.ok ? '' : res.error;
   if (res.ok) flash($('hotkey-card'));
 });
+
+/** Zeilen unter Einstellungen → Hotkeys. */
+const rowRecorders = new Map<HotkeySetting, Recorder>();
+for (const row of document.querySelectorAll<HTMLElement>('.hk')) {
+  const key = row.dataset.hotkey as HotkeySetting;
+  const change = row.querySelector<HTMLButtonElement>('.hk-change')!;
+  const off = row.querySelector<HTMLButtonElement>('.hk-off');
+  const r: Recorder = {
+    key,
+    keys: row.querySelector<HTMLElement>('.hk-keys')!,
+    error: row.querySelector<HTMLElement>('.hk-error')!,
+    size: 'sm',
+    start() {
+      row.classList.add('recording');
+      change.textContent = 'Cancel';
+      if (off) off.hidden = true;
+    },
+    stop() {
+      row.classList.remove('recording');
+      change.textContent = 'Change';
+    },
+    saved() {
+      flash(row);
+    },
+  };
+  rowRecorders.set(key, r);
+  change.addEventListener('click', () => {
+    if (rec === r) {
+      r.error.textContent = '';
+      stopRecording();
+    } else startRecording(r);
+  });
+  off?.addEventListener('click', async () => {
+    if (rec) stopRecording();
+    const res = await api.saveSettings({ [key]: '' });
+    r.error.textContent = res.ok ? '' : res.error;
+  });
+}
+
 window.addEventListener('blur', () => {
-  if (recording) stopRecording();
+  if (rec) stopRecording();
 });
 
 // ---------- Übersicht ----------
 
+function renderHotkeyRows(s: AppState) {
+  for (const [key, r] of rowRecorders) {
+    if (rec === r) continue;
+    const acc = s.settings[key];
+    const row = r.keys.closest<HTMLElement>('.hk')!;
+    const off = row.querySelector<HTMLButtonElement>('.hk-off');
+    if (!acc) {
+      r.keys.replaceChildren(el('span', 'hk-none', 'Off'));
+      if (off) off.hidden = true;
+    } else {
+      r.keys.replaceChildren(...keycaps(formatHotkey(acc), 'sm'));
+      if (off) off.hidden = false;
+    }
+    const busy = acc && s.status.hotkeysActive[key] === false;
+    if (busy && !r.error.textContent) r.error.textContent = 'Already used by another program – choose a different combination.';
+    if (!busy && r.error.textContent.startsWith('Already used by another program')) r.error.textContent = '';
+  }
+  const trade = s.settings.hotkeyTrade;
+  const wiki = s.settings.hotkeyWiki;
+  $('guide-keys-trade').replaceChildren(...(trade ? keycaps(formatHotkey(trade), 'sm') : [el('span', 'hk-none', 'Off')]));
+  $('guide-keys-wiki').replaceChildren(...(wiki ? keycaps(formatHotkey(wiki), 'sm') : [el('span', 'hk-none', 'Off')]));
+}
+
 function renderHotkey(s: AppState) {
-  if (recording) return;
+  renderHotkeyRows(s);
+  if (rec === homeRecorder) return;
   $('hotkey-keys').replaceChildren(...keycaps(formatHotkey(s.settings.hotkey)));
   $('empty-keys').replaceChildren(...keycaps(formatHotkey(s.settings.hotkey), 'sm'));
   $('guide-keys').replaceChildren(...keycaps(formatHotkey(s.settings.hotkey), 'sm'));
@@ -316,12 +408,51 @@ $<HTMLInputElement>('gpu').addEventListener('change', (e) => {
 });
 $('gpu-restart').addEventListener('click', () => api.restartApp());
 
+// ---------- Start, Infobereich ----------
+
+function renderStartup(s: AppState) {
+  const start = $<HTMLInputElement>('start-windows');
+  start.checked = s.settings.startWithWindows;
+  start.disabled = !s.status.canStartWithWindows;
+  if (!s.status.canStartWithWindows) $('start-windows-help').textContent = 'Only available in the installed or portable exe, not when running from source.';
+  $<HTMLInputElement>('close-tray').checked = s.settings.closeToTray;
+}
+$<HTMLInputElement>('start-windows').addEventListener('change', (e) => {
+  void api.saveSettings({ startWithWindows: (e.target as HTMLInputElement).checked });
+});
+$<HTMLInputElement>('close-tray').addEventListener('change', (e) => {
+  void api.saveSettings({ closeToTray: (e.target as HTMLInputElement).checked });
+});
+
+// ---------- Gefährliche Map-Mods ----------
+
+function renderDangerMods(s: AppState) {
+  const area = $<HTMLTextAreaElement>('danger-mods');
+  if (document.activeElement !== area) area.value = s.settings.dangerMods.join('\n');
+}
+
+async function saveDangerMods(lines: string[]) {
+  const res = await api.saveSettings({ dangerMods: lines });
+  if (res.ok) {
+    const hint = $('danger-saved');
+    hint.hidden = false;
+    setTimeout(() => (hint.hidden = true), 1500);
+  }
+}
+$<HTMLTextAreaElement>('danger-mods').addEventListener('change', (e) => {
+  void saveDangerMods((e.target as HTMLTextAreaElement).value.split(/\r?\n/));
+});
+$('danger-reset').addEventListener('click', () => {
+  $<HTMLTextAreaElement>('danger-mods').value = DEFAULT_DANGER_MODS.join('\n');
+  void saveDangerMods(DEFAULT_DANGER_MODS);
+});
+
 // ---------- Updates ----------
 
 function updateTexts(u: UpdateState): { title: string; text: string; action: 'install' | 'download' | null } | null {
   switch (u.status) {
     case 'ready':
-      return { title: `Update ${u.version} ready`, text: 'Installs when you close the tool – or restart now.', action: 'install' };
+      return { title: `Update ${u.version} ready`, text: 'Installs when you quit the tool – or restart now.', action: 'install' };
     case 'downloading':
       return { title: `Downloading ${u.version}`, text: `${u.percent ?? 0} %`, action: null };
     case 'available':
@@ -348,7 +479,7 @@ function renderUpdate(s: AppState) {
 
   $('version-out').textContent = u.current;
   const kind = u.selfUpdating
-    ? 'Updates are downloaded automatically and installed when you close the tool.'
+    ? 'Updates are downloaded automatically and installed when you quit the tool.'
     : 'Portable version – new versions are announced here; download them from GitHub.';
   const when = u.checkedAt ? ` Last checked ${timeAgo(u.checkedAt)}.` : '';
   let text = kind;
@@ -377,6 +508,8 @@ function render(s: AppState) {
   renderSettings(s);
   renderGpu(s);
   renderUpdate(s);
+  renderStartup(s);
+  renderDangerMods(s);
 }
 
 api.onState(render);

@@ -242,7 +242,7 @@ function numInput(m: TradeMod, which: 'min' | 'max', onCommit: () => void): HTML
 function statRow(m: TradeMod, onChange: () => void): HTMLElement {
   const searchable = m.statId !== null || !!m.filter;
   const reason = hiddenReason(m);
-  const row = el('div', `stat stat-${m.kind}${searchable ? '' : ' stat-off'}${reason ? ' stat-hidden' : ''}`);
+  const row = el('div', `stat stat-${m.kind}${searchable ? '' : ' stat-off'}${reason ? ' stat-hidden' : ''}${m.danger ? ' stat-danger' : ''}`);
   row.dataset.key = m.key;
   if (m.statId) row.dataset.stat = '1';
   if (reason) row.title = reason;
@@ -269,6 +269,7 @@ function statRow(m: TradeMod, onChange: () => void): HTMLElement {
 
   const tags = el('div', 'stat-tags');
   const coveredLabel: Record<NonNullable<TradeMod['coveredBy']>, string> = { total: 'total', DPS: 'DPS', crit: 'crit chance', defence: 'defences' };
+  if (m.danger) tags.append(el('span', 'kind kind-danger', '⚠ Dangerous'));
   if (reason) tags.append(el('span', 'tag-hidden', m.coveredBy ? `◌ in ${coveredLabel[m.coveredBy]}` : '◌ not searchable'));
   const kind = KIND_LABEL[m.kind];
   if (kind && m.kind !== 'pseudo') tags.append(el('span', `kind kind-${m.kind}`, kind));
@@ -514,7 +515,7 @@ function renderTrade(r: TradeResult): HTMLElement {
   }
 
   // --- Leiste unter den Stats: Einklappen, versteckte Stats ---
-  const hiddenCount = statMods.filter((m) => hiddenReason(m)).length;
+  const hiddenCount = statMods.filter((m) => hiddenReason(m) && !m.danger).length; // gefährliche Mods bleiben immer sichtbar
   const collapseBtn = el('button', 'link-btn');
   const hiddenBtn = el('button', 'link-btn');
   const wheelHint = el('span', 'hint', 'scroll a value to change it');
@@ -596,8 +597,18 @@ function renderTrade(r: TradeResult): HTMLElement {
 
   const results = el('div', 'results', ...resultsContent(r));
   const rate = r.exaltedPerDivine ? ` · 1 Div = ${amount(r.exaltedPerDivine)} Ex` : '';
+  // Waystones/Tablets: gefährliche Mods ganz oben zusammenfassen – auch bei eingeklappter Stat-Liste.
+  const dangerous = r.mods.filter((m) => m.danger);
+  const dangerBox = dangerous.length
+    ? el(
+        'div', 'danger',
+        el('span', 'danger-title', `⚠ ${dangerous.length} dangerous mod${dangerous.length === 1 ? '' : 's'}`),
+        ...dangerous.map((m) => el('span', 'danger-mod', m.text)),
+      )
+    : null;
   card.append(
     head,
+    ...(dangerBox ? [dangerBox] : []),
     chips,
     stats,
     statsBar,
