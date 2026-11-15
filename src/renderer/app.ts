@@ -1,9 +1,11 @@
 import { acceleratorFromEvent, formatHotkey, validateHotkey } from '../shared/hotkey';
 import { DEFAULT_DANGER_MODS } from '../shared/maps';
 import { DEFAULT_KEY_MODS, DEFAULT_LOW_MODS } from '../shared/weights';
+import { filterMarket, isThin, itemSignal, MARKET_MIN_LISTINGS, MARKET_TABS, SIGNAL_INFO, SIGNAL_MIN_EXALTED, topMovers, type MarketData, type MarketItem, type MarketSort, type MarketTab, type TrendSignal } from '../shared/market';
 import type { AppState, HistoryEntry, HotkeySetting, UpdateState } from '../shared/types';
 import { api, el, itemIcon } from './api';
 import { amount, clock, currencyShort, priceParts, timeAgo } from './format';
+import { sparkline, trend } from './spark';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -23,6 +25,7 @@ function showPage(name: string) {
   }
   document.querySelector('main')!.scrollTop = 0;
   if (rec) stopRecording();
+  if (name === 'market') void loadMarket();
 }
 
 for (const item of document.querySelectorAll<HTMLButtonElement>('.nav-item')) {
@@ -621,6 +624,195 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !$('update-modal').hidden) $('update-later').click();
 });
 
+// ---------- Marktübersicht ----------
+//
+// Die Liste kommt nur auf Anfrage (sie ist zu groß für jede Zustandsmeldung) und wird neu geholt,
+// sobald poe.ninja neue Preise geliefert hat (status.fetchedAt).
+
+let market: MarketData | null = null;
+let marketLoading = false;
+let marketTab: MarketTab = 'currency';
+let marketSort: MarketSort = 'price';
+let marketQuery = '';
+let marketSignal: TrendSignal | undefined;
+/** Mehr Zeilen auf einmal bremst das Fenster spürbar – Suche grenzt ein. */
+const MARKET_MAX_ROWS = 150;
+
+async function loadMarket() {
+  const fetchedAt = current?.status.fetchedAt ?? null;
+  if (marketLoading || (market && market.fetchedAt === fetchedAt)) return;
+  marketLoading = true;
+  try {
+    market = await api.getMarket();
+  } finally {
+    marketLoading = false;
+  }
+  renderMarket();
+  renderWatchlist();
+}
+
+function watchlist(): string[] {
+  return current?.settings.watchlist ?? [];
+}
+
+function toggleWatch(key: string) {
+  const list = watchlist();
+  const next = list.includes(key) ? list.filter((k) => k !== key) : [...list, key];
+  void api.saveSettings({ watchlist: next });
+}
+
+function starButton(it: MarketItem): HTMLElement {
+  const on = watchlist().includes(it.key);
+  const star = el('button', `mk-star${on ? ' on' : ''}`, on ? '★' : '☆');
+  star.type = 'button';
+  star.title = on ? 'Remove from watchlist' : 'Add to watchlist (shown on Home)';
+  star.setAttribute('aria-pressed', String(on));
+  star.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleWatch(it.key);
+  });
+  return star;
+}
+
+function marketPrice(it: MarketItem): HTMLElement {
+  // Der Divine Orb selbst ist immer "1 Div" – interessant ist sein Wert in Exalted.
+  const p = it.key === 'divine orb' ? { value: amount(it.exalted), unit: 'Ex', alt: undefined } : priceParts(it.divine, it.exalted);
+  const box = el('div', 'mk-price', el('span', 'mk-value', p.value), el('span', `unit unit-${p.unit.toLowerCase()}`, p.unit));
+  if (p.alt) box.title = p.alt;
+  return box;
+}
+
+const TAB_LABEL = new Map(MARKET_TABS.map((t) => [t.id, t.label]));
+
+/** Badge für das Trend-Signal (beschreibt die letzten 7 Tage, keine Vorhersage). */
+function signalBadge(it: MarketItem): HTMLElement | null {
+  const sig = itemSignal(it);
+  if (!sig) return null;
+  const badge = el('span', `sig sig-${sig}`, SIGNAL_INFO[sig].label);
+  badge.title = `${SIGNAL_INFO[sig].hint} Describes the last 7 days – not a prediction.`;
+  return badge;
+}
+
+/** Eine Zeile: Stern, Bild, Name, Verlauf, Änderung, Preis. Klick = im Overlay zeigen. */
+function marketRow(it: MarketItem, compact = false): HTMLElement {
+  const sub = (it.baseType ?? TAB_LABEL.get(it.tab) ?? '') + (isThin(it) ? ` · only ${it.listingCount} listing${it.listingCount === 1 ? '' : 's'} – price unreliable` : '');
+  const row = el(
+    'div', `mk-row${compact ? ' compact' : ''}`,
+    compact ? null : starButton(it),
+    itemIcon(it.icon, 'mk-icon'),
+    // Kompakt (Top movers): Änderung unter dem Namen, damit der Name die volle Breite bekommt.
+    el(
+      'div', 'mk-main',
+      el('span', `mk-name${it.tab === 'uniques' ? ' rarity-unique' : ''}`, it.name),
+      compact ? el('span', 'mk-sub', trend(it.change7d) ?? '–') : el('span', `mk-sub${isThin(it) ? ' thin' : ''}`, signalBadge(it), sub),
+    ),
+    compact ? null : it.sparkline ? sparkline(it.sparkline, it.change7d) : el('span', ''),
+    compact ? null : el('span', 'mk-trend', trend(it.change7d) ?? '–'),
+    marketPrice(it),
+  );
+  row.tabIndex = 0;
+  row.setAttribute('role', 'button');
+  row.title = `${it.name}${it.baseType ? ` (${it.baseType})` : ''} – show in the overlay`;
+  const open = () => api.openMarketItem(it.key);
+  row.addEventListener('click', open);
+  row.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') open();
+  });
+  return el('li', '', row);
+}
+
+function renderMarketTabs() {
+  const tabs = $('market-tabs');
+  if (tabs.childElementCount) {
+    for (const b of tabs.children) b.classList.toggle('active', (b as HTMLElement).dataset.tab === marketTab);
+    return;
+  }
+  for (const t of MARKET_TABS) {
+    const b = el('button', `mk-tab${t.id === marketTab ? ' active' : ''}`, t.label);
+    b.type = 'button';
+    b.dataset.tab = t.id;
+    b.setAttribute('role', 'tab');
+    b.addEventListener('click', () => {
+      marketTab = t.id;
+      renderMarket();
+    });
+    tabs.append(b);
+  }
+}
+
+function renderMarket() {
+  renderMarketTabs();
+  const list = $('market-list');
+  if (!market) {
+    list.replaceChildren();
+    $('market-meta').textContent = current?.status.loading ? 'Loading prices …' : 'No prices yet – check Home → Price data.';
+    for (const id of ['movers-up', 'movers-down']) $(id).replaceChildren();
+    return;
+  }
+  // Top movers über alle Kategorien
+  const movers = topMovers(market.items);
+  $('movers-up').replaceChildren(...movers.up.map((it) => marketRow(it, true)));
+  $('movers-down').replaceChildren(...movers.down.map((it) => marketRow(it, true)));
+
+  // Suche gilt für alle Kategorien – sonst findet man z. B. einen Unique im Reiter "Currency" nicht.
+  // Beim Suchen auch Uniques mit sehr wenigen Angeboten zeigen (markiert), sonst ausblenden.
+  // Suche und Trend-Filter gelten für alle Kategorien.
+  const everywhere = !!marketQuery || !!marketSignal;
+  const all = filterMarket(market.items, { tab: everywhere ? 'all' : marketTab, query: marketQuery, sort: marketSort, includeThin: !!marketQuery, signal: marketSignal });
+  const thin = marketQuery ? 0 : market.items.filter((it) => it.tab === marketTab && isThin(it)).length;
+  const shown = all.slice(0, MARKET_MAX_ROWS);
+  list.replaceChildren(...shown.map((it) => marketRow(it)));
+  $('market-tabs').classList.toggle('dim', everywhere);
+  const note = $('signal-note');
+  note.hidden = !marketSignal;
+  if (marketSignal) note.textContent = `${SIGNAL_INFO[marketSignal].label}: ${SIGNAL_INFO[marketSignal].hint} Items worth ${SIGNAL_MIN_EXALTED}+ Exalted, all categories. Signals describe the last 7 days – they don't predict prices.`;
+  const more = all.length > shown.length ? ` · showing ${shown.length} of ${all.length} – search to narrow it down` : '';
+  const hidden = thin ? ` · ${thin} with fewer than ${MARKET_MIN_LISTINGS} listings hidden (search shows them)` : '';
+  $('market-meta').textContent = `${market.league} · updated ${timeAgo(market.fetchedAt)} · ${all.length} items${everywhere ? ' in all categories' : ''}${more}${hidden}. Click an item to show it in the overlay.`;
+  $('market-empty').hidden = all.length > 0;
+  $('market-empty-text').textContent = marketQuery ? `Nothing found for "${marketQuery}".` : 'No prices in this category.';
+}
+
+function renderWatchlist() {
+  const keys = watchlist();
+  const items = market ? keys.map((k) => market!.items.find((it) => it.key === k)).filter((it): it is MarketItem => !!it) : [];
+  $('watchlist').replaceChildren(...items.map((it) => marketRow(it)));
+  $('watch-empty').hidden = keys.length > 0;
+  $('watch-more').hidden = keys.length === 0;
+}
+
+let watchSig = '';
+function renderMarketState(s: AppState) {
+  // Neue Preise → Liste neu holen (auch für die Watchlist auf der Startseite).
+  if (s.status.fetchedAt && s.status.fetchedAt !== market?.fetchedAt) void loadMarket();
+  const sig = s.settings.watchlist.join(',');
+  if (sig !== watchSig) {
+    watchSig = sig;
+    renderWatchlist();
+    if (market) renderMarket(); // Sterne aktualisieren
+  }
+}
+
+let searchTimer: ReturnType<typeof setTimeout> | undefined;
+$<HTMLInputElement>('market-search').addEventListener('input', (e) => {
+  clearTimeout(searchTimer);
+  const value = (e.target as HTMLInputElement).value.trim();
+  searchTimer = setTimeout(() => {
+    marketQuery = value;
+    renderMarket();
+  }, 120);
+});
+$<HTMLSelectElement>('market-signal').addEventListener('change', (e) => {
+  marketSignal = ((e.target as HTMLSelectElement).value || undefined) as TrendSignal | undefined;
+  renderMarket();
+});
+$<HTMLSelectElement>('market-sort').addEventListener('change', (e) => {
+  marketSort = (e.target as HTMLSelectElement).value as MarketSort;
+  renderMarket();
+});
+$('watch-go').addEventListener('click', () => showPage('market'));
+$('watch-more').addEventListener('click', () => showPage('market'));
+
 // ---------- Fenster-Buttons ----------
 
 $('win-min').addEventListener('click', () => api.windowControl('minimize'));
@@ -641,6 +833,7 @@ function render(s: AppState) {
   renderRates(s);
   renderKeyMods(s);
   renderLowMods(s);
+  renderMarketState(s);
 }
 
 api.onState(render);

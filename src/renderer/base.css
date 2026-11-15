@@ -65,3 +65,14 @@ kbd.key {
 kbd.key.lg { height: 52px; font-size: 20px; min-width: 56px; }
 kbd.key.sm { height: 28px; font-size: 12px; border-radius: 6px; border-bottom-width: 2px; }
 .plus { color: var(--faint); font-weight: 600; margin: 0 8px; }
+
+/* Kursänderung und Mini-Grafik (Overlay und Marktübersicht) */
+.trend { font-weight: 600; font-variant-numeric: tabular-nums; }
+.trend.up { color: var(--ok); }
+.trend.down { color: var(--bad); }
+.trend.flat { color: var(--muted); }
+.spark { width: 72px; height: 22px; flex: none; }
+.spark-zero { stroke: var(--line-strong); stroke-width: 1; stroke-dasharray: 2 2; }
+.spark-line { fill: none; stroke: var(--muted); stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
+.spark.up .spark-line { stroke: var(--ok); }
+.spark.down .spark-line { stroke: var(--bad); }

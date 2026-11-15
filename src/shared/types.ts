@@ -182,6 +182,8 @@ export interface Settings {
   keyMods: string[];
   /** Mods mit wenig Wert ("*: Light Radius"). */
   lowMods: string[];
+  /** Marktübersicht: gemerkte Items (Schlüssel aus market.ts), auf der Startseite angeheftet. */
+  watchlist: string[];
 }
 
 export type HotkeySetting = 'hotkey' | 'hotkeyTrade' | 'hotkeyWiki';

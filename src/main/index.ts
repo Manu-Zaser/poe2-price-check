@@ -6,6 +6,7 @@ import { parseItemText } from '../shared/parser';
 import { cleanDangerList, DEFAULT_DANGER_MODS, isMapItem, markDangerous, wikiUrl } from '../shared/maps';
 import { applyWeights, cleanWeightList, DEFAULT_KEY_MODS, DEFAULT_LOW_MODS, LEGACY_DEFAULTS, upgradeDefaults } from '../shared/weights';
 import { buildSearchQuery, isNamedUnique, tradeSearchUrl, type StatIndex } from '../shared/stats';
+import { cleanWatchlist, type MarketData } from '../shared/market';
 import type { AppState, AppStatus, HistoryEntry, HotkeySetting, ParsedItem, PriceResult, SaveResult, Settings, TradeSelection } from '../shared/types';
 import { log, logFile } from './log';
 import { buildPriceIndex, CACHE_TTL_MS, fetchLeagues, lookupPrice, makeFetchJson, type PriceIndex } from './ninja';
@@ -70,6 +71,7 @@ const DEFAULT_CONFIG: Config = {
   dangerMods: DEFAULT_DANGER_MODS,
   keyMods: DEFAULT_KEY_MODS,
   lowMods: DEFAULT_LOW_MODS,
+  watchlist: [],
   trayHintShown: false,
 };
 
@@ -90,6 +92,7 @@ function loadConfig(): Config {
   loaded.dangerMods = Array.isArray(loaded.dangerMods) ? cleanDangerList(loaded.dangerMods.map(String)) : [...DEFAULT_DANGER_MODS];
   loaded.keyMods = Array.isArray(loaded.keyMods) ? cleanWeightList(loaded.keyMods.map(String)) : [...DEFAULT_KEY_MODS];
   loaded.lowMods = Array.isArray(loaded.lowMods) ? cleanWeightList(loaded.lowMods.map(String)) : [...DEFAULT_LOW_MODS];
+  loaded.watchlist = cleanWatchlist(loaded.watchlist);
   // Unveränderte frühere Vorgaben auf die aktuellen Listen heben (eigene Anpassungen bleiben).
   loaded.keyMods = upgradeDefaults(loaded.keyMods, LEGACY_DEFAULTS.key, DEFAULT_KEY_MODS);
   loaded.lowMods = upgradeDefaults(loaded.lowMods, LEGACY_DEFAULTS.low, DEFAULT_LOW_MODS);
@@ -186,12 +189,12 @@ function currencyRates(): AppStatus['currencyRates'] {
 }
 
 function state(): AppState {
-  const { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity, hotkeyTrade, hotkeyWiki, closeToTray, startWithWindows, dangerMods, keyMods, lowMods } = config;
+  const { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity, hotkeyTrade, hotkeyWiki, closeToTray, startWithWindows, dangerMods, keyMods, lowMods, watchlist } = config;
   return {
     status: status(),
     update: updateState(),
     leagueAuto: !league,
-    settings: { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity, hotkeyTrade, hotkeyWiki, closeToTray, startWithWindows, dangerMods, keyMods, lowMods },
+    settings: { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity, hotkeyTrade, hotkeyWiki, closeToTray, startWithWindows, dangerMods, keyMods, lowMods, watchlist },
     overlayPositionSaved: config.overlayPosition !== null,
     logFile: logFile(),
     leagues,
@@ -340,6 +343,7 @@ async function saveSettings(patch: Partial<Settings>): Promise<SaveResult> {
   if (Array.isArray(patch.dangerMods)) config.dangerMods = cleanDangerList(patch.dangerMods.map(String));
   if (Array.isArray(patch.keyMods)) config.keyMods = cleanWeightList(patch.keyMods.map(String));
   if (Array.isArray(patch.lowMods)) config.lowMods = cleanWeightList(patch.lowMods.map(String));
+  if (patch.watchlist !== undefined) config.watchlist = cleanWatchlist(patch.watchlist);
 
   if (patch.gpuAcceleration !== undefined) config.gpuAcceleration = patch.gpuAcceleration; // wirkt nach Neustart
 
@@ -784,6 +788,31 @@ function rememberRequest(req: RareRequest) {
   while (recentRequests.size > HISTORY_SIZE) recentRequests.delete(recentRequests.keys().next().value!);
 }
 
+/** Marktübersicht fürs Hauptfenster (nur auf Anfrage – die Liste ist zu groß für jede Zustandsmeldung). */
+async function marketData(): Promise<MarketData | null> {
+  const idx = index ?? (await getIndex().catch(() => null));
+  if (!idx) return null;
+  return { league: idx.league, fetchedAt: idx.fetchedAt, exaltedPerDivine: idx.exaltedPerDivine, items: idx.market };
+}
+
+/** Item aus der Marktübersicht im Overlay zeigen – wie ein Preischeck, ohne Anfrage. */
+function openMarketItem(key: string) {
+  const m = index?.market.find((it) => it.key === key);
+  if (!index || !m) return;
+  const unique = m.tab === 'uniques';
+  const item: ParsedItem = {
+    itemClass: unique ? '' : 'Stackable Currency',
+    rarity: unique ? 'Unique' : 'Currency',
+    ...(unique ? { name: m.name } : {}),
+    baseType: unique ? (m.baseType ?? m.name) : m.name,
+    corrupted: false,
+    unidentified: false,
+    sections: [],
+  };
+  const { key: _key, tab: _tab, ...match } = m;
+  showOverlay({ kind: 'priced', item, source: 'poe.ninja', league: index.league, matches: [match] });
+}
+
 /** Eintrag aus "Recent checks" im Overlay öffnen (ohne neue Anfrage). */
 function openHistoryEntry(id: number) {
   const entry = history.find((h) => h.id === id);
@@ -979,6 +1008,8 @@ app.whenReady().then(() => {
     if (action === 'minimize') win.minimize();
     else if (action === 'close') win.close(); // läuft je nach Einstellung in den Infobereich
   }));
+  ipcMain.handle('market:get', safe('market:get', () => marketData()));
+  ipcMain.on('market:open', safe('market:open', (_e, key: string) => openMarketItem(String(key))));
   ipcMain.on('history:open', safe('history:open', (_e, id: number) => openHistoryEntry(Number(id))));
   ipcMain.on('update:check', safe('update:check', () => void checkForUpdates()));
   ipcMain.on('update:download', safe('update:download', () => downloadUpdate()));

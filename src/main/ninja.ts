@@ -1,3 +1,4 @@
+import { dedupe, marketKey, tabOf, type MarketItem } from '../shared/market';
 import type { ParsedItem, PriceMatch, PriceResult } from '../shared/types';
 
 const BASE = 'https://poe.ninja/poe2/api/economy';
@@ -56,6 +57,8 @@ export interface PriceIndex {
   uniquesByName: Map<string, PriceMatch[]>;
   /** Kleingeschriebener Basistyp → Uniques auf dieser Basis (für unidentifizierte Items). */
   uniquesByBase: Map<string, PriceMatch[]>;
+  /** Alles zusammen für die Marktübersicht im Hauptfenster. */
+  market: MarketItem[];
 }
 
 export type FetchJson = (url: string) => Promise<unknown>;
@@ -109,6 +112,7 @@ export async function buildPriceIndex(fetchJson: FetchJson, league: string): Pro
     currencyById: new Map(),
     uniquesByName: new Map(),
     uniquesByBase: new Map(),
+    market: [],
   };
 
   const urls = [
@@ -130,18 +134,21 @@ export async function buildPriceIndex(fetchJson: FetchJson, league: string): Pro
       const meta = items.get(line.id);
       if (!meta) continue;
       const name = meta.name;
-      index.currency.set(name.toLowerCase(), {
+      const match: PriceMatch = {
         name,
         icon: absoluteImage(meta.image),
         divine: line.primaryValue,
         exalted: line.primaryValue * (rate || index.exaltedPerDivine),
         change7d: line.sparkline?.totalChange,
         sparkline: cleanSparkline(line.sparkline?.data),
-      });
+      };
+      index.currency.set(name.toLowerCase(), match);
+      index.market.push({ ...match, key: marketKey(name), tab: tabOf(type) });
     }
   }
 
-  for (const data of uniques) {
+  for (const [i, data] of uniques.entries()) {
+    const type = UNIQUE_TYPES[i];
     const rate = data.core?.rates?.exalted ?? index.exaltedPerDivine;
     for (const line of data.lines) {
       const match: PriceMatch = {
@@ -156,8 +163,10 @@ export async function buildPriceIndex(fetchJson: FetchJson, league: string): Pro
       };
       push(index.uniquesByName, line.name.toLowerCase(), match);
       push(index.uniquesByBase, line.baseType.toLowerCase(), match);
+      index.market.push({ ...match, key: marketKey(line.name, line.baseType), tab: tabOf(type) });
     }
   }
+  index.market = dedupe(index.market);
 
   return index;
 }

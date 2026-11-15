@@ -12,6 +12,10 @@ const api = {
   clearHistory: () => ipcRenderer.send('history:clear'),
   /** Preischeck aus "Recent checks" wieder im Overlay öffnen. */
   openHistory: (id: number) => ipcRenderer.send('history:open', id),
+  /** Marktübersicht (alle poe.ninja-Preise der League). */
+  getMarket: (): Promise<import('../shared/market').MarketData | null> => ipcRenderer.invoke('market:get'),
+  /** Item der Marktübersicht im Overlay zeigen. */
+  openMarketItem: (key: string) => ipcRenderer.send('market:open', key),
   checkUpdates: () => ipcRenderer.send('update:check'),
   /** Gefundenes Update herunterladen (erst nach Bestätigung). */
   downloadUpdate: () => ipcRenderer.send('update:download'),

@@ -53,10 +53,6 @@ html, body { background: transparent; overflow: hidden; user-select: none; }
 .price-big .unit { font-size: 15px; margin-left: 6px; }
 .price-meta { display: flex; gap: 8px; align-items: center; margin-top: 6px; font-size: 12px; color: var(--muted); }
 .faint { color: var(--faint); }
-.trend { font-weight: 600; font-variant-numeric: tabular-nums; }
-.trend.up { color: var(--ok); }
-.trend.down { color: var(--bad); }
-.trend.flat { color: var(--muted); }
 
 .stack {
   display: flex; justify-content: space-between; align-items: baseline;
@@ -289,11 +285,6 @@ input[type="checkbox"]:disabled { opacity: .35; cursor: default; }
 .el-choice { display: inline-flex; gap: 3px; }
 
 /* ---------- Kursverlauf (poe.ninja) ---------- */
-.spark { width: 72px; height: 22px; flex: none; }
-.spark-zero { stroke: var(--line-strong); stroke-width: 1; stroke-dasharray: 2 2; }
-.spark-line { fill: none; stroke: var(--muted); stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
-.spark.up .spark-line { stroke: var(--ok); }
-.spark.down .spark-line { stroke: var(--bad); }
 .stats[hidden], .stats-bar[hidden] { display: none; }
 
 /* ---------- Höchstwert des Tiers ---------- */

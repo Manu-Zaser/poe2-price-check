@@ -15,6 +15,7 @@ A small overlay for Path of Exile 2: hover over an item, press **Ctrl+D**, and t
 - [What it prices](#what-it-prices)
 - [Rare and magic items](#rare-and-magic-items)
 - [Listings: hover, compare, click](#listings-hover-compare-click)
+- [Market and watchlist](#market-and-watchlist)
 - [Main window](#main-window)
 - [Hotkeys](#hotkeys)
 - [Overlay and settings](#overlay-and-settings)
@@ -132,6 +133,32 @@ The overlay is laid out like the trade site, top to bottom:
   - It compares with the item you scanned, not with your equipped gear (the tool cannot see that).
 - **Click a row** to open the trade site with the same search narrowed to that seller, so the offer is on top.
 
+## Market and watchlist
+
+<p align="center">
+  <img src="docs/images/market.png" width="640" alt="Market page: rising and falling items of the week, category tabs, search and the price list with 7-day trend">
+</p>
+
+The **Market** page shows all poe.ninja prices of the current league – the same data the price check uses, so it
+sends **no extra requests**:
+
+- **Categories:** Currency, Fragments & league items, Runes & soul cores, Essences, Gems, Uniques – each with price,
+  7-day graph and change. Search works across all categories; sort by value, rising, falling or name.
+- **Rising / Falling this week:** the biggest movers among items worth at least 20 Exalted (uniques with 10+
+  listings) – cheap items swing a lot in % without meaning much.
+- **Trend signals:** a small badge describes what the 7-day curve did – **Steady climb** (up on most days),
+  **Accelerating** (rising faster over the last two days), **Recovering** (fell, now clearly rising again),
+  **Spike** (most of the rise in one recent day – often hype or price fixing) and **Sliding** (down on most days, near
+  its weekly low). Filter by signal to see e.g. all steady climbers across categories. Signals only appear for items
+  worth 5+ Exalted. They describe the last 7 days – **they don't predict prices**; patches, build trends and new
+  crafting methods move prices in ways no curve shows.
+- **Watchlist:** star (☆) an item to pin it to the Home page, e.g. the currency and runes you farm.
+- **Click an item** to show it in the overlay like a price check.
+- Prices update hourly (as often as poe.ninja recalculates). Uniques with fewer than 5 listings often have fantasy
+  prices; they are hidden in the list and only shown – marked – when you search for them.
+- Rares are not in the market list: there is no aggregated data for them, and polling the trade site would break
+  its rate limits. Use the price check for rares.
+
 ## Main window
 
 <p align="center">
@@ -139,8 +166,9 @@ The overlay is laid out like the trade site, top to bottom:
 </p>
 
 - **Home:** the hotkey, the price data (league, exchange rate, how many items poe.ninja prices and when), a
-  **currency converter** (Divine / Exalted / Chaos / Mirror of Kalandra at current rates) and your **recent checks** –
-  click one to open it in the overlay again, without scanning or searching again.
+  **currency converter** (Divine / Exalted / Chaos / Mirror of Kalandra at current rates), your **watchlist** and
+  your **recent checks** – click one to open it in the overlay again, without scanning or searching again.
+- **Market:** all poe.ninja prices with trends, top movers and search – see [above](#market-and-watchlist).
 - **How to use:** a short guide to the hotkeys, the overlay, waystones and selling.
 - **Settings:** hotkeys, startup, overlay size/background/position, league, map mods, mod value, updates, GPU
   acceleration.
@@ -216,7 +244,7 @@ to a GitHub release tagged `v<version>`. Debug output of the results: set `POE2P
 
 `src/shared/parser.ts` (item text), `src/shared/hotkey.ts` (hotkey capture and validation),
 `src/shared/mods.ts` + `src/shared/stats.ts` (mods → trade stats, search query), `src/shared/listing.ts` (listing
-details), `src/shared/compare.ts` (comparison with your item), `src/main/trade.ts` + `src/main/ratelimit.ts` (trade
+details), `src/shared/compare.ts` (comparison with your item), `src/shared/market.ts` (market page), `src/main/trade.ts` + `src/main/ratelimit.ts` (trade
 API), `src/main/rare.ts` (rare price check), `src/main/ninja.ts` (prices), `src/main/win32.ts` (copy keystroke and
 window focus), `src/main/updater.ts` (updates), `src/main/index.ts` (hotkey, windows, IPC), `src/renderer/` (main
 window `app.*`, overlay `overlay.*`).
@@ -239,6 +267,7 @@ Everything can be set in the UI; this is where it is stored.
 | `dangerMods` | list | text snippets of dangerous waystone/tablet mods |
 | `keyMods` | list | key mods per item type (`slot: text`) – searched by default |
 | `lowMods` | list | low-value mods (`slot: text`, `*` = all) – faded, not searched |
+| `watchlist` | `[]` | items starred on the Market page (shown on Home) |
 | `gameWindowTitle` | `Path of Exile 2` | window title of the game |
 | `contact` | `""` | optional additional contact in the User-Agent (the project URL is always sent) |
 | `overlayScale` | `1.15` | overlay size (0.8–1.6) |
@@ -255,4 +284,4 @@ Code licensed under the [MIT License](LICENSE).
 Path of Exile is a trademark of Grinding Gear Games. This project is an unofficial fan tool; it is not affiliated with,
 endorsed by or reviewed by GGG. Game content (item texts, stat descriptions) belongs to GGG; price data comes from
 [poe.ninja](https://poe.ninja). Requests to pathofexile.com and poe.ninja carry a User-Agent with the project URL so
-the operators can identify the sender. The screenshots show the real overlay with made-up sample data.
+the operators can identify the sender. The screenshots show the real UI with made-up listings; the market screenshot uses a poe.ninja snapshot.

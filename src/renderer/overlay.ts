@@ -3,6 +3,7 @@ import { compareKey, compareListing, verdictText, type Comparison } from '../sha
 import { PSEUDO, type PriceSuggestion } from '../shared/extras';
 import type { Listing, PriceMatch, PriceResult, TradeMod, TradeSelection } from '../shared/types';
 import { api, el, itemIcon } from './api';
+import { sparkline, trend } from './spark';
 import { ageFromIso, amount, currencyShort, parseMin, priceParts, priceText } from './format';
 
 const root = document.getElementById('root')!;
@@ -12,12 +13,6 @@ type TradeResult = Extract<PriceResult, { kind: 'trade' }>;
 
 // ---------- Bausteine ----------
 
-function trend(change?: number): HTMLElement | null {
-  if (change === undefined || !Number.isFinite(change)) return null;
-  const dir = change > 0.5 ? 'up' : change < -0.5 ? 'down' : 'flat';
-  const arrow = dir === 'up' ? '▲' : dir === 'down' ? '▼' : '■';
-  return el('span', `trend ${dir}`, `${arrow} ${amount(Math.abs(change))}%`);
-}
 
 function bigPrice(value: string, unit: string, prefix?: string, meta?: HTMLElement | null): HTMLElement {
   return el(
@@ -27,37 +22,6 @@ function bigPrice(value: string, unit: string, prefix?: string, meta?: HTMLEleme
   );
 }
 
-/**
- * Mini-Grafik des Kursverlaufs (poe.ninja: Änderung in % je Tag). Die Null-Linie ist der Stand
- * vor einer Woche – darüber teurer, darunter günstiger geworden.
- */
-function sparkline(points: number[], change?: number): SVGSVGElement {
-  const W = 72;
-  const H = 22;
-  const lo = Math.min(0, ...points);
-  const hi = Math.max(0, ...points);
-  const span = hi - lo || 1;
-  const x = (i: number) => (i / (points.length - 1)) * (W - 2) + 1;
-  const y = (v: number) => H - 1 - ((v - lo) / span) * (H - 2);
-  const ns = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(ns, 'svg');
-  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-  svg.setAttribute('class', `spark ${change === undefined ? '' : change > 0.5 ? 'up' : change < -0.5 ? 'down' : 'flat'}`);
-  const zero = document.createElementNS(ns, 'line');
-  zero.setAttribute('x1', '0');
-  zero.setAttribute('x2', String(W));
-  zero.setAttribute('y1', String(y(0)));
-  zero.setAttribute('y2', String(y(0)));
-  zero.setAttribute('class', 'spark-zero');
-  const line = document.createElementNS(ns, 'polyline');
-  line.setAttribute('points', points.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' '));
-  line.setAttribute('class', 'spark-line');
-  svg.append(zero, line);
-  const title = document.createElementNS(ns, 'title');
-  title.textContent = `Price change over the last ${points.length} days (poe.ninja)`;
-  svg.append(title);
-  return svg;
-}
 
 function ninjaPrice(m: PriceMatch): HTMLElement {
   const p = priceParts(m.divine, m.exalted);

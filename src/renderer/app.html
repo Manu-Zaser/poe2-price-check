@@ -27,6 +27,10 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5h-5v5H5a1 1 0 0 1-1-1z" /></svg>
         <span>Home</span>
       </button>
+      <button class="nav-item" data-page="market">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16M5 15l4.5-4.5 3.5 3L19 7M15 7h4v4" /></svg>
+        <span>Market</span>
+      </button>
       <button class="nav-item" data-page="guide">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h5.5a2 2 0 0 1 2 2V20a1.5 1.5 0 0 0-1.5-1.5H5zM19 4.5h-5.5a2 2 0 0 0-2 2V20a1.5 1.5 0 0 1 1.5-1.5H19z" /></svg>
         <span>How to use</span>
@@ -126,6 +130,13 @@
         </div>
 
         <div class="section-head">
+          <h2>Watchlist</h2>
+          <button class="link" id="watch-more">Market →</button>
+        </div>
+        <ul class="mk-list" id="watchlist"></ul>
+        <p class="section-hint watch-empty" id="watch-empty">Star items on the <button class="link" id="watch-go">Market</button> page to see their prices here.</p>
+
+        <div class="section-head">
           <h2>Recent checks</h2>
           <button class="link" id="history-clear" hidden>Clear</button>
         </div>
@@ -135,6 +146,44 @@
           <div class="empty-keys" id="empty-keys"></div>
           <p>No price checks yet. Hover over an item in game and press the hotkey.</p>
         </div>
+      </section>
+
+      <!-- MARKT -->
+      <section class="page market" data-page="market" data-title="Market" data-sub="poe.ninja prices of the current league, updated hourly">
+        <div class="movers">
+          <div class="card mover-card">
+            <div class="card-head"><h2>Rising this week</h2></div>
+            <ul class="mover-list" id="movers-up"></ul>
+          </div>
+          <div class="card mover-card">
+            <div class="card-head"><h2>Falling this week</h2></div>
+            <ul class="mover-list" id="movers-down"></ul>
+          </div>
+        </div>
+        <p class="section-hint movers-note">Only items worth at least 20 Exalted (uniques: 10+ listings) – cheap items swing a lot in % without meaning much.</p>
+
+        <div class="mk-tabs" id="market-tabs" role="tablist" aria-label="Category"></div>
+        <div class="mk-tools">
+          <input type="search" id="market-search" placeholder="Search, e.g. divine or headhunter" aria-label="Search" />
+          <div class="select-wrap"><select id="market-sort" aria-label="Sort">
+            <option value="price">Most valuable</option>
+            <option value="rising">Rising (7 days)</option>
+            <option value="falling">Falling (7 days)</option>
+            <option value="name">Name</option>
+          </select></div>
+          <div class="select-wrap"><select id="market-signal" aria-label="Trend signal">
+            <option value="">All trends</option>
+            <option value="climb">Steady climb</option>
+            <option value="accelerating">Accelerating</option>
+            <option value="recovering">Recovering</option>
+            <option value="spike">Spike</option>
+            <option value="sliding">Sliding</option>
+          </select></div>
+        </div>
+        <p class="section-hint signal-note" id="signal-note" hidden></p>
+        <p class="section-hint" id="market-meta"></p>
+        <ul class="mk-list" id="market-list"></ul>
+        <div class="empty" id="market-empty" hidden><p id="market-empty-text">Nothing found.</p></div>
       </section>
 
       <!-- ANLEITUNG -->
@@ -209,6 +258,9 @@
 
         <h2 class="guide-h">Waystones and tablets</h2>
         <p class="guide-text">Price-check a waystone or tablet and dangerous mods are marked <span class="danger-word">red</span>, with a warning at the top of the overlay – before you put it into the map device. Which mods count as dangerous is up to you: Settings → Map mods.</p>
+
+        <h2 class="guide-h">Market</h2>
+        <p class="guide-text">The <b>Market</b> page lists all poe.ninja prices of the league by category – currency, fragments, runes and soul cores, essences, gems and uniques – with the 7-day trend. <b>Rising / Falling this week</b> shows the biggest movers. Search across all categories, sort by value or change, click an item to show it in the overlay, and <b>☆ star</b> items to pin them to the watchlist on Home. Badges such as <b>Steady climb</b>, <b>Spike</b> or <b>Sliding</b> describe the 7-day curve (hover for details) – they don't predict prices. Prices update hourly; the page sends no extra requests.</p>
 
         <h2 class="guide-h">Good to know</h2>
         <ul class="tips">

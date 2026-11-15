@@ -83,3 +83,14 @@ describe('poe.ninja: trend and uncut gems', () => {
     expect(r.kind === 'priced' && r.matches[0].name).toBe('Uncut Skill Gem (Level 12)');
   });
 });
+
+describe('poe.ninja: market list', () => {
+  it('collects all prices with tab and stable key for the market page', async () => {
+    const index = await buildPriceIndex(fakeFetch, 'Test');
+    const byKey = new Map(index.market.map((m) => [m.key, m]));
+    expect(byKey.get('divine orb')).toMatchObject({ tab: 'currency', exalted: 600, change7d: 10 });
+    expect(byKey.get('uncut skill gem (level 12)')!.tab).toBe('gems');
+    expect(byKey.get('temporalis|silk robe')).toMatchObject({ tab: 'uniques', baseType: 'Silk Robe', listingCount: 18 });
+    expect(index.market).toHaveLength(6);
+  });
+});
