@@ -17,8 +17,9 @@ export interface SearchResponse { id: string; total: number; result: string[] }
 
 export interface FetchedListing {
   id: string;
-  listing: { indexed: string; price?: { amount: number; currency: string; type: string } };
-  item: { icon?: string; ilvl?: number; baseType?: string };
+  listing: { indexed: string; price?: { amount: number; currency: string; type: string }; account?: { name?: string } };
+  /** Vollständiges Item des Angebots (Mods, Eigenschaften …) – siehe shared/listing.ts. */
+  item: { icon?: string; ilvl?: number; baseType?: string; [key: string]: unknown };
 }
 
 export class TradeApiError extends Error {}

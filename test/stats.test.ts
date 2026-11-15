@@ -255,3 +255,17 @@ describe('roll quality', () => {
     ]);
   });
 });
+
+describe('tradeSellerUrl', () => {
+  it('adds the seller filter to the search and keeps the original query untouched', async () => {
+    const { tradeSellerUrl } = await import('../src/shared/stats');
+    const query = { query: { status: { option: 'securable' }, filters: { type_filters: { filters: {} } } }, sort: { price: 'asc' } };
+    const url = tradeSellerUrl('Rise of the Abyssal', query, 'Seller#1234');
+    expect(url.startsWith('https://www.pathofexile.com/trade2/search/poe2/Rise%20of%20the%20Abyssal?q=')).toBe(true);
+    const q = JSON.parse(decodeURIComponent(url.split('?q=')[1]));
+    expect(q.query.filters.trade_filters).toEqual({ filters: { account: { input: 'Seller#1234' } } });
+    expect(q.query.filters.type_filters).toEqual({ filters: {} });
+    expect(q.sort).toEqual({ price: 'asc' });
+    expect((query.query.filters as Record<string, unknown>).trade_filters).toBeUndefined();
+  });
+});

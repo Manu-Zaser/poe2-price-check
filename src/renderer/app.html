@@ -166,7 +166,7 @@
             <span class="step-no">4</span>
             <div>
               <h3>Sell it</h3>
-              <p><b>Sell for</b> suggests a price just below the cheapest current offers. <b>Copy</b> puts it on your clipboard as a stash note, e.g. <code>~b/o 67 divine</code>.</p>
+              <p><b>Sell for</b> suggests a price just below the cheapest offers. <b>Copy</b> puts it on your clipboard as a stash note, e.g. <code>~b/o 67 divine</code>.</p>
             </div>
           </li>
         </ol>
@@ -188,9 +188,9 @@
             <dt>Search &amp; Trade ↗</dt>
             <dd>Nothing is searched until you click <b>Search</b>. <b>Trade ↗</b> opens the same search on pathofexile.com.</dd>
             <dt>Typical price</dt>
-            <dd>The median of the 3 cheapest current offers – the single cheapest offer is often a forgotten or mispriced item.</dd>
+            <dd>The median of the 3 cheapest offers – the single cheapest offer alone is often mispriced. Old offers count too: they can still be bought.</dd>
             <dt>Listings</dt>
-            <dd>The 20 cheapest offers. Faded rows have been listed for more than 14 days and are ignored for the typical price.</dd>
+            <dd>The 20 cheapest offers. Hover a row to see that item's stats – including DPS for weapons – like an in-game tooltip; ✓ marks mods you searched for. Click a row to open that offer on the trade site. The dot in front of the price compares the offer with your item on the stats you ticked: green better, yellow mixed, red worse.</dd>
           </dl>
         </div>
 
@@ -363,6 +363,18 @@
         </div>
       </section>
     </main>
+  </div>
+
+  <!-- ---------- Fenster-Buttons (eigene, statt der Windows-Buttons) ----------
+       Bewusst am Ende: Electron wertet die Zieh-Bereiche (-webkit-app-region) in Dokument-Reihenfolge aus –
+       stünden die Knöpfe vorne, würde der ziehbare Seitenkopf sie überdecken und Klicks kämen nicht an. -->
+  <div class="win-controls">
+    <button class="win-btn" id="win-min" title="Minimize" aria-label="Minimize">
+      <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 5.5h8" /></svg>
+    </button>
+    <button class="win-btn win-close" id="win-close" title="Close" aria-label="Close">
+      <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" /></svg>
+    </button>
   </div>
 
   <script src="app.js"></script>

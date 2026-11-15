@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { defenceStats, isStale, marketPrice, priceWarnings, pricingBasis, pseudoContributions, q20Dps, suggestPrice, weaponStats } from '../src/shared/extras';
+import { defenceStats, marketPrice, priceWarnings, pseudoContributions, q20Dps, suggestPrice, weaponStats } from '../src/shared/extras';
 import { parseItemText } from '../src/shared/parser';
 import { buildSearchQuery, buildTradeMods, StatIndex, type StatsData } from '../src/shared/stats';
 import type { Listing } from '../src/shared/types';
@@ -60,7 +60,7 @@ describe('Waffen-DPS (Morbid Stinger)', () => {
 
   it('berechnet pDPS, eDPS und Gesamt-DPS aus den Eigenschaften', () => {
     // (242+449)/2 × 1,10 = 380,05 · (37+59)/2 × 1,10 = 52,8
-    expect(weaponStats(item)).toEqual({ aps: 1.1, pdps: 380.1, edps: 52.8, cdps: 0, dps: 432.9, crit: 8.44 });
+    expect(weaponStats(item)).toEqual({ aps: 1.1, pdps: 380.1, edps: 52.8, cdps: 0, dps: 432.9, crit: 8.44, elements: ['cold'] });
   });
 
   it('searches the overall critical hit chance instead of the local crit mod', () => {
@@ -182,34 +182,21 @@ describe('Corrupted-Status', () => {
   });
 });
 
-describe('market price and stale listings', () => {
+describe('market price', () => {
   const now = Date.parse('2026-11-13T12:00:00Z');
   const daysAgo = (d: number) => new Date(now - d * 86_400_000).toISOString();
   const l = (exalted: number, age: number): Listing => ({ amount: exalted, currency: 'exalted', divine: exalted / 600, exalted, indexed: daysAgo(age) });
 
-  it('marks listings older than 14 days as stale', () => {
-    expect(isStale(l(10, 13), now)).toBe(false);
-    expect(isStale(l(10, 15), now)).toBe(true);
-    expect(isStale({ ...l(10, 1), indexed: '' }, now)).toBe(false);
-  });
-
-  it('uses the median of the cheapest current listings and ignores an old outlier', () => {
-    // Like Grim Claw: a 61-day-old 30 Ex listing in front of real prices around 1 Div
+  it('uses the median of the 3 cheapest listings – old listings count too, they can be bought', () => {
     const listings = [l(30, 61), l(600, 10), l(620, 2), l(3000, 5)];
-    expect(pricingBasis(listings, now)).toMatchObject({ staleIgnored: 1 });
-    expect(marketPrice(listings, 600, now)).toMatchObject({ exalted: 620, divine: 620 / 600, basedOn: 3, staleIgnored: 1 });
+    expect(marketPrice(listings, 600)).toEqual({ exalted: 600, divine: 1, basedOn: 3 });
+    expect(marketPrice(listings, null)).toBeNull();
   });
 
-  it('falls back to all listings when fewer than 2 are current', () => {
-    const listings = [l(30, 61), l(600, 50), l(620, 2)];
-    expect(marketPrice(listings, 600, now)).toMatchObject({ exalted: 600, staleIgnored: 0 });
-    expect(marketPrice(listings, null, now)).toBeNull();
-  });
-
-  it('warns about few results and only old listings', () => {
-    const old = [l(30, 61), l(600, 50)];
-    expect(priceWarnings(6, old, now)).toHaveLength(2);
-    expect(priceWarnings(50, [l(30, 1)], now)).toEqual([]);
+  it('only warns about very few results', () => {
+    expect(priceWarnings(6)).toHaveLength(1);
+    expect(priceWarnings(50)).toEqual([]);
+    expect(priceWarnings(0)).toEqual([]);
   });
 
   it('adds the divine equivalent to suggestions in exalted', () => {
@@ -235,7 +222,7 @@ describe('summed defence mods (Vengeance Wrap)', () => {
 });
 
 describe('DPS at 20% quality', () => {
-  const w = { aps: 1, pdps: 300, edps: 50, cdps: 0, dps: 350, crit: 5 };
+  const w = { aps: 1, pdps: 300, edps: 50, cdps: 0, dps: 350, crit: 5, elements: [] as ('fire' | 'cold' | 'lightning')[] };
   const lines = [{ template: '#% increased Physical Damage', values: [80] }, { template: '#% increased Physical Damage', values: [20] }];
 
   it('scales physical damage like increased physical damage', () => {
@@ -267,5 +254,14 @@ describe('skill gems via trade search', () => {
     expect(q.query).toMatchObject({ type: 'Fireball' });
     expect(q.query.filters.type_filters.filters).toEqual({ quality: { min: 20 } });
     expect(q.query.filters.misc_filters?.filters).toMatchObject({ gem_level: { min: 18 } });
+  });
+});
+
+describe('weapon elements', () => {
+  it('reads the elements from single and combined damage lines', () => {
+    const one = parseItemText('Item Class: Bows\nRarity: Rare\nX\nRecurve Bow\n--------\nPhysical Damage: 10-20\nFire Damage: 5-9 (fire)\nAttacks per Second: 1.20\n--------\nItem Level: 80')!;
+    expect(weaponStats(one)?.elements).toEqual(['fire']);
+    const two = parseItemText('Item Class: Bows\nRarity: Rare\nX\nRecurve Bow\n--------\nPhysical Damage: 10-20\nElemental Damage: 11-17 (cold), 1-73 (lightning)\nAttacks per Second: 1.20\n--------\nItem Level: 80')!;
+    expect(weaponStats(two)?.elements).toEqual(['cold', 'lightning']);
   });
 });

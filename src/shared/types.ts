@@ -73,6 +73,8 @@ export interface TradeMod {
   danger?: boolean;
   /** Waffen: DPS bei 20 % Qualität (nur wenn die Waffe weniger hat). */
   q20?: number;
+  /** Elemental-DPS-Zeile: Elemente des Schadens (Symbole hinter dem Wert). */
+  elements?: ('fire' | 'cold' | 'lightning')[];
   /** Trägt typischerweise den Preis dieses Slots (Liste in den Einstellungen). */
   keyMod?: boolean;
   /** Macht kaum Preis (Liste in den Einstellungen) – standardmäßig nicht gesucht. */
@@ -107,6 +109,10 @@ export interface Listing {
   /** ISO-Zeitpunkt, seit dem das Angebot gelistet ist. */
   indexed: string;
   itemLevel?: number;
+  /** Mods und Eigenschaften des angebotenen Items (für das Fenster beim Darüberfahren). */
+  details?: import('./listing').ListingDetails;
+  /** Trade-Seite mit genau diesem Angebot (Suche auf den Verkäufer eingeschränkt). */
+  url?: string;
 }
 
 export interface TradeSearch {

@@ -1,7 +1,8 @@
 /** Preischeck für Rares/Magic-Items über die Trade-Suche. */
 import { readFileSync, statSync, writeFileSync } from 'node:fs';
-import { buildSearchQuery, buildTradeMods, isNamedUnique, normalDefaults, StatIndex, tradeSearchUrl, uniqueDefaults, type StatsData } from '../shared/stats';
-import { marketPrice, priceWarnings, pricingBasis, suggestPrice } from '../shared/extras';
+import { buildSearchQuery, buildTradeMods, isNamedUnique, normalDefaults, StatIndex, tradeSearchUrl, tradeSellerUrl, uniqueDefaults, type StatsData } from '../shared/stats';
+import { marketPrice, priceWarnings, suggestPrice } from '../shared/extras';
+import { listingDetails } from '../shared/listing';
 import type { Listing, ParsedItem, PriceMatch, PriceResult, TradeMod, TradeSearch, TradeSelection } from '../shared/types';
 import type { PriceIndex } from './ninja';
 import { RateLimitError } from './ratelimit';
@@ -34,7 +35,7 @@ export async function loadStatIndex(client: TradeClient, cacheFile: string): Pro
   }
 }
 
-export function toListing(f: FetchedListing, index: PriceIndex): Listing | null {
+export function toListing(f: FetchedListing, index: PriceIndex, query?: unknown): Listing | null {
   const price = f.listing.price;
   if (!price) return null;
   const rate = index.currencyById.get(price.currency);
@@ -46,6 +47,9 @@ export function toListing(f: FetchedListing, index: PriceIndex): Listing | null 
     exalted: divine !== null && index.exaltedPerDivine ? divine * index.exaltedPerDivine : null,
     indexed: f.listing.indexed,
     itemLevel: f.item.ilvl,
+    details: listingDetails(f.item),
+    // Klick auf das Angebot: Trade-Seite, gefiltert auf diesen Verkäufer.
+    url: query && f.listing.account?.name ? tradeSellerUrl(index.league, query, f.listing.account.name) : undefined,
   };
 }
 
@@ -149,17 +153,17 @@ ${JSON.stringify(query)}`;
     ]);
     if (first.status === 'rejected') throw first.reason;
     const fetched = [...first.value, ...(second.status === 'fulfilled' ? second.value : [])];
-    const listings = sortByValue(fetched.map((f) => toListing(f, index)).filter((l): l is Listing => l !== null));
+    const listings = sortByValue(fetched.map((f) => toListing(f, index, query)).filter((l): l is Listing => l !== null));
     const search: TradeSearch = {
       queryId: found.id,
       url: tradeSearchUrl(index.league, found.id),
       total: found.total,
       listings,
       icon: fetched.find((f) => f.item.icon)?.item.icon,
-      // Vorschlag und typischer Preis aus aktuellen Angeboten; alte zählen nur, wenn es sonst keine gibt.
-      suggestion: suggestPrice(pricingBasis(listings).listings, index.exaltedPerDivine || null),
+      // Alle Angebote zählen – auch alte sind kaufbar; die Suche filtert schon auf die gewünschten Stats.
+      suggestion: suggestPrice(listings, index.exaltedPerDivine || null),
       market: marketPrice(listings, index.exaltedPerDivine || null),
-      warnings: priceWarnings(found.total, listings),
+      warnings: priceWarnings(found.total),
     };
     searchCache.set(cacheKey, { at: Date.now(), search });
     return { ...base, search };

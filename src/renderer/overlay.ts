@@ -1,5 +1,6 @@
 import { categoryFor, defaultMatchCount } from '../shared/stats';
-import { isStale, STALE_DAYS, type PriceSuggestion } from '../shared/extras';
+import { compareKey, compareListing, verdictText, type Comparison } from '../shared/compare';
+import { PSEUDO, type PriceSuggestion } from '../shared/extras';
 import type { Listing, PriceMatch, PriceResult, TradeMod, TradeSelection } from '../shared/types';
 import { api, el, itemIcon } from './api';
 import { ageFromIso, amount, currencyShort, parseMin, priceParts, priceText } from './format';
@@ -431,17 +432,170 @@ function elementChoice(stats: HTMLElement, mods: TradeMod[], onChange: () => voi
   tags.append(group);
 }
 
-function listingRow(l: Listing, now: number): HTMLElement {
-  const stale = isStale(l, now);
+function listingRow(l: Listing, searched: Set<string>, own: TradeMod[]): HTMLElement {
   const short = currencyShort(l.currency);
+  // Vergleich mit dem gescannten Item: Punkt vor dem Preis (grün besser, gelb gemischt, rot schlechter).
+  const cmp = l.details ? compareListing(own, l.details) : null;
+  const dot = cmp ? el('span', `cmp-dot cmp-${cmp.verdict}`) : null;
+  if (dot && cmp) dot.title = verdictText(cmp);
+  const hasDetails = !!l.details && (l.details.mods.length > 0 || l.details.properties.length > 0 || !!l.details.dps);
   const row = el(
-    'div', `lst${stale ? ' lst-stale' : ''}`,
-    el('span', 'lst-price', `${amount(l.amount)} `, el('span', `unit unit-${short.toLowerCase()}`, short)),
+    'div', `lst${hasDetails ? ' lst-details' : ''}`,
+    el('span', 'lst-price', dot, `${amount(l.amount)} `, el('span', `unit unit-${short.toLowerCase()}`, short)),
     el('span', 'lst-ilvl', l.itemLevel ? String(l.itemLevel) : '–'),
     el('span', 'lst-age', ageFromIso(l.indexed)),
   );
-  if (stale) row.title = `Listed for more than ${STALE_DAYS} days – probably not a real price, ignored for the typical price.`;
+  if (l.url) {
+    // Klick: Trade-Seite mit genau diesem Angebot öffnen.
+    row.classList.add('lst-link');
+    row.addEventListener('click', () => api.openTrade(l.url!));
+    if (!hasDetails) row.title = 'Open this listing on the trade site';
+  }
+  if (hasDetails) {
+    // Beim Darüberfahren: kleines Fenster mit den Stats des angebotenen Items.
+    row.addEventListener('pointerenter', () => showListingPopover(row, l, searched, cmp));
+    row.addEventListener('pointerleave', hideListingPopover);
+  }
   return row;
+}
+
+// ---------- Stats eines Angebots (Fenster beim Darüberfahren) ----------
+//
+// Aufgebaut wie ein Item-Tooltip im Spiel: alles zentriert, Name, Basis, Eigenschaften und DPS,
+// dann die Mods in Gruppen (Augments | Implicit | Präfixe + Suffixe) mit Trennlinien dazwischen.
+
+let popover: HTMLElement | null = null;
+
+/** Besondere Herkunft nur als Tooltip – die Farbe der Zeile zeigt sie schon. */
+const LISTING_KIND: Partial<Record<string, string>> = {
+  fractured: 'Fractured', desecrated: 'Desecrated', crafted: 'Crafted', enchant: 'Enchant',
+};
+
+type ListingModT = NonNullable<Listing['details']>['mods'][number];
+
+/** Reihenfolge wie im Spiel: Augments und Enchants, Implicit, dann Präfixe, Suffixe, übrige. */
+function lpGroup(m: ListingModT): number {
+  if (m.kind === 'rune' || m.kind === 'enchant') return 0;
+  if (m.kind === 'implicit') return 1;
+  return 2;
+}
+function lpOrder(m: ListingModT): number {
+  return m.tier?.startsWith('P') ? 0 : m.tier?.startsWith('S') ? 1 : 2;
+}
+
+/** Pfeil mit Unterschied zum eigenen Item, z. B. "▲ 15" (grün) oder "▼ 8" (rot). */
+function deltaMark(cmp: Comparison | null, key: string | undefined): HTMLElement | null {
+  const d = key ? cmp?.deltas.get(key) : undefined;
+  if (!d) return null;
+  const dir = d.delta > 0 ? 'up' : d.delta < 0 ? 'down' : 'eq';
+  const mark = el('span', `cmp-delta cmp-${dir}`, dir === 'up' ? `▲ ${amount(d.delta)}` : dir === 'down' ? `▼ ${amount(-d.delta)}` : '=');
+  mark.title = `Yours: ${amount(d.own)} · this one: ${amount(d.theirs)}`;
+  return mark;
+}
+
+const PSEUDO_LABEL = new Map(Object.values(PSEUDO).map((p) => [p.id, p.label]));
+
+function showListingPopover(row: HTMLElement, l: Listing, searched: Set<string>, cmp: Comparison | null) {
+  const d = l.details;
+  const card = row.closest<HTMLElement>('.card');
+  if (!d || !card) return;
+  if (!popover || !popover.isConnected) popover = el('div', 'lp');
+  const short = currencyShort(l.currency);
+
+  // Die Basis zählt beim Vergleich, der Name ist zufällig – daher Basis groß, Name klein darunter.
+  const title = d.base || d.name;
+  const sub = [d.base && d.name ? d.name : '', d.ilvl ? `Item level ${d.ilvl}` : ''].filter(Boolean).join(' · ');
+
+  // DPS (Waffen) und Eigenschaften; Schadenszeilen stecken schon in den DPS.
+  const dps = d.dps
+    ? el(
+        'div', 'lp-dps',
+        el('span', 'lp-dps-item', el('span', 'lp-dps-label', 'Total DPS'), el('strong', '', amount(d.dps.total)), deltaMark(cmp, 'filter:dps')),
+        d.dps.physical ? el('span', 'lp-dps-item', el('span', 'lp-dps-label', 'Physical'), el('strong', '', amount(d.dps.physical)), deltaMark(cmp, 'filter:pdps')) : null,
+        d.dps.elemental
+          ? el('span', 'lp-dps-item', el('span', 'lp-dps-label', 'Elemental'), el('strong', '', amount(d.dps.elemental)), ...(d.elements ?? []).map(elementIcon), deltaMark(cmp, 'filter:edps'))
+          : null,
+      )
+    : null;
+  // Eigenschaften untereinander wie auf der Trade-Seite: Name gedämpft, Wert hervorgehoben.
+  const props = d.properties.map((p) => {
+    const i = p.indexOf(': ');
+    return i < 0
+      ? el('div', 'lp-prop', p)
+      : el('div', 'lp-prop', el('span', 'lp-prop-name', `${p.slice(0, i)}: `), el('span', 'lp-prop-value', p.slice(i + 2)));
+  });
+
+  const groups = new Map<number, ListingModT[]>();
+  for (const m of d.mods) groups.set(lpGroup(m), [...(groups.get(lpGroup(m)) ?? []), m]);
+  const blocks = [...groups.keys()].sort((x, y) => x - y).map((g) =>
+    el(
+      'div', 'lp-block',
+      ...groups.get(g)!
+        .slice()
+        .sort((x, y) => lpOrder(x) - lpOrder(y))
+        .map((m) => {
+          const hit = !!m.statId && searched.has(m.statId);
+          // Tier links in eigener Spalte (wie auf der Trade-Seite), Text bleibt mittig.
+          const tier = m.tier ? el('span', `lp-tier lp-tier-${m.tier.startsWith('P') ? 'p' : m.tier.startsWith('S') ? 's' : 'x'}`, m.tier) : el('span', 'lp-tier');
+          const text = el('span', 'lp-mod-text', hit ? el('span', 'lp-check', '✓ ') : null, m.text);
+          // Rechte Spalte: Unterschied zum eigenen Item (hält den Text zugleich mittig).
+          const line = el('div', `lp-mod lp-${m.kind}${hit ? ' lp-hit' : ''}`, tier, text, el('span', 'lp-tier-pad', deltaMark(cmp, m.statId ? compareKey(m.statId) : undefined)));
+          const extra = LISTING_KIND[m.kind];
+          if (hit || extra) line.title = [extra, hit ? 'Matches a stat you searched for' : ''].filter(Boolean).join(' · ');
+          return line;
+        }),
+    ),
+  );
+
+  // Summen (Life, Resistenzen …), die du gesucht hast – wie die Pseudo-Zeilen auf der Trade-Seite.
+  const totals = [...(cmp?.deltas.values() ?? [])]
+    .filter((x) => PSEUDO_LABEL.has(x.key))
+    .map((x) => el('div', 'lp-mod lp-pseudo', el('span', 'lp-tier'), el('span', 'lp-mod-text', PSEUDO_LABEL.get(x.key)!(amount(x.theirs))), el('span', 'lp-tier-pad', deltaMark(cmp, x.key))));
+
+  const parts: (HTMLElement | null)[] = [
+    el('div', `lp-name rarity-${(d.rarity ?? 'rare').toLowerCase()}`, title),
+    sub ? el('div', 'lp-sub', sub) : null,
+    d.corrupted ? el('div', 'lp-corrupted', 'Corrupted') : null,
+    cmp ? el('div', `cmp-badge cmp-${cmp.verdict}`, verdictText(cmp)) : null,
+    el('div', 'lp-price', `${amount(l.amount)} `, el('span', `unit unit-${short.toLowerCase()}`, short), el('span', 'lp-age', ` · listed ${ageFromIso(l.indexed)}`)),
+    dps,
+    props.length ? el('div', 'lp-props', ...props) : null,
+    ...blocks,
+    totals.length ? el('div', 'lp-block lp-totals', ...totals) : null,
+    l.url ? el('div', 'lp-hint', 'Click to open on the trade site') : null,
+  ];
+  popover.replaceChildren(...parts.filter((p): p is HTMLElement => p !== null));
+  if (popover.parentElement !== card) card.append(popover);
+  popover.hidden = false;
+
+  // Über der Zeile, wenn dort Platz ist – sonst darunter.
+  const above = row.offsetTop - popover.offsetHeight - 6;
+  popover.style.top = `${above >= card.scrollTop + 4 ? above : row.offsetTop + row.offsetHeight + 6}px`;
+}
+
+/** Kleines Symbol je Element: Flamme (Feuer), Schneeflocke (Kälte), Blitz. */
+function elementIcon(element: 'fire' | 'cold' | 'lightning'): SVGSVGElement {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 16 16');
+  svg.setAttribute('class', `el-icon el-${element}`);
+  const shape = document.createElementNS(ns, 'path');
+  shape.setAttribute(
+    'd',
+    element === 'fire'
+      ? 'M8 1c.6 2.6 4.2 4.2 4.2 8.3A4.2 4.2 0 0 1 3.8 9.4c0-2.3 1.6-3.4 2-5.2.9.9 1.4 2 1.4 3 .9-1.4 1.3-3.6.8-6.2z'
+      : element === 'cold'
+        ? 'M8 1v14M2 4.5l12 7M14 4.5l-12 7M6 2.5 8 4l2-1.5M6 13.5 8 12l2 1.5'
+        : 'M9.5 1 3 9h4.5L6 15l7-8.5H8.5z',
+  );
+  const title = document.createElementNS(ns, 'title');
+  title.textContent = element === 'fire' ? 'Fire' : element === 'cold' ? 'Cold' : 'Lightning';
+  svg.append(shape, title);
+  return svg;
+}
+
+function hideListingPopover() {
+  if (popover) popover.hidden = true;
 }
 
 /** Verkaufspreis-Vorschlag mit Kopier-Button für die Stash-Notiz. */
@@ -509,6 +663,8 @@ function resultsContent(r: TradeResult): HTMLElement[] {
   } else if (s && s.listings.length > 0) {
     const cheapest = s.listings[0];
     const now = Date.now();
+    // Gesuchte Stats – im Fenster eines Angebots werden passende Mods mit ✓ markiert.
+    const searched = new Set(r.mods.filter((m) => m.enabled && m.statId).map((m) => m.statId!));
 
     // Kurzfassung: typischer Preis links, Verkaufsvorschlag rechts.
     const price = el('div', 'sum-price');
@@ -518,8 +674,7 @@ function resultsContent(r: TradeResult): HTMLElement[] {
         el('strong', 'sum-value', `≈ ${p.value} `, el('span', `unit unit-${p.unit.toLowerCase()}`, p.unit)),
         el('span', 'sum-label', `typical · from ${amount(cheapest.amount)} ${currencyShort(cheapest.currency)}`),
       );
-      price.title = `Median of the ${s.market.basedOn} cheapest current listings`
-        + (s.market.staleIgnored ? ` – ${s.market.staleIgnored} listings older than ${STALE_DAYS} days ignored` : '');
+      price.title = `Median of the ${s.market.basedOn} cheapest listings`;
     } else {
       price.append(
         el('strong', 'sum-value', `${amount(cheapest.amount)} `, el('span', `unit unit-${currencyShort(cheapest.currency).toLowerCase()}`, currencyShort(cheapest.currency))),
@@ -535,7 +690,7 @@ function resultsContent(r: TradeResult): HTMLElement[] {
       el(
         'div', 'lst-table',
         el('div', 'lst lst-head', el('span', '', 'Price'), el('span', '', 'iLvl'), el('span', '', 'Listed')),
-        ...s.listings.slice(0, 20).map((l) => listingRow(l, now)),
+        ...s.listings.slice(0, 20).map((l) => listingRow(l, searched, r.mods)),
       ),
     );
   } else if (s) {
@@ -808,6 +963,7 @@ function renderTrade(r: TradeResult): HTMLElement {
 
 /** Neues Ergebnis derselben Prüfung: nur den Ergebnisteil tauschen, Eingaben bleiben unangetastet. */
 function updateTrade(v: TradeView, r: TradeResult) {
+  hideListingPopover();
   v.results.replaceChildren(...resultsContent(r));
   v.results.classList.toggle('stale', !!r.pending);
   v.matched.textContent = matchedText(r);

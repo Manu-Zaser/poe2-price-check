@@ -423,9 +423,12 @@ function createMainWindow() {
     minHeight: 560,
     title: 'PoE2 Price Check',
     backgroundColor: '#100e0c',
+    // Nicht maximierbar (auch nicht per Doppelklick auf den Zieh-Bereich) – das Layout ist für die
+    // normale Fenstergröße gedacht. Größe ziehen geht weiterhin.
+    maximizable: false,
+    // Ohne Windows-Titelleiste: Minimieren/Schließen zeichnet die Seite selbst (app.html),
+    // damit Farben und Hover zum Design passen – die Windows-Buttons lassen sich kaum anpassen.
     titleBarStyle: 'hidden',
-    // Nur die Fenster-Buttons oben rechts, ohne eigene Leiste – Navigation sitzt in der Seitenleiste.
-    titleBarOverlay: { color: '#100e0c', symbolColor: '#9a8f7c', height: 40 },
     show: false,
     webPreferences: { preload: join(__dirname, 'preload.js') },
   });
@@ -970,6 +973,12 @@ app.whenReady().then(() => {
     pushState();
   }));
   ipcMain.on('overlay:test', safe('overlay:test', () => testOverlay()));
+  ipcMain.on('window:control', safe('window:control', (e, action: 'minimize' | 'close') => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (!win) return;
+    if (action === 'minimize') win.minimize();
+    else if (action === 'close') win.close(); // läuft je nach Einstellung in den Infobereich
+  }));
   ipcMain.on('history:open', safe('history:open', (_e, id: number) => openHistoryEntry(Number(id))));
   ipcMain.on('update:check', safe('update:check', () => void checkForUpdates()));
   ipcMain.on('update:install', safe('update:install', () => installUpdate()));

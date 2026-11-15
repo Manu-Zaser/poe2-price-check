@@ -19,6 +19,8 @@ const api = {
   openReleasePage: () => ipcRenderer.send('update:open'),
   testOverlay: () => ipcRenderer.send('overlay:test'),
   restartApp: () => ipcRenderer.send('app:restart'),
+  /** Eigene Fenster-Buttons des Hauptfensters. */
+  windowControl: (action: 'minimize' | 'close') => ipcRenderer.send('window:control', action),
   /** Overlay erscheint wieder neben dem Mauszeiger statt an der gemerkten Stelle. */
   resetOverlayPosition: () => ipcRenderer.send('overlay:resetPosition'),
 

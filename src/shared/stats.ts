@@ -284,6 +284,16 @@ export function buildSearchQuery(item: ParsedItem, mods: TradeMod[], opts: Searc
   };
 }
 
+/**
+ * Link zur Trade-Seite mit derselben Suche, eingeschränkt auf einen Verkäufer – so steht genau
+ * dessen Angebot oben. Die Seite nimmt die Suche als ?q=… entgegen; das kostet keine API-Anfrage.
+ */
+export function tradeSellerUrl(league: string, query: unknown, seller: string): string {
+  const q = structuredClone(query) as { query: { filters?: Record<string, unknown> } };
+  q.query.filters = { ...q.query.filters, trade_filters: { filters: { account: { input: seller } } } };
+  return `https://www.pathofexile.com/trade2/search/poe2/${encodeURIComponent(league)}?q=${encodeURIComponent(JSON.stringify(q))}`;
+}
+
 export function tradeSearchUrl(league: string, queryId: string): string {
   return `https://www.pathofexile.com/trade2/search/poe2/${encodeURIComponent(league)}/${queryId}`;
 }

@@ -111,12 +111,25 @@ switches back to automatic.
     and **Trade ↗** (opens the same search in your browser). Nothing is searched until you click **Search** – not
     even when the overlay opens, so you can check the stats first. The button lights up whenever there is something
     new to search. The result is added to the history in the main window.
-  - **Summary:** the typical price (median of the 3 cheapest *current* listings – the single cheapest is often a
-    forgotten or mispriced item) and a **suggested selling price** slightly below it, with a button to copy it as a
+  - **Summary:** the typical price (median of the 3 cheapest listings – the single cheapest alone is often a
+    mispriced item) and a **suggested selling price** slightly below it, with a button to copy it as a
     stash note (e.g. `~b/o 58 exalted`; Exalted suggestions also show the Divine equivalent).
-  - **Warnings** appear when the price is unreliable: fewer than 10 results, or only listings older than 14 days.
-  - **Listings table** with the 20 cheapest offers (price, item level, listed). Listings older than 14 days are faded
-    and ignored for the typical price (unless there are fewer than 2 current ones). Listings are sorted by their value
+  - **Warning** when the price is unreliable because there are fewer than 10 results. Old listings count like new
+    ones – they can still be bought, and the search already filters for the stats you want.
+  - **Listings table** with the 20 cheapest offers (price, item level, listed). **Hover a row** to see the offered
+    item's stats in a small window. It is laid out like the item view on the official trade site, so there is nothing
+    new to learn and you find things where you already look for them: base type (with the item's name below), item
+    level, corrupted, price and age, for weapons **total / physical / elemental DPS** with element icons, the other
+    properties line by line and all mods in game order (augments, implicit, prefixes and suffixes with their tier in a
+    column on the left); ✓ marks mods that match a stat you searched for. **Click a row** to open the trade site
+    with the same search narrowed to that seller, so the offer is on top.
+  - **Compared with your item:** a dot in front of each price shows whether the offer is better (green), mixed
+    (yellow), worse (red) or the same (grey) on the stats you ticked. The hover window says how many stats are higher
+    or lower and puts ▲/▼ with the difference next to each mod, DPS value and total (life, resistances,
+    attributes). It counts stats instead of adding them up into one score, because what 10 life are worth against
+    5% resistance depends on your build. Key mods count double; low-value and "reduced" mods are left out, and a
+    stat the offer lacks counts as lower. It compares with the item you scanned, not with your equipped gear (the
+    tool cannot see that). Listings are sorted by their value
     according to poe.ninja (GGG sorts by its own rates).
 
 poe.ninja is fetched at most once per hour, the trade search's stat list once per day

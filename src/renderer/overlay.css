@@ -231,8 +231,6 @@ input[type="checkbox"]:disabled { opacity: .35; cursor: default; }
 .lst-price .unit { margin-left: 2px; }
 .lst-ilvl { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
 .lst-age { color: var(--faint); font-size: 11.5px; }
-/* Alte Angebote: gedämpft, aber noch lesbar. */
-.lst-stale { opacity: .72; }
 
 .loading { display: flex; align-items: center; gap: 8px; margin-top: 10px; color: var(--muted); font-size: 12.5px; }
 .spinner {
@@ -311,3 +309,68 @@ input[type="checkbox"]:disabled { opacity: .35; cursor: default; }
 .missing-toggle:hover, .missing-toggle.open { color: var(--gold-bright); }
 .missing-list { margin: 4px 0 0; padding: 6px 10px 6px 24px; border-radius: 7px; background: var(--panel-2); font-size: 12px; color: var(--muted); }
 .missing-list[hidden] { display: none; }
+
+/* ---------- Stats eines Angebots (Fenster beim Darüberfahren) ---------- */
+.lst-details { cursor: default; }
+.lst-details:hover { background: rgba(201,168,92,.12); }
+.lp {
+  position: absolute; left: 12px; right: 12px; z-index: 5; pointer-events: none;
+  padding: 12px 14px 10px; border-radius: 10px; text-align: center;
+  background: rgb(22, 19, 14); border: 1px solid var(--gold-deep);
+  box-shadow: 0 12px 28px rgba(0,0,0,.6);
+}
+.lp[hidden] { display: none; }
+.lp-name { font: 600 15px var(--font-display); }
+.lp-sub { margin-top: 1px; font-size: 11.5px; color: var(--muted); }
+.lp-corrupted { margin-top: 2px; font-size: 11.5px; font-weight: 600; color: var(--bad); }
+.lp-price { margin-top: 6px; font: 700 14px var(--font-display); font-variant-numeric: tabular-nums; }
+.lp-age { font: 400 11px var(--font); color: var(--faint); }
+.lp-dps { display: flex; justify-content: center; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; }
+.lp-dps-item { display: inline-flex; align-items: baseline; gap: 5px; font-size: 12px; }
+.lp-dps-label { font-size: 10.5px; color: var(--faint); text-transform: uppercase; letter-spacing: .06em; }
+.lp-dps-item strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.lp-props { display: flex; flex-direction: column; gap: 1px; margin-top: 7px; }
+.lp-prop { font-size: 12px; color: var(--muted); }
+.lp-prop-value { color: var(--text); font-variant-numeric: tabular-nums; }
+.lp-block { margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; }
+.lp-mod { display: grid; grid-template-columns: 52px 1fr 52px; align-items: baseline; font-size: 12.5px; color: var(--mod-explicit); }
+.lp-mod-text { min-width: 0; }
+.lp-tier { text-align: left; font-size: 11px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lp-tier-p { color: #e0705c; }
+.lp-tier-s { color: #6fa3e0; }
+.lp-tier-x { color: var(--faint); }
+.lp-implicit, .lp-enchant { color: var(--mod-implicit); }
+.lp-rune { color: var(--mod-rune); }
+.lp-fractured { color: var(--mod-fractured); }
+.lp-desecrated { color: var(--mod-desecrated); }
+.lp-hit { font-weight: 600; }
+.lp-check { color: var(--ok); font-weight: 700; }
+
+/* Element-Symbole hinter Elemental DPS */
+.el-icon { width: 12px; height: 12px; align-self: center; }
+.el-fire path { fill: #f07a3a; }
+.el-cold path { fill: none; stroke: #7cc4f0; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.el-lightning path { fill: #f2d64b; }
+
+/* Angebot anklickbar (öffnet die Trade-Seite) */
+.lst-link { cursor: pointer; }
+.lst-link:hover { background: rgba(201,168,92,.12); }
+.lp-hint { margin-top: 8px; font-size: 10.5px; color: var(--muted); opacity: .8; }
+
+/* Vergleich mit dem gescannten Item */
+.cmp-dot { display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; vertical-align: 1px; }
+.cmp-dot.cmp-better { background: var(--ok); }
+.cmp-dot.cmp-mixed { background: #d9b44a; }
+.cmp-dot.cmp-worse { background: var(--bad); }
+.cmp-dot.cmp-same { background: var(--faint); }
+.cmp-badge { display: inline-block; margin-top: 6px; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+.cmp-badge.cmp-better { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }
+.cmp-badge.cmp-mixed { color: #d9b44a; background: rgba(217,180,74,.14); }
+.cmp-badge.cmp-worse { color: var(--bad); background: color-mix(in srgb, var(--bad) 14%, transparent); }
+.cmp-badge.cmp-same { color: var(--muted); background: var(--panel-2); }
+.cmp-delta { font-size: 10.5px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; margin-left: 4px; }
+.cmp-up { color: var(--ok); }
+.cmp-down { color: var(--bad); }
+.cmp-eq { color: var(--faint); }
+.lp-tier-pad { text-align: right; }
+.lp-pseudo { color: var(--muted); }

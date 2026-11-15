@@ -51,7 +51,13 @@ export function pseudoContributions(template: string): { key: string; factor: nu
 
 // ---------- Waffen-DPS ----------
 
-export interface WeaponStats { aps: number; pdps: number; edps: number; cdps: number; dps: number; /** Kritische Trefferchance in %, wie angezeigt (0 = keine Angabe). */ crit: number }
+export interface WeaponStats {
+  aps: number; pdps: number; edps: number; cdps: number; dps: number;
+  /** Kritische Trefferchance in %, wie angezeigt (0 = keine Angabe). */
+  crit: number;
+  /** Elemente des elementaren Schadens (für die Symbole hinter Elemental DPS). */
+  elements: ('fire' | 'cold' | 'lightning')[];
+}
 
 const DAMAGE_LINE = /^(Physical|Fire|Cold|Lightning|Chaos|Elemental) Damage:\s*(.+)$/i;
 const RANGE = /(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)/g;
@@ -67,6 +73,7 @@ export function weaponStats(item: ParsedItem): WeaponStats | null {
   let phys = 0;
   let ele = 0;
   let chaos = 0;
+  const elements = new Set<'fire' | 'cold' | 'lightning'>();
   for (const line of lines) {
     const m = line.match(DAMAGE_LINE);
     if (!m) continue;
@@ -75,12 +82,17 @@ export function weaponStats(item: ParsedItem): WeaponStats | null {
     const type = m[1].toLowerCase();
     if (type === 'physical') phys += avg;
     else if (type === 'chaos') chaos += avg;
-    else ele += avg;
+    else {
+      ele += avg;
+      // "Cold Damage: 37-59" bzw. "Elemental Damage: 11-17 (cold), 1-73 (lightning)"
+      if (type === 'fire' || type === 'cold' || type === 'lightning') elements.add(type);
+      for (const e of m[2].matchAll(/\((fire|cold|lightning)\)/gi)) elements.add(e[1].toLowerCase() as 'fire' | 'cold' | 'lightning');
+    }
   }
   const round = (n: number) => Math.round(n * 10) / 10;
   // Gesamtwert inkl. Basis, lokaler Mods und Qualität – aussagekräftiger als der einzelne Mod.
   const crit = Number(lines.find((l) => /^Critical Hit Chance:/i.test(l))?.match(/(\d+(?:\.\d+)?)%/)?.[1] ?? 0);
-  return { aps, pdps: round(phys * aps), edps: round(ele * aps), cdps: round(chaos * aps), dps: round((phys + ele + chaos) * aps), crit };
+  return { aps, pdps: round(phys * aps), edps: round(ele * aps), cdps: round(chaos * aps), dps: round((phys + ele + chaos) * aps), crit, elements: [...elements] };
 }
 
 /**
@@ -205,6 +217,7 @@ export function buildExtraMods(item: ParsedItem, lines: ModLine[], mods: TradeMo
       extras.push({
         key: `w:${filter}`, text, kind: 'weapon', statId: null, filter, value, min: minOf(value), enabled: filter === main,
         ...(atQ20 !== undefined && atQ20 > value ? { q20: atQ20 } : {}),
+        ...(filter === 'edps' && w.elements.length ? { elements: w.elements } : {}),
       });
     }
   }
@@ -316,60 +329,34 @@ export function suggestPrice(listings: Listing[], exaltedPerDivine: number | nul
 
 // ---------- Marktpreis und Verlässlichkeit ----------
 
-/** Angebote, die länger als das online sind, sind meist Ladenhüter oder Lockangebote. */
-export const STALE_DAYS = 14;
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-export function isStale(l: Listing, now = Date.now()): boolean {
-  const t = Date.parse(l.indexed);
-  return !Number.isNaN(t) && now - t > STALE_DAYS * DAY_MS;
-}
-
-/**
- * Angebote für Preis und Vorschlag: aktuelle bevorzugt. Gibt es weniger als 2 aktuelle,
- * werden alle verwendet (besser alte Daten als gar keine).
- */
-export function pricingBasis(listings: Listing[], now = Date.now()): { listings: Listing[]; staleIgnored: number } {
-  const fresh = listings.filter((l) => !isStale(l, now));
-  if (fresh.length >= 2) return { listings: fresh, staleIgnored: listings.length - fresh.length };
-  return { listings, staleIgnored: 0 };
-}
-
 export interface MarketPrice {
   divine: number;
   exalted: number;
   /** Auf wie vielen Angeboten der Wert beruht. */
   basedOn: number;
-  /** Wie viele alte Angebote dafür übergangen wurden. */
-  staleIgnored: number;
 }
 
 /**
- * Typischer Preis = Median der n günstigsten (aktuellen) Angebote. Robuster als das günstigste
- * Angebot, das oft ein vergessenes oder falsch bepreistes Item ist.
+ * Typischer Preis = Median der n günstigsten Angebote. Robuster als das günstigste Angebot allein.
+ * Alte Angebote zählen voll mit: Sie sind kaufbar, und die Suche filtert bereits auf die gewünschten Stats.
  */
-export function marketPrice(listings: Listing[], exaltedPerDivine: number | null, now = Date.now(), n = 3): MarketPrice | null {
+export function marketPrice(listings: Listing[], exaltedPerDivine: number | null, n = 3): MarketPrice | null {
   if (!exaltedPerDivine) return null;
-  const basis = pricingBasis(listings, now);
-  const values = basis.listings.slice(0, n).map((l) => l.exalted).filter((v): v is number => v !== null && v > 0);
+  const values = listings.slice(0, n).map((l) => l.exalted).filter((v): v is number => v !== null && v > 0);
   if (values.length === 0) return null;
   values.sort((a, b) => a - b);
   const mid = Math.floor(values.length / 2);
   const exalted = values.length % 2 ? values[mid] : (values[mid - 1] + values[mid]) / 2;
-  return { exalted, divine: exalted / exaltedPerDivine, basedOn: values.length, staleIgnored: basis.staleIgnored };
+  return { exalted, divine: exalted / exaltedPerDivine, basedOn: values.length };
 }
 
 /** Wenig Treffer = der Preis ist nur grob; dann lieber Mods abwählen. */
 export const FEW_RESULTS = 10;
 
-/** Hinweise, wenn der angezeigte Preis wenig aussagekräftig ist. */
-export function priceWarnings(total: number, listings: Listing[], now = Date.now()): string[] {
-  const out: string[] = [];
-  if (listings.length > 0 && listings.every((l) => isStale(l, now))) {
-    out.push(`All listings are older than ${STALE_DAYS} days – price probably outdated.`);
-  }
+/** Hinweis, wenn der angezeigte Preis wenig aussagekräftig ist (sehr wenige Treffer). */
+export function priceWarnings(total: number): string[] {
   if (total > 0 && total < FEW_RESULTS) {
-    out.push(`Only ${total} result${total === 1 ? '' : 's'} – untick some mods for a more reliable price.`);
+    return [`Only ${total} result${total === 1 ? '' : 's'} – untick some mods for a more reliable price.`];
   }
-  return out;
+  return [];
 }

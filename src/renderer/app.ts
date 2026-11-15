@@ -567,6 +567,11 @@ $('update-action').addEventListener('click', (e) => {
   else if (action === 'download') api.openReleasePage();
 });
 
+// ---------- Fenster-Buttons ----------
+
+$('win-min').addEventListener('click', () => api.windowControl('minimize'));
+$('win-close').addEventListener('click', () => api.windowControl('close'));
+
 // ---------- Start ----------
 
 function render(s: AppState) {

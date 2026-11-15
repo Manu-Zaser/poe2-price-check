@@ -67,7 +67,8 @@ body {
 .content { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .page-head {
   flex: none; height: 64px; display: flex; align-items: center;
-  padding: 0 150px 0 28px; /* rechts Platz für die Fenster-Buttons */
+  padding: 0 0 0 28px;
+  margin-right: 96px; /* Zieh-Bereich endet vor den Fenster-Buttons – sonst fangen ihn deren Klicks ab */
   -webkit-app-region: drag;
 }
 h1 { margin: 0; font: 600 19px var(--font-display); }
@@ -308,3 +309,17 @@ textarea:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .conv-none { color: var(--faint); font-size: 13px; }
 
 .help code { word-break: normal; white-space: nowrap; }
+
+/* ---------- Eigene Fenster-Buttons ---------- */
+.win-controls { position: fixed; top: 0; right: 0; z-index: 20; display: flex; -webkit-app-region: no-drag; }
+.win-btn {
+  display: grid; place-items: center; width: 46px; height: 36px; padding: 0;
+  border: 0; background: none; color: var(--muted); cursor: default;
+  transition: background .12s, color .12s;
+}
+.win-btn svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 1.1; }
+.win-btn:hover { background: rgba(255, 244, 225, .09); color: var(--text); }
+.win-btn:active { background: rgba(255, 244, 225, .05); }
+.win-close:hover { background: #c42b1c; color: #fff; }
+.win-close:active { background: #a52419; color: #fff; }
+.win-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
