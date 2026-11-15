@@ -488,7 +488,9 @@ function deltaMark(cmp: Comparison | null, key: string | undefined): HTMLElement
   const d = key ? cmp?.deltas.get(key) : undefined;
   if (!d) return null;
   const dir = d.delta > 0 ? 'up' : d.delta < 0 ? 'down' : 'eq';
-  const mark = el('span', `cmp-delta cmp-${dir}`, dir === 'up' ? `▲ ${amount(d.delta)}` : dir === 'down' ? `▼ ${amount(-d.delta)}` : '=');
+  // Unterschied kompakt: höchstens eine Nachkommastelle ("4.5" statt "4.50").
+  const diff = (n: number) => String(Math.round(Math.abs(n) * 10) / 10);
+  const mark = el('span', `cmp-delta cmp-${dir}`, dir === 'up' ? `▲ ${diff(d.delta)}` : dir === 'down' ? `▼ ${diff(d.delta)}` : '=');
   mark.title = `Yours: ${amount(d.own)} · this one: ${amount(d.theirs)}`;
   return mark;
 }

@@ -11,7 +11,7 @@ import { log, logFile } from './log';
 import { buildPriceIndex, CACHE_TTL_MS, fetchLeagues, lookupPrice, makeFetchJson, type PriceIndex } from './ninja';
 import { applySelection, idleRareResult, loadStatIndex, newRareRequest, runRareSearch, type RareRequest } from './rare';
 import { TradeClient } from './trade';
-import { checkForUpdates, initUpdates, installUpdate, openReleasePage, updateState } from './updater';
+import { checkForUpdates, downloadUpdate, initUpdates, installUpdate, openReleasePage, updateState } from './updater';
 import { focusWindowByTitle, foregroundWindowHandle, foregroundWindowTitle, sendCopy } from './win32';
 
 // Fester Datenordner (%APPDATA%\poe2-pricecheck), egal ob per `npm start` oder als gebaute .exe
@@ -981,6 +981,7 @@ app.whenReady().then(() => {
   }));
   ipcMain.on('history:open', safe('history:open', (_e, id: number) => openHistoryEntry(Number(id))));
   ipcMain.on('update:check', safe('update:check', () => void checkForUpdates()));
+  ipcMain.on('update:download', safe('update:download', () => downloadUpdate()));
   ipcMain.on('update:install', safe('update:install', () => installUpdate()));
   ipcMain.on('update:open', safe('update:open', () => openReleasePage()));
   ipcMain.on('overlay:resetPosition', safe('overlay:resetPosition', () => {

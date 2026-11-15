@@ -190,7 +190,7 @@
             <dt>Typical price</dt>
             <dd>The median of the 3 cheapest offers – the single cheapest offer alone is often mispriced. Old offers count too: they can still be bought.</dd>
             <dt>Listings</dt>
-            <dd>The 20 cheapest offers. Hover a row to see that item's stats – including DPS for weapons – like an in-game tooltip; ✓ marks mods you searched for. Click a row to open that offer on the trade site. The dot in front of the price compares the offer with your item on the stats you ticked: green better, yellow mixed, red worse.</dd>
+            <dd>The 20 cheapest offers. Hover a row to see that item's stats – including DPS for weapons – laid out like the trade site; ✓ marks mods you searched for. Click a row to open that offer on the trade site. The dot in front of the price compares the offer with your item on the stats you ticked: green better, yellow mixed, red worse.</dd>
           </dl>
         </div>
 
@@ -363,6 +363,18 @@
         </div>
       </section>
     </main>
+  </div>
+
+  <!-- ---------- Rückfrage: Update gefunden ---------- -->
+  <div class="modal-backdrop" id="update-modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="update-modal-title">
+      <h3 id="update-modal-title">Update available</h3>
+      <p id="update-modal-text"></p>
+      <div class="modal-actions">
+        <button class="btn ghost" id="update-later">Later</button>
+        <button class="btn primary" id="update-confirm">Download</button>
+      </div>
+    </div>
   </div>
 
   <!-- ---------- Fenster-Buttons (eigene, statt der Windows-Buttons) ----------

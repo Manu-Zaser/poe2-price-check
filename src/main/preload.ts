@@ -13,6 +13,8 @@ const api = {
   /** Preischeck aus "Recent checks" wieder im Overlay öffnen. */
   openHistory: (id: number) => ipcRenderer.send('history:open', id),
   checkUpdates: () => ipcRenderer.send('update:check'),
+  /** Gefundenes Update herunterladen (erst nach Bestätigung). */
+  downloadUpdate: () => ipcRenderer.send('update:download'),
   /** Heruntergeladenes Update installieren (Neustart). */
   installUpdate: () => ipcRenderer.send('update:install'),
   /** Download-Seite des neuesten Releases öffnen (portable Version). */

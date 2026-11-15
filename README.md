@@ -3,10 +3,32 @@
 A small overlay for Path of Exile 2: hover over an item, press **Ctrl+D**, and the price appears next to the cursor.
 
 <p align="center">
-  <img src="docs/images/overlay-rare.png" width="420" alt="Price check overlay for a rare bow: filter chips, stats with min/max, typical price, sell suggestion and the cheapest listings">
+  <img src="docs/images/overlay-rare.png" width="440" alt="Price check overlay for a rare bow: filter chips, stats with tiers, key mods, typical price, sell suggestion and the cheapest listings with comparison dots">
 </p>
 
 > This product isn't affiliated with or endorsed by Grinding Gear Games in any way.
+
+## Contents
+
+- [Quick start](#quick-start)
+- [Download](#download)
+- [What it prices](#what-it-prices)
+- [Rare and magic items](#rare-and-magic-items)
+- [Listings: hover, compare, click](#listings-hover-compare-click)
+- [Main window](#main-window)
+- [Hotkeys](#hotkeys)
+- [Overlay and settings](#overlay-and-settings)
+- [Trade search, rate limits and GGG rules](#trade-search-rate-limits-and-ggg-rules)
+- [For developers](#for-developers)
+- [License and legal](#license-and-legal)
+
+## Quick start
+
+1. Download **`PoE2-Price-Check-Setup-<version>.exe`** from the
+   [latest release](https://github.com/Manu-Zaser/poe2-price-check/releases/latest) and run it.
+2. Play PoE2 in **windowed / windowed fullscreen** mode (otherwise the overlay ends up behind the game).
+3. Hover over an item in game and press **Ctrl+D**.
+4. For rares: check the ticked stats, then click **Search**.
 
 ## Download
 
@@ -14,33 +36,118 @@ From the [latest release](https://github.com/Manu-Zaser/poe2-price-check/release
 
 | File | |
 |---|---|
-| **`PoE2-Price-Check-Setup-<version>.exe`** (recommended) | Installs for your Windows user (no admin rights) and **updates itself**: new versions are downloaded in the background and installed when you close the tool – or right away with "Restart now". |
+| **`PoE2-Price-Check-Setup-<version>.exe`** (recommended) | Installs for your Windows user (no admin rights) and **updates itself**: it checks for a new version at start (and every 6 hours or with "Check now"), asks before downloading it, and installs it when you close the tool – or right away with "Restart now". |
 | `PoE2-Price-Check-<version>.exe` | Portable, no installation. Cannot replace itself – the tool tells you when a new version is available and opens the download page. |
 
-Settings are stored in `%APPDATA%\poe2-pricecheck` for both. The exe files are not signed: on first launch Windows
-shows "Windows protected your PC" → "More info" → "Run anyway".
-Play PoE2 in **windowed / windowed fullscreen** mode, otherwise the overlay ends up behind the game.
+- Settings are stored in `%APPDATA%\poe2-pricecheck` for both.
+- The exe files are not signed: on first launch Windows shows "Windows protected your PC" → "More info" → "Run anyway".
+- Update checks only ask github.com for the latest release – no data is sent. Nothing is downloaded without your OK.
 
-Update checks only ask github.com for the latest release – no data is sent.
+## What it prices
 
-## Running from source
+| Item | What you get |
+|---|---|
+| **Currency, fragments, runes, essences, uncut gems** (by level) … | Price per unit and for the whole stack, with the 7-day trend as a small graph (poe.ninja) |
+| **Skill gems** | Trade search by name with gem level and quality as filters (poe.ninja has no prices for cut gems) |
+| **Unidentified uniques** | All possible uniques for that base with their prices (poe.ninja) |
+| **Identified uniques** | Trade search by name and base; tick a roll to find copies at least as good as yours. The poe.ninja price ("any rolls") stays visible for comparison |
+| **Rare and magic items** | Trade search with your item's stats – see [below](#rare-and-magic-items) |
+| **Normal (white) items** such as crafting bases | Trade search for **this base type** with at least **your item level**, same corrupted state |
+| **Waystones and tablets** | Dangerous mods marked red, with a warning at the top (list under Settings → Map mods) |
 
-```bash
-npm install
-npm start
-```
+<p align="center">
+  <img src="docs/images/overlay-currency.png" width="320" alt="Currency overlay: price in Exalted and Divine, 7-day trend graph and stack value">
+  &nbsp;
+  <img src="docs/images/overlay-unique.png" width="380" alt="Unique overlay: roll with min/max, typical price, listings and the poe.ninja price for comparison">
+</p>
+
+Anything poe.ninja knows is priced via poe.ninja, even as a white item. For identified uniques no mod is ticked by
+default, so you see the cheapest copies.
+
+## Rare and magic items
+
+The overlay is laid out like the trade site, top to bottom:
+
+- **Chips** for the filters you rarely change – click to switch: *Category / Base* (by default the whole category,
+  e.g. all bows – for rares the mods matter, not the base), *Not corrupted* (on by default), *Item level* and
+  *Sockets* (scroll over the chip to change the value), and the match mode (*all ticked stats must match* or *most of
+  them*, e.g. "3 of 5").
+- **Stat lines** with a checkbox, **Min** and **Max**. Under each mod: where it comes from (Explicit, Implicit,
+  Augment = rune/soul core, Desecrated, Fractured …) and its tier (e.g. "P T3"; in PoE2 a higher tier is better).
+  Click to tick, change values with the **mouse wheel** or type them (empty = no limit). Default minimum = your
+  item's own value.
+- **Key mods:** a rare's price depends on 2–3 mods, not on all of them. Only the **key mods** of the item type are
+  ticked by default (e.g. movement speed on boots, skill levels and Spirit on amulets, flat attack damage and rarity on
+  rings), together with the totals for life and resistances. **Low value** mods (light radius, thorns, stun …) are
+  faded and not searched. "ⓘ key mods … not on this item" lists what the item is missing.
+- **Tier maximum:** next to each tier the highest value it can roll ("max 149"); a perfect roll shows a gold "max ✓".
+- **Weapons:** total / physical / elemental DPS and critical hit chance as search filters. Below 20% quality,
+  **Q20** sets the DPS at 20% quality as minimum. **Elemental DPS** lets you pick the element.
+- **Results:** nothing is searched until you click **Search**, so you can check the stats first. You get the
+  **typical price** (median of the 3 cheapest listings), a **suggested selling price** with a button to copy it as a
+  stash note (e.g. `~b/o 58 exalted`), and the 20 cheapest listings – see the next section. **Trade ↗** opens the
+  same search in your browser.
+
+<details>
+<summary><b>More details: totals, hidden mods, key mod lists, warnings</b></summary>
+
+- Order of the stat lines: weapon DPS and the weapon's overall **critical hit chance** (as displayed, including base
+  value, local mods and quality), defences (armour, evasion, energy shield; block and spirit optional), **totals**
+  (resistances, life, mana, attributes combined into pseudo stats – finds far more comparable items), then the mods.
+- **Hidden:** mods already counted in a total, the DPS or the defences, and mods the trade search does not know.
+  "Hidden (n)" shows them in place, marked "◌ in DPS" etc. **Collapse** folds the stat list away. Both are remembered.
+- "Reduced" mods (e.g. "50% reduced Projectile Range") are shown as on the item; the search converts them.
+  Summed mods show one tier value per source line. Hover a tier for its full range and your roll in %.
+- **Key mod and low value lists** can be edited under Settings → Mod value (`slot: text`, e.g.
+  `boots: increased Movement Speed`; for attack weapons also `melee`, `ranged`, `bow`, `crossbow`). If an item has
+  none of the key mods, all other mods are ticked. The defaults are based on research from November 2026 (poe2db mod
+  tables for patch 0.5.x, the 0.5.0 patch notes and gear/selling guides); rules with thin evidence were left out, and
+  shields/belts have no key mods on purpose.
+- **Instant buyout** is on by default; off = also "in person" listings.
+- A **warning** appears when there are fewer than 10 results. Old listings count like new ones – they can still be
+  bought, and the search already filters for the stats you want.
+- Listings are sorted by their value according to poe.ninja (GGG sorts by its own rates).
+- Each search is added to the history in the main window.
+
+</details>
+
+## Listings: hover, compare, click
+
+<p align="center">
+  <img src="docs/images/listing-hover.png" width="420" alt="Hover window of a listed bow: verdict compared with your item, DPS with element icon, properties, mods with tier column and arrows with the difference">
+</p>
+
+- **Hover a row** to see the offered item. The window is laid out like the item view on the **official trade site**,
+  so there is nothing new to learn and you find things where you already look for them: base type (with the item's
+  name below), item level, price and age, **total / physical / elemental DPS** with element icons, the properties
+  line by line, then the mods in game order – augments, implicit, prefixes and suffixes with their **tier in a column
+  on the left** ("P3 + P5" for merged lines). ✓ marks mods you searched for.
+- **Compared with your item:** the dot in front of each price shows whether the offer is **better** (green),
+  **mixed** (yellow), **worse** (red) or the **same** (grey) on the stats you ticked. The hover window says how many
+  stats are higher or lower and puts **▲/▼ with the difference** next to each mod, DPS value and total (life,
+  resistances, attributes).
+  - It counts stats instead of adding them up into one score, because what 10 life are worth against 5% resistance
+    depends on your build.
+  - Key mods count double; low-value and "reduced" mods are left out; a stat the offer lacks counts as lower.
+  - It compares with the item you scanned, not with your equipped gear (the tool cannot see that).
+- **Click a row** to open the trade site with the same search narrowed to that seller, so the offer is on top.
 
 ## Main window
 
-- **Home:** the hotkey, the price data (league, exchange rate, how many items poe.ninja prices and when they were
-  updated), a **currency converter** (Divine / Exalted / Chaos / Mirror of Kalandra at current rates) and your **recent checks** – click one to open it in the overlay again, without scanning or searching again.
-- **How to use:** a short guide to the hotkeys, the overlay, waystones and selling.
-- **Settings:** hotkeys, startup, overlay size/background/position, league, map mods, updates, GPU acceleration.
+<p align="center">
+  <img src="docs/images/main-window.png" width="640" alt="Main window: hotkey, price data, currency converter and recent checks">
+</p>
 
-**Tray:** closing the main window keeps the tool running in the tray (next to the clock) – the hotkeys keep working.
-Quit with right-click on the tray icon → Quit. Turn this off under Settings → Startup, where you can also let the
-tool **start with Windows** (quietly in the tray). For the portable exe, Windows starts it from where it is when you
-tick the option – tick it again if you move the file.
+- **Home:** the hotkey, the price data (league, exchange rate, how many items poe.ninja prices and when), a
+  **currency converter** (Divine / Exalted / Chaos / Mirror of Kalandra at current rates) and your **recent checks** –
+  click one to open it in the overlay again, without scanning or searching again.
+- **How to use:** a short guide to the hotkeys, the overlay, waystones and selling.
+- **Settings:** hotkeys, startup, overlay size/background/position, league, map mods, mod value, updates, GPU
+  acceleration.
+- **Tray:** closing the main window keeps the tool running in the tray (next to the clock) – the hotkeys keep
+  working. Quit with right-click on the tray icon → Quit. Under Settings → Startup you can turn this off or let the
+  tool **start with Windows** (quietly in the tray). For the portable exe, Windows starts it from where it is when
+  you tick the option – tick it again if you move the file.
 
 ## Hotkeys
 
@@ -54,132 +161,72 @@ Each press sends exactly one copy keystroke to the game. Change them under Setti
 can be turned off): press the new combination – Ctrl/Alt + key or a single F key. Combinations such as Ctrl+C are
 rejected because the game needs them. Esc cancels.
 
-**League:** "Automatic" follows the current challenge league on poe.ninja. Prices are refreshed every hour, so after a
-league start the tool switches to the new league within an hour. A league you picked by hand that no longer exists
-switches back to automatic.
+## Overlay and settings
 
-## Features
+- **Overlay:** stays open until you close it with **×** (or Esc); a new price check replaces its content. Drag it by
+  any empty spot to move it – the position is remembered (Settings → "Reset position" = back next to the cursor).
+  If the overlay content crashes, the window is recreated so nothing invisible is left on top of the game.
+- **Appearance:** overlay size (80–160%) and background opacity (40–100%) – lower values let the game show through;
+  text and buttons stay fully visible. Check with "Show test overlay".
+- **League:** "Automatic" follows the current challenge league on poe.ninja and switches to a new league within an
+  hour of its start. A league you picked by hand that no longer exists switches back to automatic.
+- **Performance:** by default the tool renders **without GPU acceleration** so it doesn't take graphics performance
+  away from the game (Settings → Performance, restart required).
+- **Data:** poe.ninja is fetched at most once per hour, the trade search's stat list once per day. Errors are written
+  to `%APPDATA%\poe2-pricecheck\poe2-pricecheck.log`.
 
-- **Currency, fragments, runes, essences, uncut gems (by level) etc.** → price per unit and for the whole stack, with the
-  7-day trend as a small graph (poe.ninja)
-- **Skill gems** → trade search by name with gem level and quality as filters (poe.ninja has no prices for cut gems)
-- **Unidentified uniques** → all possible uniques for that base with their prices (poe.ninja)
-- **Identified uniques** → trade search by name and base, with the same mod list as for rares. By default no mod is
-  ticked, so you see the cheapest copies; tick a roll to search for copies that are at least as good as yours (all
-  ticked rolls must match). The poe.ninja price ("any rolls") stays visible for comparison.
-
-  <img src="docs/images/overlay-unique.png" width="360" alt="Price check overlay for a unique: rolls with min/max, listings and the poe.ninja price for comparison">
-
-- **Waystones and tablets** → dangerous mods are marked red, with a warning at the top of the overlay. Which mods count
-  as dangerous is a list of text snippets under Settings → Map mods (one per line, case-insensitive) – adapt it to
-  your build.
-- **Normal (white) items** such as crafting bases or waystones → trade search like rares, with defaults for bases:
-  only white items of **this base type** with at least **your item level**, same corrupted state. Implicits and
-  defences are listed but not ticked. Anything poe.ninja knows (e.g. currency) is still priced via poe.ninja.
-- **Rare and magic items** (and identified uniques) → search on the official trade site. The overlay is laid out
-  like the trade site (top to bottom):
-  - **Chips** for the filters you rarely change – click to switch: *Category / Base* (by default the whole item
-    category, e.g. all bows – for rares the mods matter, not the base; click to search only this base type), *Not corrupted* (on by default), *Item level* and *Sockets* (scroll over the chip to change the value),
-    and the match mode (*all ticked stats must match* – the default – or *most of them*, e.g. "3 of 5").
-  - **Stat lines** with a checkbox, **Min** and **Max**. Under each mod: where it comes from (Explicit, Implicit,
-    Augment = rune/soul core, Desecrated, Fractured …) and its tier (e.g. "P T7"; in PoE2 a higher tier is better).
-    Tick or untick (clicking the text works too), change values with the **mouse wheel** or click and type them
-    (empty = no limit). Default minimum = your item's own value (rounded down to one decimal place).
-    **Key mods and low value:** a rare's price depends on 2–3 mods, not on all of them, so for rare and magic items
-    only the **key mods** of the item type are ticked by default (e.g. movement speed on boots, skill levels and
-    Spirit on amulets, flat attack damage and rarity on rings) – together with the totals for life and resistances.
-    **Low value** mods (light radius, thorns, stun threshold, attribute requirements …) are faded and not searched.
-    "ⓘ key mods … not on this item" lists the key mods the item is missing (tooltip, click to expand). Both lists can
-    be edited under Settings → Mod value (`slot: text`, e.g. `boots: increased Movement Speed`; for attack weapons
-    also `melee`, `ranged`, `bow`, `crossbow`). If an item has none of them, all other mods are ticked as before.
-    The defaults are based on research from November 2026 (poe2db mod tables for patch 0.5.x, the 0.5.0 patch notes
-    and gear/selling guides); rules with thin evidence were left out, and shields/belts have no key mods on purpose.
-    **Tier maximum:** next to each tier you see the highest value that tier can roll (e.g. "P T3 max 149"); a perfect
-    roll shows a gold "max ✓". Hover for the full range and your roll in %. Summed mods show one value per source line.
-    "Reduced" mods (e.g. "50% reduced Projectile Range") are shown and edited as on the item; the search converts them.
-  - **Weapons below 20% quality:** the DPS rows offer **Q20** – the DPS at 20% quality, as minimum with one click.
-    **Elemental DPS** lets you pick the element (Any, Fire, Cold, Lightning – whatever the weapon has).
-  - Order: weapon DPS (total/physical/elemental, calculated from the item's properties) and the weapon's overall
-    **critical hit chance** (as displayed, including base value, local mods and quality – the local
-    "+#% to Critical Hit Chance" mod is hidden because it is already part of it), defences (armour, evasion,
-    energy shield as displayed; block and spirit optional), **totals** (resistances, life, mana, attributes combined
-    into pseudo stats – finds far more comparable items), then the item's mods.
-  - **Hidden:** mods that are already counted in a total, the DPS or the defences, and mods the trade search does not
-    know, are hidden by default. "Hidden (n)" shows them in place, marked "◌ in DPS" etc.
-  - **Collapse** folds the stat list away so only chips and results remain. Both settings are remembered.
-  - **Results bar:** number of matches, *Instant buyout* (on by default; off = also "in person" listings), **Search**
-    and **Trade ↗** (opens the same search in your browser). Nothing is searched until you click **Search** – not
-    even when the overlay opens, so you can check the stats first. The button lights up whenever there is something
-    new to search. The result is added to the history in the main window.
-  - **Summary:** the typical price (median of the 3 cheapest listings – the single cheapest alone is often a
-    mispriced item) and a **suggested selling price** slightly below it, with a button to copy it as a
-    stash note (e.g. `~b/o 58 exalted`; Exalted suggestions also show the Divine equivalent).
-  - **Warning** when the price is unreliable because there are fewer than 10 results. Old listings count like new
-    ones – they can still be bought, and the search already filters for the stats you want.
-  - **Listings table** with the 20 cheapest offers (price, item level, listed). **Hover a row** to see the offered
-    item's stats in a small window. It is laid out like the item view on the official trade site, so there is nothing
-    new to learn and you find things where you already look for them: base type (with the item's name below), item
-    level, corrupted, price and age, for weapons **total / physical / elemental DPS** with element icons, the other
-    properties line by line and all mods in game order (augments, implicit, prefixes and suffixes with their tier in a
-    column on the left); ✓ marks mods that match a stat you searched for. **Click a row** to open the trade site
-    with the same search narrowed to that seller, so the offer is on top.
-  - **Compared with your item:** a dot in front of each price shows whether the offer is better (green), mixed
-    (yellow), worse (red) or the same (grey) on the stats you ticked. The hover window says how many stats are higher
-    or lower and puts ▲/▼ with the difference next to each mod, DPS value and total (life, resistances,
-    attributes). It counts stats instead of adding them up into one score, because what 10 life are worth against
-    5% resistance depends on your build. Key mods count double; low-value and "reduced" mods are left out, and a
-    stat the offer lacks counts as lower. It compares with the item you scanned, not with your equipped gear (the
-    tool cannot see that). Listings are sorted by their value
-    according to poe.ninja (GGG sorts by its own rates).
-
-poe.ninja is fetched at most once per hour, the trade search's stat list once per day
-(`%APPDATA%\poe2-pricecheck\trade-stats.json`).
-
-### Trade search and rate limits
+## Trade search, rate limits and GGG rules
 
 Each rare price check sends **two to three** requests to pathofexile.com (one search + one or two fetches for the
-20 cheapest listings; fetches have their own, more generous limit).
-GGG currently allows about 5 searches per 10 s and 30 per 5 min; exceeding that gets you blocked for up to 30 min.
-The tool reads the limits from every response, keeps one request in reserve and shows "please wait X s" instead of
-retrying blindly. No login / POESESSID is used.
+20 cheapest listings). GGG currently allows about 5 searches per 10 s and 30 per 5 min; exceeding that gets you
+blocked for up to 30 min. The tool reads the limits from every response, keeps one request in reserve and shows
+"please wait X s" instead of retrying blindly. No login / POESESSID is used. Opening a listing on the trade site
+(click on a row) needs no extra request.
 
 The trade endpoints (`/api/trade2`) are **not** part of GGG's officially documented API. All common price-check tools
 use them; GGG may change them at any time.
 
-## Rules (GGG developer docs)
+Following GGG's developer docs:
 
 - One hotkey press = **one** action in the game (a single Ctrl+Alt+C = advanced copy including tiers); the clipboard
   is read once per press.
 - The copy keystroke is only sent when the "Path of Exile 2" window is in the foreground. If one of the tool's own
-  windows is in front (e.g. after clicking into the overlay), the game window is brought back to the front first –
-  a plain window switch, no input to the game. Otherwise only the current clipboard is checked (handy for testing).
+  windows is in front, the game window is brought back to the front first – a plain window switch, no input to the
+  game. Otherwise only the current clipboard is checked.
 - While the mouse is over the overlay, the overlay may take the focus so clicks reliably reach it; when the mouse
   leaves it or it is closed, the game gets the focus back.
 - No memory reading, no client modification, no automation.
 
-## Overlay
+## For developers
 
-- Stays open until you close it with **×** (or Esc); a new price check replaces its content.
-- Drag it by any empty spot to move it (a short click stays a click). The position is remembered and used for all
-  further price checks (Settings → "Reset position" = back next to the mouse cursor).
-- If the overlay content crashes, the window is recreated automatically so nothing invisible is left on top of the
-  game. Errors are written to `%APPDATA%\poe2-pricecheck\poe2-pricecheck.log`.
+```bash
+npm install
+npm start          # run from source
+npm test           # Vitest
+npm run typecheck  # tsc
+npm run dist       # build the exe files into release/
+```
 
-## Performance
+`npm run dist` creates the installer (`PoE2-Price-Check-Setup-<version>.exe`), the portable exe, and `latest.yml` +
+the `.blockmap` for the auto-updater. To publish, raise `version` in `package.json`, build, and attach all four files
+to a GitHub release tagged `v<version>`. Debug output of the results: set `POE2PC_DEBUG=1`.
 
-By default the tool renders **without GPU acceleration** so it doesn't take graphics performance away from the game.
-Animations on top of the game only run in coarse steps. Configurable under Settings → Performance (restart required).
+<details>
+<summary><b>Project layout</b></summary>
 
-## Appearance
+`src/shared/parser.ts` (item text), `src/shared/hotkey.ts` (hotkey capture and validation),
+`src/shared/mods.ts` + `src/shared/stats.ts` (mods → trade stats, search query), `src/shared/listing.ts` (listing
+details), `src/shared/compare.ts` (comparison with your item), `src/main/trade.ts` + `src/main/ratelimit.ts` (trade
+API), `src/main/rare.ts` (rare price check), `src/main/ninja.ts` (prices), `src/main/win32.ts` (copy keystroke and
+window focus), `src/main/updater.ts` (updates), `src/main/index.ts` (hotkey, windows, IPC), `src/renderer/` (main
+window `app.*`, overlay `overlay.*`).
 
-Under Settings you can set the **overlay size** (80–160%) and the **overlay background** opacity (40–100%). Lower
-background values let the game show through; text, buttons and input fields stay fully visible. Both changes apply
-immediately – check them with "Show test overlay".
+</details>
 
-## Configuration
+<details>
+<summary><b>Configuration file</b> (<code>%APPDATA%\poe2-pricecheck\config.json</code>)</summary>
 
-Hotkey, league and overlay settings are set in the UI. Everything is stored in
-`%APPDATA%\poe2-pricecheck\config.json`:
+Everything can be set in the UI; this is where it is stored.
 
 | Field | Default | Meaning |
 |---|---|---|
@@ -199,35 +246,7 @@ Hotkey, league and overlay settings are set in the UI. Everything is stored in
 | `overlayPosition` | `null` | remembered overlay position (`null` = at the mouse cursor) |
 | `gpuAcceleration` | `false` | GPU acceleration for the app windows |
 
-## Building the exe
-
-```bash
-npm run dist
-```
-
-Creates in `release/`:
-
-- `PoE2-Price-Check-Setup-<version>.exe` – installer with automatic updates
-- `PoE2-Price-Check-<version>.exe` – portable exe
-- `latest.yml` and `PoE2-Price-Check-Setup-<version>.exe.blockmap` – needed by the auto-updater
-
-To publish a version, raise `version` in `package.json`, build, and attach all four files to a GitHub release tagged
-`v<version>`. Installed copies pick it up automatically; portable copies show a notice.
-
-## Development
-
-```bash
-npm test           # Vitest (parser, price index, hotkeys, mod mapping, rate limits)
-npm run typecheck  # tsc
-```
-
-Layout: `src/shared/parser.ts` (item text), `src/shared/hotkey.ts` (hotkey capture and validation),
-`src/shared/mods.ts` + `src/shared/stats.ts` (mods → trade stats, search query), `src/main/trade.ts` +
-`src/main/ratelimit.ts` (trade API), `src/main/rare.ts` (rare price check), `src/main/ninja.ts` (prices),
-`src/main/win32.ts` (copy keystroke and window focus), `src/main/updater.ts` (updates), `src/main/index.ts` (hotkey, windows, IPC),
-`src/renderer/` (main window `app.*`, overlay `overlay.*`).
-
-Debug output of the results: set the environment variable `POE2PC_DEBUG=1`.
+</details>
 
 ## License and legal
 
@@ -236,4 +255,4 @@ Code licensed under the [MIT License](LICENSE).
 Path of Exile is a trademark of Grinding Gear Games. This project is an unofficial fan tool; it is not affiliated with,
 endorsed by or reviewed by GGG. Game content (item texts, stat descriptions) belongs to GGG; price data comes from
 [poe.ninja](https://poe.ninja). Requests to pathofexile.com and poe.ninja carry a User-Agent with the project URL so
-the operators can identify the sender.
+the operators can identify the sender. The screenshots show the real overlay with made-up sample data.

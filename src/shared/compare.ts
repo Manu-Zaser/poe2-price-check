@@ -88,8 +88,8 @@ export function compareListing(own: TradeMod[], d: ListingDetails): Comparison |
 
 /** Kurzer Text fürs Fenster, z. B. "Better · 4 of 5 stats higher". */
 export function verdictText(c: Comparison): string {
-  const label = { better: 'Better', worse: 'Worse', mixed: 'Mixed', same: 'Same' }[c.verdict];
-  if (c.verdict === 'same') return `${label} · all ${c.total} stats equal`;
+  if (c.verdict === 'same') return `Same as yours · all ${c.total} stats equal`;
+  const label = { better: 'Better than yours', worse: 'Worse than yours', mixed: 'Mixed vs. yours' }[c.verdict];
   const parts = [c.higher ? `${c.higher} higher` : '', c.lower ? `${c.lower} lower` : ''].filter(Boolean).join(', ');
-  return `${label} than yours · ${parts} (of ${c.total})`;
+  return `${label} · ${parts} (of ${c.total})`;
 }

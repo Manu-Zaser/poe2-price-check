@@ -518,14 +518,16 @@ $('danger-reset').addEventListener('click', () => {
 
 // ---------- Updates ----------
 
-function updateTexts(u: UpdateState): { title: string; text: string; action: 'install' | 'download' | null } | null {
+function updateTexts(u: UpdateState): { title: string; text: string; action: 'install' | 'download' | 'fetch' | null } | null {
   switch (u.status) {
     case 'ready':
       return { title: `Update ${u.version} ready`, text: 'Installs when you quit the tool – or restart now.', action: 'install' };
     case 'downloading':
       return { title: `Downloading ${u.version}`, text: `${u.percent ?? 0} %`, action: null };
     case 'available':
-      return { title: `Version ${u.version} available`, text: 'Download the new version from GitHub.', action: 'download' };
+      return u.selfUpdating
+        ? { title: `Version ${u.version} available`, text: 'Download it now – it installs when you quit the tool.', action: 'fetch' }
+        : { title: `Version ${u.version} available`, text: 'Download the new version from GitHub.', action: 'download' };
     default:
       return null;
   }
@@ -540,7 +542,7 @@ function renderUpdate(s: AppState) {
     $('update-text').textContent = info.text;
     const action = $('update-action') as HTMLButtonElement;
     action.hidden = !info.action;
-    action.textContent = info.action === 'install' ? 'Restart now' : 'Download';
+    action.textContent = info.action === 'install' ? 'Restart now' : info.action === 'fetch' ? 'Download' : 'Open download page';
     action.dataset.action = info.action ?? '';
     $('update-progress').hidden = u.status !== 'downloading';
     ($('update-progress').firstElementChild as HTMLElement).style.width = `${u.percent ?? 0}%`;
@@ -548,7 +550,7 @@ function renderUpdate(s: AppState) {
 
   $('version-out').textContent = u.current;
   const kind = u.selfUpdating
-    ? 'Updates are downloaded automatically and installed when you quit the tool.'
+    ? 'Checks for updates at start. A new version is downloaded after you confirm and installs when you quit the tool.'
     : 'Portable version – new versions are announced here; download them from GitHub.';
   const when = u.checkedAt ? ` Last checked ${timeAgo(u.checkedAt)}.` : '';
   let text = kind;
@@ -558,13 +560,65 @@ function renderUpdate(s: AppState) {
   else if (info) text = `${info.title}.`;
   $('update-help').textContent = text;
   ($('update-check') as HTMLButtonElement).disabled = u.status === 'checking' || u.status === 'downloading';
+  maybeAskUpdate(u);
 }
 
-$('update-check').addEventListener('click', () => api.checkUpdates());
-$('update-action').addEventListener('click', (e) => {
-  const action = (e.currentTarget as HTMLElement).dataset.action;
+// Rückfrage, sobald eine neue Version gefunden wird (beim Start, alle 6 h oder per "Check now").
+// "Later" merkt sich die Version – gefragt wird dann erst wieder bei "Check now" oder einer neueren.
+let updateDismissed: string | null = null;
+let manualCheck = false;
+let modalFor: string | null = null;
+
+function maybeAskUpdate(u: UpdateState) {
+  if (u.status !== 'available' || !u.version) {
+    if (u.status !== 'checking') manualCheck = false;
+    closeUpdateModal();
+    return;
+  }
+  if (modalFor === u.version || (updateDismissed === u.version && !manualCheck)) return;
+  manualCheck = false;
+  modalFor = u.version;
+  $('update-modal-title').textContent = `Update ${u.version} available`;
+  $('update-modal-text').textContent = u.selfUpdating
+    ? `You have ${u.current}. Download the new version now? It installs when you quit the tool – or right away with "Restart now".`
+    : `You have ${u.current}. This is the portable version – open the download page for the new version?`;
+  $('update-confirm').textContent = u.selfUpdating ? 'Download' : 'Open download page';
+  $('update-modal').hidden = false;
+  $('update-confirm').focus();
+}
+
+function closeUpdateModal() {
+  $('update-modal').hidden = true;
+  modalFor = null;
+}
+
+function runUpdateAction(action: string | undefined) {
   if (action === 'install') api.installUpdate();
+  else if (action === 'fetch') api.downloadUpdate();
   else if (action === 'download') api.openReleasePage();
+}
+
+$('update-check').addEventListener('click', () => {
+  manualCheck = true;
+  updateDismissed = null;
+  // Schon gefunden: gleich wieder fragen, statt erneut nachzusehen.
+  if (current?.update.status === 'available') maybeAskUpdate(current.update);
+  else api.checkUpdates();
+});
+$('update-action').addEventListener('click', (e) => runUpdateAction((e.currentTarget as HTMLElement).dataset.action));
+$('update-confirm').addEventListener('click', () => {
+  const version = modalFor;
+  runUpdateAction(current?.update.selfUpdating ? 'fetch' : 'download');
+  closeUpdateModal();
+  updateDismissed = version;
+});
+$('update-later').addEventListener('click', () => {
+  const version = modalFor;
+  closeUpdateModal();
+  updateDismissed = version;
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !$('update-modal').hidden) $('update-later').click();
 });
 
 // ---------- Fenster-Buttons ----------
