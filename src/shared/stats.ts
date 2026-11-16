@@ -2,7 +2,7 @@
  * Zuordnung von Mod-Zeilen zu Stat-IDs der Trade-Suche (/api/trade2/data/stats)
  * und Aufbau der Suchanfrage.
  */
-import { extractModLines, toTemplate, type ModKind, type ModLine } from './mods';
+import { extractModLines, toTemplate, type ModKind, type ModLine } from '@poe2/core/item';
 import { buildExtraMods } from './extras';
 import type { ParsedItem, TradeMod } from './types';
 

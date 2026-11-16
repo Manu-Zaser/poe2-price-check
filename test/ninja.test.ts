@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildPriceIndex, lookupPrice, type FetchJson } from '../src/main/ninja';
-import { parseItemText } from '../src/shared/parser';
+import { parseItemText } from '@poe2/core/item';
 
 const fakeFetch: FetchJson = async (url) => {
   const type = new URL(url).searchParams.get('type');

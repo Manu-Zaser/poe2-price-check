@@ -19,6 +19,7 @@
     "dist": "node build.mjs && electron-builder --win --x64 --publish never"
   },
   "devDependencies": {
+    "@poe2/core": "file:../core",
     "@types/node": "^26.6.6",
     "electron": "^45.3.1",
     "electron-builder": "^26.18.0",

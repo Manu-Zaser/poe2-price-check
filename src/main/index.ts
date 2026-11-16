@@ -1,8 +1,10 @@
 import { app, BrowserWindow, clipboard, globalShortcut, ipcMain, Menu, nativeImage, screen, shell, Tray } from 'electron';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { validateHotkey } from '../shared/hotkey';
-import { parseItemText } from '../shared/parser';
+import { readItemText as readGameItemText } from '@poe2/core/clipboard';
+import { validateHotkey } from '@poe2/core/hotkey';
+import { parseItemText } from '@poe2/core/item';
+import { focusWindowByTitle, foregroundWindowHandle, foregroundWindowTitle } from '@poe2/core/win32';
 import { cleanDangerList, DEFAULT_DANGER_MODS, isMapItem, markDangerous, wikiUrl } from '../shared/maps';
 import { applyWeights, cleanWeightList, DEFAULT_KEY_MODS, DEFAULT_LOW_MODS, LEGACY_DEFAULTS, upgradeDefaults } from '../shared/weights';
 import { buildSearchQuery, isNamedUnique, tradeSearchUrl, type StatIndex } from '../shared/stats';
@@ -13,7 +15,6 @@ import { buildPriceIndex, CACHE_TTL_MS, fetchLeagues, lookupPrice, makeFetchJson
 import { applySelection, idleRareResult, loadStatIndex, newRareRequest, runRareSearch, type RareRequest } from './rare';
 import { TradeClient } from './trade';
 import { checkForUpdates, downloadUpdate, initUpdates, installUpdate, openReleasePage, updateState } from './updater';
-import { focusWindowByTitle, foregroundWindowHandle, foregroundWindowTitle, sendCopy } from './win32';
 
 // Fester Datenordner (%APPDATA%\poe2-pricecheck), egal ob per `npm start` oder als gebaute .exe
 // mit anderem Produktnamen gestartet – so bleiben Einstellungen und Overlay-Position erhalten.
@@ -370,8 +371,6 @@ async function saveSettings(patch: Partial<Settings>): Promise<SaveResult> {
 
 // ---------- Zwischenablage ----------
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
 /**
  * Ist PoE2 im Vordergrund, wird EINMAL Strg+C gesendet und auf den neuen Inhalt gewartet.
  * Sonst (z. B. zum Testen) wird nur die aktuelle Zwischenablage gelesen.
@@ -384,37 +383,13 @@ function ownWindowInFront(): boolean {
   return [overlayWin, mainWin].some((w) => alive(w) && w.getNativeWindowHandle().readBigUInt64LE(0) === fg);
 }
 
-async function readItemText(): Promise<string> {
-  let inGame = foregroundWindowTitle() === config.gameWindowTitle;
-  // Hat gerade unser Overlay (oder das Hauptfenster) den Fokus – z. B. nach einem Klick ins Overlay –
-  // oder ist gar kein Fenster vorne, erst das Spiel nach vorne holen. Sonst würde nur die alte
-  // Zwischenablage gelesen.
-  const noForeground = foregroundWindowHandle() === 0n;
-  if (!inGame && (noForeground || ownWindowInFront()) && focusWindowByTitle(config.gameWindowTitle)) {
-    for (let waited = 0; waited < 300 && !inGame; waited += 20) {
-      await sleep(20);
-      inGame = foregroundWindowTitle() === config.gameWindowTitle;
-    }
-    log('info', `Hotkey while ${noForeground ? 'no window' : 'our window'} was in front – game brought back${inGame ? '' : ' (failed)'}`);
-  }
-  if (!inGame) {
-    // Spiel nicht vorne: nur die aktuelle Zwischenablage prüfen (praktisch zum Testen).
-    log('info', `Hotkey without the game in front ("${foregroundWindowTitle()}") – reading the current clipboard`);
-    return clipboard.readText();
-  }
-
-  const previous = await clipboard.readText();
-  await clipboard.writeText('');
-  sendCopy();
-
-  let text = '';
-  // Engmaschig abfragen: PoE2 legt den Text meist nach wenigen Millisekunden ab.
-  for (let waited = 0; waited < 500 && !text; waited += 10) {
-    await sleep(10);
-    text = await clipboard.readText();
-  }
-  void clipboard.writeText(previous); // Wiederherstellen muss den Preischeck nicht aufhalten
-  return text;
+/** Ein Strg+Alt+C pro Tastendruck, Zwischenablage danach wiederhergestellt – Logik aus @poe2/core. */
+function readItemText(): Promise<string> {
+  return readGameItemText({
+    gameTitle: config.gameWindowTitle,
+    isOwnWindowInFront: ownWindowInFront,
+    log: (message) => log('info', message),
+  });
 }
 
 // ---------- Hauptfenster ----------

@@ -5,7 +5,7 @@ import { mapLimit, type PriceIndex } from '../src/main/ninja';
 import { applySelection, idleRareResult, newRareRequest, runRareSearch } from '../src/main/rare';
 import { parseMin } from '../src/renderer/format';
 import type { TradeClient } from '../src/main/trade';
-import { parseItemText } from '../src/shared/parser';
+import { parseItemText } from '@poe2/core/item';
 import { StatIndex, type StatsData } from '../src/shared/stats';
 
 describe('mapLimit', () => {

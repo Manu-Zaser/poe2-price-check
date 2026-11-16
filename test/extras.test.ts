@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { defenceStats, marketPrice, priceWarnings, pseudoContributions, q20Dps, suggestPrice, weaponStats } from '../src/shared/extras';
-import { parseItemText } from '../src/shared/parser';
+import { parseItemText } from '@poe2/core/item';
 import { buildSearchQuery, buildTradeMods, StatIndex, type StatsData } from '../src/shared/stats';
 import type { Listing } from '../src/shared/types';
 

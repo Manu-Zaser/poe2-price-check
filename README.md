@@ -227,6 +227,16 @@ Following GGG's developer docs:
 
 ## For developers
 
+The item parser, hotkey handling, the one-keystroke item copy, the Win32 helpers and logging live in the shared
+[`@poe2/core`](https://github.com/Manu-Zaser/poe2-core) package. Clone it **next to** this repository – the tool
+references it as `../core`:
+
+```bash
+git clone https://github.com/Manu-Zaser/poe2-core.git core
+git clone https://github.com/Manu-Zaser/poe2-price-check.git price-check
+cd price-check
+```
+
 ```bash
 npm install
 npm start          # run from source
@@ -242,12 +252,13 @@ to a GitHub release tagged `v<version>`. Debug output of the results: set `POE2P
 <details>
 <summary><b>Project layout</b></summary>
 
-`src/shared/parser.ts` (item text), `src/shared/hotkey.ts` (hotkey capture and validation),
-`src/shared/mods.ts` + `src/shared/stats.ts` (mods → trade stats, search query), `src/shared/listing.ts` (listing
+From `@poe2/core`: item text parsing and mod lines (`item`), hotkey capture and validation (`hotkey`), the copy
+keystroke and window focus (`win32`, `clipboard`), the log file (`log`).
+
+In this repository: `src/shared/stats.ts` (mods → trade stats, search query), `src/shared/listing.ts` (listing
 details), `src/shared/compare.ts` (comparison with your item), `src/shared/market.ts` (market page), `src/main/trade.ts` + `src/main/ratelimit.ts` (trade
-API), `src/main/rare.ts` (rare price check), `src/main/ninja.ts` (prices), `src/main/win32.ts` (copy keystroke and
-window focus), `src/main/updater.ts` (updates), `src/main/index.ts` (hotkey, windows, IPC), `src/renderer/` (main
-window `app.*`, overlay `overlay.*`).
+API), `src/main/rare.ts` (rare price check), `src/main/ninja.ts` (prices), `src/main/updater.ts` (updates),
+`src/main/index.ts` (hotkey, windows, IPC), `src/renderer/` (main window `app.*`, overlay `overlay.*`).
 
 </details>
 

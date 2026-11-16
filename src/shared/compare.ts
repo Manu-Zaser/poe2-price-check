@@ -5,7 +5,7 @@
  */
 import { pseudoContributions, PSEUDO } from './extras';
 import type { ListingDetails } from './listing';
-import { toTemplate } from './mods';
+import { toTemplate } from '@poe2/core/item';
 import type { TradeMod } from './types';
 
 /** Trade-Filter für Waffen-DPS, die sich mit den DPS des Angebots vergleichen lassen. */

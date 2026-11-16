@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { parseModLine, rollOf } from '../src/shared/mods';
-import { parseItemText } from '../src/shared/parser';
+import { parseModLine, rollOf } from '@poe2/core/item';
+import { parseItemText } from '@poe2/core/item';
 import { buildSearchQuery, buildTradeMods, defaultMatchCount, defaultMin, isNamedUnique, normalDefaults, StatIndex, statRange, uniqueDefaults, type StatsData } from '../src/shared/stats';
 
 // Echte Items aus dem Spiel; die Stat-Liste ist ein gekürzter Auszug aus /api/trade2/data/stats.

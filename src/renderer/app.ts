@@ -1,4 +1,4 @@
-import { acceleratorFromEvent, formatHotkey, validateHotkey } from '../shared/hotkey';
+import { acceleratorFromEvent, formatHotkey, validateHotkey } from '@poe2/core/hotkey';
 import { DEFAULT_DANGER_MODS } from '../shared/maps';
 import { DEFAULT_KEY_MODS, DEFAULT_LOW_MODS } from '../shared/weights';
 import { filterMarket, isThin, itemSignal, MARKET_MIN_LISTINGS, MARKET_TABS, SIGNAL_INFO, SIGNAL_MIN_EXALTED, topMovers, type MarketData, type MarketItem, type MarketSort, type MarketTab, type TrendSignal } from '../shared/market';

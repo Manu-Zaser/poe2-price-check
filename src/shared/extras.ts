@@ -2,7 +2,7 @@
  * Zusätzliche Suchkriterien für Rares: Pseudo-Summen (z. B. Resistenzen gesamt),
  * Waffen-DPS, Item-Level und Rune-Sockel – plus ein Verkaufspreis-Vorschlag.
  */
-import type { ModLine } from './mods';
+import type { ModLine } from '@poe2/core/item';
 import type { Listing, ParsedItem, TradeMod } from './types';
 
 // ---------- Pseudo-Summen ----------

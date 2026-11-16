@@ -1,30 +1,15 @@
 /**
- * Einfaches Fehlerprotokoll in %APPDATA%\poe2-pricecheck\poe2-pricecheck.log.
- * Hilft, Abstürze nachzuvollziehen, die im Spiel nicht sichtbar sind.
+ * Fehlerprotokoll in %APPDATA%\poe2-pricecheck\poe2-pricecheck.log (über @poe2/core).
+ * Hilft, Abstürze nachzuvollziehen, die im Spiel nicht sichtbar sind. Konsole nur mit POE2PC_DEBUG.
  */
-import { app } from 'electron';
-import { appendFileSync, renameSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { createLogger, type LogLevel } from '@poe2/core/log';
 
-const MAX_BYTES = 512 * 1024;
+const logger = createLogger({ fileName: 'poe2-pricecheck.log', console: () => !!process.env.POE2PC_DEBUG });
 
 export function logFile(): string {
-  return join(app.getPath('userData'), 'poe2-pricecheck.log');
+  return logger.file;
 }
 
-export function log(level: 'info' | 'warn' | 'error', message: string, err?: unknown): void {
-  const detail = err instanceof Error ? `${err.message}\n${err.stack ?? ''}` : err !== undefined ? String(err) : '';
-  const line = `${new Date().toISOString()} [${level}] ${message}${detail ? ` – ${detail}` : ''}\n`;
-  try {
-    const file = logFile();
-    try {
-      if (statSync(file).size > MAX_BYTES) renameSync(file, `${file}.old`);
-    } catch {
-      // Datei existiert noch nicht
-    }
-    appendFileSync(file, line);
-  } catch {
-    // Protokollieren darf nie selbst einen Absturz auslösen.
-  }
-  if (process.env.POE2PC_DEBUG) console.log(line.trimEnd());
+export function log(level: LogLevel, message: string, err?: unknown): void {
+  logger.log(level, message, err);
 }
