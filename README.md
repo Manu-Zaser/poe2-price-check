@@ -246,8 +246,17 @@ npm run dist       # build the exe files into release/
 ```
 
 `npm run dist` creates the installer (`PoE2-Price-Check-Setup-<version>.exe`), the portable exe, and `latest.yml` +
-the `.blockmap` for the auto-updater. To publish, raise `version` in `package.json`, build, and attach all four files
-to a GitHub release tagged `v<version>`. Debug output of the results: set `POE2PC_DEBUG=1`.
+the `.blockmap` for the auto-updater. Debug output of the results: set `POE2PC_DEBUG=1`.
+
+**GitHub Actions** (`.github/workflows/`):
+
+- **CI** – every push to `main` and every pull request: type check, tests and build (with the core checked out next
+  to it). *Run workflow* on the Actions page can also build the exe files and attach them to the run for testing.
+- **Release** – publishing a new version:
+  1. Raise `version` in `package.json` and commit.
+  2. Tag and push: `git tag v<version>` and `git push origin v<version>` (the tag must match `version`).
+  3. The workflow builds all four files and creates a **draft** release with the download table and SHA-256 sums.
+  4. Write the *What's new* section in the draft and publish it – only then does the auto-update offer it.
 
 <details>
 <summary><b>Project layout</b></summary>

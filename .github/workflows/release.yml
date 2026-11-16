@@ -1,0 +1,109 @@
+name: Release
+
+# Push a tag "v<version>" (matching "version" in package.json) to build the installer, the portable exe,
+# latest.yml and the .blockmap, and to create a DRAFT GitHub release with them.
+# Nothing reaches users until the draft is published by hand on GitHub – then the auto-update picks it up.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: price-check
+
+      - uses: actions/checkout@v4
+        with:
+          repository: Manu-Zaser/poe2-core
+          path: core
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            price-check/package-lock.json
+            core/package-lock.json
+
+      - name: Tag must match package.json version
+        working-directory: price-check
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"
+            exit 1
+          fi
+
+      - name: Install core
+        working-directory: core
+        run: npm ci
+
+      - name: Install
+        working-directory: price-check
+        run: npm ci
+
+      - name: Type check
+        working-directory: price-check
+        run: npm run typecheck
+
+      - name: Tests
+        working-directory: price-check
+        run: npm test
+
+      - name: Build exe files
+        working-directory: price-check
+        run: npm run dist
+
+      - name: Create draft release
+        working-directory: price-check
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          setup="release/PoE2-Price-Check-Setup-$v.exe"
+          portable="release/PoE2-Price-Check-$v.exe"
+          for f in "$setup" "$setup.blockmap" "$portable" release/latest.yml; do
+            [ -f "$f" ] || { echo "::error::Missing $f"; exit 1; }
+          done
+          sha_setup=$(sha256sum "$setup" | cut -d' ' -f1)
+          sha_portable=$(sha256sum "$portable" | cut -d' ' -f1)
+          cat > notes.md <<EOF
+          ## Downloads
+
+          | File | |
+          |---|---|
+          | **PoE2-Price-Check-Setup-$v.exe** (recommended) | Installs for your Windows user (no admin rights) and updates itself. |
+          | PoE2-Price-Check-$v.exe | Portable, no installation. Shows a notice when a new version is available. |
+
+          Already installed? The tool asks whether to download $v – it then installs when you quit the tool, or right away with "Restart now".
+
+          ## What's new
+          <!-- TODO before publishing: describe the changes for players; the commit list GitHub adds at the end is for reference (remove it if you like). -->
+
+          ## Notes
+          - The exe files are not signed: Windows shows "Windows protected your PC" → "More info" → "Run anyway".
+          - Play PoE2 in windowed / windowed fullscreen mode.
+          - Unofficial fan tool, not affiliated with or endorsed by Grinding Gear Games.
+
+          SHA-256
+          - Setup: \`$sha_setup\`
+          - Portable: \`$sha_portable\`
+
+          EOF
+          gh release create "$GITHUB_REF_NAME" --draft --title "PoE2 Price Check $v" \
+            --notes-file notes.md --generate-notes \
+            "$setup" "$setup.blockmap" "$portable" release/latest.yml

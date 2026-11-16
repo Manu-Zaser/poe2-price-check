@@ -1,0 +1,83 @@
+name: CI
+
+# Every push to main and every pull request: type check, tests and build.
+# "Run workflow" (manual start) can additionally build the exe files and attach them to the run
+# for testing – nothing is published, the auto-update is not affected.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      build_exe:
+        description: Build the exe files and attach them to this run
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      # The tool references the shared core as ../core – check out both side by side.
+      - uses: actions/checkout@v4
+        with:
+          path: price-check
+
+      - uses: actions/checkout@v4
+        with:
+          repository: Manu-Zaser/poe2-core
+          path: core
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            price-check/package-lock.json
+            core/package-lock.json
+
+      - name: Install core
+        working-directory: core
+        run: npm ci
+
+      - name: Install
+        working-directory: price-check
+        run: npm ci
+
+      - name: Type check
+        working-directory: price-check
+        run: npm run typecheck
+
+      - name: Tests
+        working-directory: price-check
+        run: npm test
+
+      - name: Build
+        working-directory: price-check
+        run: npm run build
+
+      - name: Build exe files
+        if: github.event_name == 'workflow_dispatch' && inputs.build_exe
+        working-directory: price-check
+        run: npx electron-builder --win --x64 --publish never
+
+      - name: Attach exe files to this run
+        if: github.event_name == 'workflow_dispatch' && inputs.build_exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: price-check-exe-${{ github.sha }}
+          path: |
+            price-check/release/*.exe
+            price-check/release/*.blockmap
+            price-check/release/latest.yml
+          retention-days: 30
+          if-no-files-found: error
