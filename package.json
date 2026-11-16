@@ -21,7 +21,7 @@
   "devDependencies": {
     "@poe2/core": "file:../core",
     "@types/node": "^26.6.6",
-    "electron": "^45.3.1",
+    "electron": "^45.3.3",
     "electron-builder": "^26.18.0",
     "esbuild": "^0.28.2",
     "typescript": "^7.0.2",
@@ -32,10 +32,10 @@
     "koffi": "^3.3.8"
   },
   "allowScripts": {
-    "electron@45.3.1": true,
     "esbuild@0.28.2": true,
     "koffi@3.3.8": true,
-    "electron-winstaller": false
+    "electron-winstaller": false,
+    "electron": true
   },
   "productName": "PoE2 Price Check",
   "author": "Manu-Zaser",
