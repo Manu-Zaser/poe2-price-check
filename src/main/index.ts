@@ -13,7 +13,7 @@ import type { AppState, AppStatus, HistoryEntry, HotkeySetting, ParsedItem, Pric
 import { log, logFile } from './log';
 import { buildPriceIndex, CACHE_TTL_MS, fetchLeagues, lookupPrice, makeFetchJson, type PriceIndex } from './ninja';
 import { applySelection, idleRareResult, loadStatIndex, newRareRequest, runRareSearch, type RareRequest } from './rare';
-import { TradeClient } from './trade';
+import { TradeClient } from '@poe2/core/trade';
 import { checkForUpdates, downloadUpdate, initUpdates, installUpdate, openReleasePage, updateState } from './updater';
 
 // Fester Datenordner (%APPDATA%\poe2-pricecheck), egal ob per `npm start` oder als gebaute .exe

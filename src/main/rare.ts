@@ -5,8 +5,8 @@ import { marketPrice, priceWarnings, suggestPrice } from '../shared/extras';
 import { listingDetails } from '../shared/listing';
 import type { Listing, ParsedItem, PriceMatch, PriceResult, TradeMod, TradeSearch, TradeSelection } from '../shared/types';
 import type { PriceIndex } from './ninja';
-import { RateLimitError } from './ratelimit';
-import type { FetchedListing, TradeClient } from './trade';
+import { RateLimitError } from '@poe2/core/trade';
+import type { FetchedListing, TradeClient } from '@poe2/core/trade';
 
 const STATS_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 

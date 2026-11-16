@@ -262,11 +262,11 @@ the `.blockmap` for the auto-updater. Debug output of the results: set `POE2PC_D
 <summary><b>Project layout</b></summary>
 
 From `@poe2/core`: item text parsing and mod lines (`item`), hotkey capture and validation (`hotkey`), the copy
-keystroke and window focus (`win32`, `clipboard`), the log file (`log`).
+keystroke and window focus (`win32`, `clipboard`), the log file (`log`), the trade API client with its rate limiter
+(`trade`).
 
 In this repository: `src/shared/stats.ts` (mods → trade stats, search query), `src/shared/listing.ts` (listing
-details), `src/shared/compare.ts` (comparison with your item), `src/shared/market.ts` (market page), `src/main/trade.ts` + `src/main/ratelimit.ts` (trade
-API), `src/main/rare.ts` (rare price check), `src/main/ninja.ts` (prices), `src/main/updater.ts` (updates),
+details), `src/shared/compare.ts` (comparison with your item), `src/shared/market.ts` (market page), `src/main/rare.ts` (rare price check), `src/main/ninja.ts` (prices), `src/main/updater.ts` (updates),
 `src/main/index.ts` (hotkey, windows, IPC), `src/renderer/` (main window `app.*`, overlay `overlay.*`).
 
 </details>
