@@ -5,9 +5,9 @@ import { readItemText as readGameItemText } from '@poe2/core/clipboard';
 import { validateHotkey } from '@poe2/core/hotkey';
 import { parseItemText } from '@poe2/core/item';
 import { focusWindowByTitle, foregroundWindowHandle, foregroundWindowTitle } from '@poe2/core/win32';
-import { cleanDangerList, DEFAULT_DANGER_MODS, isMapItem, markDangerous, wikiUrl } from '../shared/maps';
+import { cleanDangerList, CRAFT_OF_EXILE_URL, DEFAULT_DANGER_MODS, isCraftable, isMapItem, markDangerous, poe2dbUrl, wikiUrl } from '../shared/maps';
 import { applyWeights, cleanWeightList, DEFAULT_KEY_MODS, DEFAULT_LOW_MODS, LEGACY_DEFAULTS, upgradeDefaults } from '../shared/weights';
-import { buildSearchQuery, isNamedUnique, tradeSearchUrl, type StatIndex } from '../shared/stats';
+import { buildSearchQuery, cleanSavedSearches, isNamedUnique, tradeSearchUrl, type StatIndex } from '../shared/stats';
 import { cleanWatchlist, type MarketData } from '../shared/market';
 import type { AppState, AppStatus, HistoryEntry, HotkeySetting, ParsedItem, PriceResult, SaveResult, Settings, TradeSelection } from '../shared/types';
 import { log, logFile } from './log';
@@ -73,6 +73,7 @@ const DEFAULT_CONFIG: Config = {
   keyMods: DEFAULT_KEY_MODS,
   lowMods: DEFAULT_LOW_MODS,
   watchlist: [],
+  savedSearches: [],
   trayHintShown: false,
 };
 
@@ -94,6 +95,7 @@ function loadConfig(): Config {
   loaded.keyMods = Array.isArray(loaded.keyMods) ? cleanWeightList(loaded.keyMods.map(String)) : [...DEFAULT_KEY_MODS];
   loaded.lowMods = Array.isArray(loaded.lowMods) ? cleanWeightList(loaded.lowMods.map(String)) : [...DEFAULT_LOW_MODS];
   loaded.watchlist = cleanWatchlist(loaded.watchlist);
+  loaded.savedSearches = cleanSavedSearches(loaded.savedSearches);
   // Unveränderte frühere Vorgaben auf die aktuellen Listen heben (eigene Anpassungen bleiben).
   loaded.keyMods = upgradeDefaults(loaded.keyMods, LEGACY_DEFAULTS.key, DEFAULT_KEY_MODS);
   loaded.lowMods = upgradeDefaults(loaded.lowMods, LEGACY_DEFAULTS.low, DEFAULT_LOW_MODS);
@@ -190,12 +192,12 @@ function currencyRates(): AppStatus['currencyRates'] {
 }
 
 function state(): AppState {
-  const { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity, hotkeyTrade, hotkeyWiki, closeToTray, startWithWindows, dangerMods, keyMods, lowMods, watchlist } = config;
+  const { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity, hotkeyTrade, hotkeyWiki, closeToTray, startWithWindows, dangerMods, keyMods, lowMods, watchlist, savedSearches } = config;
   return {
     status: status(),
     update: updateState(),
     leagueAuto: !league,
-    settings: { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity, hotkeyTrade, hotkeyWiki, closeToTray, startWithWindows, dangerMods, keyMods, lowMods, watchlist },
+    settings: { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity, hotkeyTrade, hotkeyWiki, closeToTray, startWithWindows, dangerMods, keyMods, lowMods, watchlist, savedSearches },
     overlayPositionSaved: config.overlayPosition !== null,
     logFile: logFile(),
     leagues,
@@ -345,6 +347,7 @@ async function saveSettings(patch: Partial<Settings>): Promise<SaveResult> {
   if (Array.isArray(patch.keyMods)) config.keyMods = cleanWeightList(patch.keyMods.map(String));
   if (Array.isArray(patch.lowMods)) config.lowMods = cleanWeightList(patch.lowMods.map(String));
   if (patch.watchlist !== undefined) config.watchlist = cleanWatchlist(patch.watchlist);
+  if (patch.savedSearches !== undefined) config.savedSearches = cleanSavedSearches(patch.savedSearches);
 
   if (patch.gpuAcceleration !== undefined) config.gpuAcceleration = patch.gpuAcceleration; // wirkt nach Neustart
 
@@ -806,6 +809,9 @@ function updateHistory(result: PriceResult) {
   pushState();
 }
 
+/** Das zuletzt per Hotkey geprüfte Item mit seinem Kopiertext (für "Craft of Exile"). */
+let lastCheck: { item: ParsedItem; text: string } | null = null;
+
 async function priceCheck() {
   if (busy) return; // ein Tastendruck = ein Durchlauf
   busy = true;
@@ -816,6 +822,7 @@ async function priceCheck() {
       showOverlay({ kind: 'error', message: 'No item in the clipboard. Hover over an item and press the hotkey again.' });
       return;
     }
+    lastCheck = { item, text };
     // Rares, Magic-Items und identifizierte Uniques laufen über die Trade-Suche (Mod-Liste im Overlay).
     const isRareLike = item.rarity === 'Rare' || item.rarity === 'Magic' || isNamedUnique(item);
     // Weiße Items: was poe.ninja kennt (z. B. Währung mit "Rarity: Normal"), bleibt dort,
@@ -1017,6 +1024,35 @@ app.whenReady().then(() => {
     // Nur kurze Preis-Notizen zulassen, nichts Beliebiges aus dem Renderer.
     if (typeof text === 'string' && /^~(b\/o|price) [\d.]+ [a-z]+$/.test(text)) void clipboard.writeText(text);
   }));
+  // Links zum Item (Wiki, PoE2DB, Craft of Exile). Die Adresse baut der Main-Prozess selbst – der Renderer
+  // schickt nur Name/Basis; für Craft of Exile wird der Kopiertext des zuletzt geprüften Items in die
+  // Zwischenablage gelegt (nur wenn es dasselbe Item ist), dort per "Import" einfügen.
+  ipcMain.handle('item:link', (_e, kind: unknown, raw: unknown): { ok: boolean; copied?: boolean } => {
+    const r = (raw ?? {}) as Record<string, unknown>;
+    const str = (v: unknown) => (typeof v === 'string' && v.length > 0 && v.length <= 200 ? v : undefined);
+    const baseType = str(r.baseType);
+    const rarity = str(r.rarity);
+    if (!baseType || !rarity) return { ok: false };
+    const item = { rarity, baseType, name: str(r.name), unidentified: r.unidentified === true } as Pick<ParsedItem, 'rarity' | 'name' | 'baseType' | 'unidentified'>;
+    if (kind === 'wiki') void shell.openExternal(wikiUrl(item));
+    else if (kind === 'poe2db') void shell.openExternal(poe2dbUrl(item));
+    else if (kind === 'coe') {
+      const same = lastCheck && lastCheck.item.baseType === baseType && lastCheck.item.name === item.name;
+      if (same) clipboard.writeText(lastCheck!.text);
+      void shell.openExternal(CRAFT_OF_EXILE_URL);
+      return { ok: true, copied: !!same };
+    } else return { ok: false };
+    return { ok: true };
+  });
+  // Suche aus dem Overlay merken (erscheint auf der Startseite). Nur Trade-Links, Name kurz.
+  ipcMain.handle('search:save', (_e, name: unknown, url: unknown): { ok: boolean; error?: string } => {
+    const next = cleanSavedSearches([{ name, url, at: new Date().toISOString() }, ...config.savedSearches]);
+    if (next.length === config.savedSearches.length && !next.some((x) => x.url === url)) return { ok: false, error: 'Not a trade search link.' };
+    config.savedSearches = next;
+    saveConfig(config);
+    pushState();
+    return { ok: true };
+  });
   ipcMain.on('trade:open', safe('trade:open', (_e, url: string) => {
     // Nur echte Trade-Links öffnen, nichts Beliebiges aus dem Renderer.
     if (typeof url === 'string' && url.startsWith('https://www.pathofexile.com/trade2/search/poe2/')) void shell.openExternal(url);

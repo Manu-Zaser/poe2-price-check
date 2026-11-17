@@ -87,7 +87,9 @@ The overlay is laid out like the trade site, top to bottom:
 - **Results:** nothing is searched until you click **Search**, so you can check the stats first. You get the
   **typical price** (median of the 3 cheapest listings), a **suggested selling price** with a button to copy it as a
   stash note (e.g. `~b/o 58 exalted`), and the 20 cheapest listings – see the next section. **Trade ↗** opens the
-  same search in your browser.
+  same search in your browser; **☆** saves it to Home (as the search itself, so the link does not expire).
+- **Links** under the item name: **Wiki**, **PoE2DB** (mod tables and tiers) and, for craftable items,
+  **Craft of Exile** – the item text is copied for you, use "Import" there and paste it.
 
 <details>
 <summary><b>More details: totals, hidden mods, key mod lists, warnings</b></summary>
@@ -166,8 +168,9 @@ sends **no extra requests**:
 </p>
 
 - **Home:** the hotkey, the price data (league, exchange rate, how many items poe.ninja prices and when), a
-  **currency converter** (Divine / Exalted / Chaos / Mirror of Kalandra at current rates), your **watchlist** and
-  your **recent checks** – click one to open it in the overlay again, without scanning or searching again.
+  **currency converter** (Divine / Exalted / Chaos / Mirror of Kalandra at current rates), your **watchlist**, your
+  **saved searches** (from ☆ in the overlay or any pasted pathofexile.com/trade2 link; rename, remove, click to
+  open) and your **recent checks** – click one to open it in the overlay again, without scanning or searching again.
 - **Market:** all poe.ninja prices with trends, top movers and search – see [above](#market-and-watchlist).
 - **How to use:** a short guide to the hotkeys, the overlay, waystones and selling.
 - **Settings:** hotkeys, startup, overlay size/background/position, league, map mods, mod value, updates, GPU

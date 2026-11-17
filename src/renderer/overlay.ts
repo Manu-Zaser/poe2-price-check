@@ -1,3 +1,4 @@
+import { isCraftable } from '../shared/maps';
 import { categoryFor, defaultMatchCount } from '../shared/stats';
 import { compareKey, compareListing, verdictText, type Comparison } from '../shared/compare';
 import { PSEUDO, type PriceSuggestion } from '../shared/extras';
@@ -44,6 +45,27 @@ function closeButton(): HTMLElement {
   return b;
 }
 
+/** Links zum Item: Wiki, PoE2DB und – für craftbare Items – Craft of Exile (Item wird dafür kopiert). */
+function itemLinks(item: Result['item']): HTMLElement {
+  const ref = { rarity: item.rarity, name: item.name, baseType: item.baseType, unidentified: item.unidentified };
+  const link = (label: string, kind: 'wiki' | 'poe2db' | 'coe', title: string) => {
+    const b = el('button', 'link-chip', label);
+    b.title = title;
+    b.addEventListener('click', () => {
+      void api.openItemLink(kind, ref).then((r) => {
+        if (kind !== 'coe') return;
+        b.textContent = r.copied ? 'Item copied ✓' : label;
+        b.title = r.copied ? 'Item text is in the clipboard – in Craft of Exile use "Import" and paste it' : 'Price-check the item again to copy it for Craft of Exile';
+        if (r.copied) setTimeout(() => (b.textContent = label), 4000);
+      });
+    });
+    return b;
+  };
+  const row = el('div', 'links', link('Wiki ↗', 'wiki', 'Open on poe2wiki.net'), link('PoE2DB ↗', 'poe2db', 'Open on poe2db.tw – mod tables and tiers'));
+  if (isCraftable(item)) row.append(link('Craft of Exile ↗', 'coe', 'Copies the item and opens Craft of Exile – use "Import" there and paste it'));
+  return row;
+}
+
 /**
  * Kopfzeile = Griff zum Verschieben (-webkit-app-region: drag). Das Fenster merkt sich die
  * neue Position für alle weiteren Preischecks. Der Schließen-Knopf liegt mit darin.
@@ -64,6 +86,7 @@ function header(r: Result | null, icon?: string, title?: string, showTags = true
       el('div', 'sub', item.name ? item.baseType : item.itemClass),
     );
     if (showTags && tags.length) text.append(el('div', 'tags', ...tags.map((t) => el('span', `tag ${t === 'Corrupted' ? 'tag-bad' : t === 'Not corrupted' ? 'tag-ok' : ''}`, t))));
+    text.append(itemLinks(item));
   } else {
     text.append(el('div', 'title', title ?? ''));
   }
@@ -600,7 +623,10 @@ interface TradeView {
   matched: HTMLElement;
   searchBtn: HTMLButtonElement;
   openBtn: HTMLButtonElement;
+  saveBtn: HTMLButtonElement;
   url: string | null;
+  /** Die Suche als dauerhafter Link zum Speichern. */
+  saveUrl: string | null;
   /** Auswahl seit der letzten Suche geändert? */
   dirty: boolean;
   searching: boolean;
@@ -860,6 +886,17 @@ function renderTrade(r: TradeResult): HTMLElement {
   openBtn.addEventListener('click', () => {
     if (view?.url) api.openTrade(view.url);
   });
+  const saveBtn = el('button', 'btn-sm btn-save', '☆');
+  saveBtn.title = 'Save this search – it appears on Home in the main window';
+  saveBtn.addEventListener('click', () => {
+    const url = view?.saveUrl;
+    if (!url) return;
+    const name = [r.item.name, r.item.baseType].filter(Boolean).join(', ');
+    void api.saveSearch(name, url).then((res) => {
+      saveBtn.textContent = res.ok ? '★' : '☆';
+      saveBtn.title = res.ok ? 'Saved – find it on Home in the main window' : (res.error ?? 'Could not save');
+    });
+  });
 
   const results = el('div', 'results', ...resultsContent(r));
   const rate = r.exaltedPerDivine ? ` · 1 Div = ${amount(r.exaltedPerDivine)} Ex` : '';
@@ -896,7 +933,7 @@ function renderTrade(r: TradeResult): HTMLElement {
     ...(missingBox ? [missingBox] : []),
     stats,
     statsBar,
-    el('div', 'results-bar', matched, instantChip, el('span', 'spacer'), searchBtn, openBtn),
+    el('div', 'results-bar', matched, instantChip, el('span', 'spacer'), searchBtn, openBtn, saveBtn),
     results,
     el('div', 'foot', `pathofexile.com/trade · ${r.league}${rate}`),
   );
@@ -910,7 +947,9 @@ function renderTrade(r: TradeResult): HTMLElement {
     matched,
     searchBtn,
     openBtn,
+    saveBtn,
     url: r.search?.url ?? null,
+    saveUrl: r.search?.saveUrl ?? null,
     // Vor der ersten Suche ist "Search" hervorgehoben – das ist der nächste Schritt.
     dirty: !r.search && !r.pending,
     searching: !!r.pending,
@@ -920,6 +959,7 @@ function renderTrade(r: TradeResult): HTMLElement {
       searchBtn.textContent = v.searching ? 'Searching …' : 'Search';
       searchBtn.classList.toggle('dirty', v.dirty && !v.searching);
       openBtn.disabled = !v.url;
+      saveBtn.disabled = !v.saveUrl;
     },
   };
   v.refresh();
@@ -935,6 +975,12 @@ function updateTrade(v: TradeView, r: TradeResult) {
   v.matched.textContent = matchedText(r);
   v.searching = !!r.pending;
   v.url = r.search?.url ?? v.url;
+  if (r.search?.saveUrl && r.search.saveUrl !== v.saveUrl) {
+    // Neue Suche (andere Filter) → wieder speicherbar.
+    v.saveUrl = r.search.saveUrl;
+    v.saveBtn.textContent = '☆';
+    v.saveBtn.title = 'Save this search – it appears on Home in the main window';
+  }
   if (r.search?.icon && !v.head.querySelector('.head-icon')) v.head.prepend(itemIcon(r.search.icon, 'head-icon'));
   v.refresh();
 }

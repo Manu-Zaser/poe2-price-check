@@ -51,8 +51,25 @@ export function markDangerous(mods: TradeMod[], patterns: string[]): TradeMod[] 
 
 // ---------- Wiki ----------
 
+type LinkItem = Pick<ParsedItem, 'rarity' | 'name' | 'baseType' | 'unidentified'>;
+
+/** Uniques heißen in Wiki und PoE2DB wie das Unique, alles andere wie die Basis. */
+const pageTitle = (item: LinkItem) => (item.rarity === 'Unique' && item.name && !item.unidentified ? item.name : item.baseType);
+
 /** Seite im Community-Wiki: Uniques unter ihrem Namen, alles andere unter der Basis. */
-export function wikiUrl(item: Pick<ParsedItem, 'rarity' | 'name' | 'baseType' | 'unidentified'>): string {
-  const title = item.rarity === 'Unique' && item.name && !item.unidentified ? item.name : item.baseType;
-  return `https://www.poe2wiki.net/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`;
+export function wikiUrl(item: LinkItem): string {
+  return `https://www.poe2wiki.net/wiki/${encodeURIComponent(pageTitle(item).replace(/ /g, '_'))}`;
+}
+
+/** Seite auf PoE2DB (poe2db.tw): Basis mit Mod-Tabellen, Unique mit allen Rolls. */
+export function poe2dbUrl(item: LinkItem): string {
+  return `https://poe2db.tw/us/${encodeURIComponent(pageTitle(item).replace(/ /g, '_'))}`;
+}
+
+/** Craft of Exile (PoE2): das Item lässt sich dort aus der Zwischenablage importieren. */
+export const CRAFT_OF_EXILE_URL = 'https://www.craftofexile.com/?game=poe2';
+
+/** Items, die man craften kann – nur dafür ist Craft of Exile sinnvoll. */
+export function isCraftable(item: Pick<ParsedItem, 'rarity' | 'itemLevel'> & { itemClass?: string }): boolean {
+  return (item.rarity === 'Normal' || item.rarity === 'Magic' || item.rarity === 'Rare') && !!item.itemLevel && !/Waystone|Tablet|Currency/i.test(item.itemClass ?? '');
 }

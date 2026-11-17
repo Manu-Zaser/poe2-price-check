@@ -365,3 +365,10 @@ input[type="checkbox"]:disabled { opacity: .35; cursor: default; }
 .cmp-eq { color: var(--faint); }
 .lp-tier-pad { text-align: right; }
 .lp-pseudo { color: var(--muted); }
+
+/* Links zum Item (Wiki, PoE2DB, Craft of Exile) */
+.links { display: flex; gap: 4px; margin-top: 5px; flex-wrap: wrap; }
+.link-chip { font-size: 10.5px; padding: 1px 7px; border-radius: 4px; border: 1px solid var(--line-strong, #453b2b); background: none; color: var(--muted); cursor: pointer; }
+.link-chip:hover { color: var(--text); border-color: var(--gold-deep, #8a6d33); }
+.results-bar .btn-sm { white-space: nowrap; flex: none; }
+.results-bar .btn-save { padding-left: 9px; padding-right: 9px; }

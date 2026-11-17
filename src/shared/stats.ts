@@ -294,6 +294,28 @@ export function tradeSellerUrl(league: string, query: unknown, seller: string): 
   return `https://www.pathofexile.com/trade2/search/poe2/${encodeURIComponent(league)}?q=${encodeURIComponent(JSON.stringify(q))}`;
 }
 
+/** Die Suche selbst als Link (?q=…) – verfällt nicht wie eine Such-ID; die Seite führt sie beim Öffnen aus. */
+export function tradeQueryUrl(league: string, query: unknown): string {
+  return `https://www.pathofexile.com/trade2/search/poe2/${encodeURIComponent(league)}?q=${encodeURIComponent(JSON.stringify(query))}`;
+}
+
+/** Gespeicherte Suchen: nur Trade-Links von pathofexile.com, mit Namen, höchstens 50. */
+export const TRADE_LINK_PREFIX = 'https://www.pathofexile.com/trade2/search/poe2/';
+export const MAX_SAVED_SEARCHES = 50;
+export function cleanSavedSearches(v: unknown): { name: string; url: string; at: string }[] {
+  if (!Array.isArray(v)) return [];
+  const out: { name: string; url: string; at: string }[] = [];
+  for (const e of v) {
+    if (!e || typeof e !== 'object') continue;
+    const { name, url, at } = e as Record<string, unknown>;
+    if (typeof url !== 'string' || !url.startsWith(TRADE_LINK_PREFIX) || url.length > 8000) continue;
+    const label = typeof name === 'string' && name.trim() ? name.trim().slice(0, 80) : 'Trade search';
+    if (out.some((x) => x.url === url)) continue;
+    out.push({ name: label, url, at: typeof at === 'string' ? at : new Date().toISOString() });
+  }
+  return out.slice(0, MAX_SAVED_SEARCHES);
+}
+
 export function tradeSearchUrl(league: string, queryId: string): string {
   return `https://www.pathofexile.com/trade2/search/poe2/${encodeURIComponent(league)}/${queryId}`;
 }

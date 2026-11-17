@@ -91,6 +91,8 @@ export interface Listing {
 export interface TradeSearch {
   queryId: string;
   url: string;
+  /** Die Suche als dauerhafter Link (?q=…) zum Speichern. */
+  saveUrl?: string;
   total: number;
   listings: Listing[];
   icon?: string;
@@ -157,6 +159,16 @@ export interface Settings {
   lowMods: string[];
   /** Marktübersicht: gemerkte Items (Schlüssel aus market.ts), auf der Startseite angeheftet. */
   watchlist: string[];
+  /** Gespeicherte Trade-Suchen (Name + Link), auf der Startseite. */
+  savedSearches: SavedSearch[];
+}
+
+export interface SavedSearch {
+  name: string;
+  /** Link zur Trade-Seite; aus dem Overlay mit der Suche selbst (?q=…), damit er nicht verfällt. */
+  url: string;
+  /** Wann gespeichert (ISO). */
+  at: string;
 }
 
 export type HotkeySetting = 'hotkey' | 'hotkeyTrade' | 'hotkeyWiki';

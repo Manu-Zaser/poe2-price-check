@@ -44,6 +44,11 @@ const api = {
   hideOverlay: () => ipcRenderer.send('overlay:hide'),
   tradeSearch: (selection: TradeSelection) => ipcRenderer.send('trade:search', selection),
   openTrade: (url: string) => ipcRenderer.send('trade:open', url),
+  /** Remembers a trade search (shown on Home). */
+  saveSearch: (name: string, url: string): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('search:save', name, url),
+  /** Opens the item on the wiki, PoE2DB or Craft of Exile (the main process builds the address). */
+  openItemLink: (kind: 'wiki' | 'poe2db' | 'coe', item: { rarity: string; name?: string; baseType: string; unidentified?: boolean }): Promise<{ ok: boolean; copied?: boolean }> =>
+    ipcRenderer.invoke('item:link', kind, item),
   /** Preisvorschlag (z. B. "~b/o 55 exalted") in die Zwischenablage legen. */
   copyText: (text: string) => ipcRenderer.send('clipboard:write', text),
   /** Overlay kurz fokussierbar machen, um einen Wert einzutippen. */

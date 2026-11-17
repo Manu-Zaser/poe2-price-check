@@ -1,6 +1,6 @@
 /** Preischeck für Rares/Magic-Items über die Trade-Suche. */
 import { readFileSync, statSync, writeFileSync } from 'node:fs';
-import { buildSearchQuery, buildTradeMods, isNamedUnique, normalDefaults, StatIndex, tradeSearchUrl, tradeSellerUrl, uniqueDefaults, type StatsData } from '../shared/stats';
+import { buildSearchQuery, buildTradeMods, isNamedUnique, normalDefaults, StatIndex, tradeQueryUrl, tradeSearchUrl, tradeSellerUrl, uniqueDefaults, type StatsData } from '../shared/stats';
 import { marketPrice, priceWarnings, suggestPrice } from '../shared/extras';
 import { listingDetails } from '../shared/listing';
 import type { Listing, ParsedItem, PriceMatch, PriceResult, TradeMod, TradeSearch, TradeSelection } from '../shared/types';
@@ -157,6 +157,7 @@ ${JSON.stringify(query)}`;
     const search: TradeSearch = {
       queryId: found.id,
       url: tradeSearchUrl(index.league, found.id),
+      saveUrl: tradeQueryUrl(index.league, query),
       total: found.total,
       listings,
       icon: fetched.find((f) => f.item.icon)?.item.icon,

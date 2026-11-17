@@ -818,6 +818,68 @@ $('watch-more').addEventListener('click', () => showPage('market'));
 $('win-min').addEventListener('click', () => api.windowControl('minimize'));
 $('win-close').addEventListener('click', () => api.windowControl('close'));
 
+// ---------- Gespeicherte Suchen ----------
+
+let savedSig = '';
+function renderSaved(s: AppState) {
+  const list = s.settings.savedSearches;
+  const sig = JSON.stringify(list);
+  if (sig === savedSig) return;
+  savedSig = sig;
+  $('saved-empty').hidden = list.length > 0;
+  $('saved-list').replaceChildren(
+    ...list.map((entry, i) => {
+      const name = el('button', 'saved-name', entry.name);
+      name.title = 'Open on the trade site';
+      name.addEventListener('click', () => api.openTrade(entry.url));
+      const rename = el('button', 'link', 'Rename');
+      rename.addEventListener('click', () => {
+        const input = el('input', 'saved-rename') as HTMLInputElement;
+        input.type = 'text';
+        input.value = entry.name;
+        const done = (keep: boolean) => {
+          const v = input.value.trim();
+          if (keep && v && v !== entry.name) saveSaved(list.map((x, j) => (j === i ? { ...x, name: v } : x)));
+          else input.replaceWith(name);
+        };
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') done(true);
+          if (e.key === 'Escape') done(false);
+        });
+        input.addEventListener('blur', () => done(true));
+        name.replaceWith(input);
+        input.focus();
+        input.select();
+      });
+      const del = el('button', 'link', 'Remove');
+      del.addEventListener('click', () => saveSaved(list.filter((_, j) => j !== i)));
+      return el('li', 'saved-row', name, el('span', 'saved-meta', timeAgo(Date.parse(entry.at))), rename, del);
+    }),
+  );
+}
+
+function saveSaved(next: AppState['settings']['savedSearches']) {
+  void api.saveSettings({ savedSearches: next });
+}
+
+$('saved-add').addEventListener('click', () => {
+  const url = $<HTMLInputElement>('saved-url').value.trim();
+  const name = $<HTMLInputElement>('saved-name').value.trim();
+  if (!url.startsWith('https://www.pathofexile.com/trade2/search/poe2/')) {
+    $<HTMLInputElement>('saved-url').setCustomValidity('Only links from pathofexile.com/trade2');
+    $<HTMLInputElement>('saved-url').reportValidity();
+    return;
+  }
+  $<HTMLInputElement>('saved-url').setCustomValidity('');
+  void api.saveSearch(name || 'Trade search', url).then((r) => {
+    if (r.ok) {
+      $<HTMLInputElement>('saved-url').value = '';
+      $<HTMLInputElement>('saved-name').value = '';
+    }
+  });
+});
+$('saved-url').addEventListener('input', () => $<HTMLInputElement>('saved-url').setCustomValidity(''));
+
 // ---------- Start ----------
 
 function render(s: AppState) {
@@ -834,6 +896,7 @@ function render(s: AppState) {
   renderKeyMods(s);
   renderLowMods(s);
   renderMarketState(s);
+  renderSaved(s);
 }
 
 api.onState(render);

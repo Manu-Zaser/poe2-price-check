@@ -402,3 +402,15 @@ textarea:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .sig-spike { color: #d9b44a; background: rgba(217,180,74,.15); }
 .sig-sliding { color: var(--bad); background: rgba(217,112,95,.14); }
 .signal-note { margin-top: 0; }
+
+/* Gespeicherte Suchen */
+.saved-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.saved-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: 12px; padding: 7px 12px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); font-size: 13px; }
+.saved-name { text-align: left; background: none; border: 0; padding: 0; color: var(--text); font: inherit; font-weight: 600; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.saved-name:hover { color: var(--gold-bright); }
+.saved-name::after { content: " ↗"; color: var(--faint); font-weight: 400; }
+.saved-meta { font-size: 11.5px; color: var(--faint); }
+.saved-rename { padding: 4px 8px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--gold-deep); color: var(--text); font: inherit; }
+.saved-add { display: grid; grid-template-columns: minmax(0, 1fr) 180px auto; gap: 8px; margin-top: 8px; }
+.saved-add input { padding: 8px 12px; border-radius: 8px; color: var(--text); font: inherit; background: var(--surface-2); border: 1px solid var(--line-strong); outline: none; }
+.saved-add input:focus { border-color: var(--gold-deep); }
