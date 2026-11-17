@@ -138,12 +138,20 @@ The overlay is laid out like the trade site, top to bottom:
 
 ## Reward scanner
 
-With the **Runeshape Combinations** window open, press **Alt+R**: the overlay lists every reward with its
-poe.ninja price (per item and for the whole row, e.g. "3× Greater Chaos Orb · 436 Ex") in the game's order, and
-marks the most valuable one with ★. Rewards without a poe.ninja price (e.g. "Unique Jewellery") are shown faded.
+Press **Alt+R** with one of these windows open:
+
+- **Runeshape Combinations:** every reward with its poe.ninja price (per item and for the whole row, e.g.
+  "3× Greater Chaos Orb · 436 Ex") in the game's order, the most valuable marked with ★. Rewards without a
+  poe.ninja price (e.g. "Unique Jewellery") are shown faded.
+- **Ritual Favours:** the window shows only pictures, so the items are recognised by their **pictures** – every
+  unique, currency item and omen poe.ninja prices, compared by shape *and* colour (many unique pictures are
+  recoloured base pictures, so a grey rare must not count as the unique). The list is sorted by value, with the
+  size and position in the grid ("2×4 · column 4, row 3"); unsure matches say "possibly" – price-check those with
+  Ctrl+D. Rares and bases have no market price and are not listed. The first ritual scan loads the item pictures
+  once (about 1000 small images, ~13 MB from poe.ninja's image CDN, kept in `%APPDATA%\poe2-pricecheck\icons`).
 
 - The tool takes **one screenshot** of your screen when you press the hotkey and reads the left part with the text
-  recognition built into Windows – nothing is installed, nothing is sent anywhere, no key is sent to the game. The
+  recognition built into Windows (window titles and Runeshape rewards) – nothing is installed, nothing is sent anywhere, no key is sent to the game. The
   image only lives in memory; a temporary file for the text recognition is deleted right away.
 - Names are matched against the poe.ninja names tolerantly (text recognition reads "1x" as "lx", adds stray
   characters, …), so it works at 1080p to 4K and different UI sizes. English game text; Windows uses its English
@@ -202,7 +210,7 @@ sends **no extra requests**:
 | **Ctrl+D** | Price check – opens the overlay for the item under the cursor |
 | **Ctrl+Alt+D** | Opens the item on pathofexile.com/trade in your browser, with the same default filters as the overlay (one trade search) |
 | **Alt+W** | Opens the unique – or the item's base – on [poe2wiki.net](https://www.poe2wiki.net) |
-| **Alt+R** | Reward scanner: reads the open Runeshape Combinations window from the screen and prices the rewards (sends nothing to the game) |
+| **Alt+R** | Reward scanner: reads the open Runeshape Combinations or Ritual Favours window from the screen and prices the rewards (sends nothing to the game) |
 
 Each press of the first three sends exactly one copy keystroke to the game; the reward scanner sends none (it only
 takes a screenshot). Change them under Settings → Hotkeys (all but the price check can be turned off): press the new combination – Ctrl/Alt + key or a single F key. Combinations such as Ctrl+C are

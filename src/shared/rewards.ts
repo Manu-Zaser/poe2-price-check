@@ -30,6 +30,10 @@ export interface RewardRow {
   totalExalted?: number;
   /** Position auf dem Bildschirm. */
   rect: { x0: number; y0: number; x1: number; y1: number };
+  /** Ritual: nur "möglich" erkannt (Bild ähnlich, aber nicht sicher) – mit Ctrl+D nachprüfen. */
+  possible?: boolean;
+  /** Ritual: wo das Item im Raster liegt, z. B. "column 3, row 1". */
+  where?: string;
 }
 
 /** Titel des Fensters ("Runeshape Combinations"); die Texterkennung liest die Zierschrift oft schief. */
@@ -114,8 +118,8 @@ export function readRuneshape(lines: OcrLine[], names: Map<string, PriceMatch>):
   const rows: RewardRow[] = [];
   for (const line of sorted) {
     if (line.y0 <= title.y1) continue;
-    // Nur der Zeilenbereich rechts vom Titelanfang (das Fenster selbst, nicht der Hintergrund daneben).
-    if (line.x1 < title.x0) continue;
+    // Nur das Fenster selbst: Zeilen enden rechts vom Titelanfang und nicht weit hinter dem Titel.
+    if (line.x1 < title.x0 || line.x1 > title.x1 + 1.5 * (title.x1 - title.x0)) continue;
     const parsed = parseRewardLine(line.text);
     if (!parsed) continue;
     const hit = bestMatch(parsed.name, names);

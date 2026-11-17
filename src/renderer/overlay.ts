@@ -1024,9 +1024,14 @@ function renderRewards(r: RewardsResult): HTMLElement {
       row.match && row.count > 1 ? el('span', 'rw-unit', `${priceText(row.match)} each`) : null,
     );
     name.title = row.match ? row.name : `Read as "${row.raw}" – no price on poe.ninja`;
+    if (row.where) {
+      // Ritual: Lage im Raster, bei unsicherer Erkennung als "possibly" markiert.
+      name.append(el('span', 'rw-unit', `${row.possible ? 'possibly · ' : ''}${row.raw} · ${row.where}`));
+      if (row.possible) name.title = `Looks like ${row.name}, but not certain – hover it and price-check to be sure`;
+    }
     return el(
       'div',
-      `rw-row${best ? ' best' : ''}${row.match ? '' : ' unpriced'}`,
+      `rw-row${best ? ' best' : ''}${row.match ? '' : ' unpriced'}${row.possible ? ' possible' : ''}`,
       el('span', 'rw-mark', best ? '★' : ''),
       row.match ? itemIcon(row.match.icon, 'rw-icon') : el('span', 'rw-icon'),
       name,
@@ -1036,7 +1041,7 @@ function renderRewards(r: RewardsResult): HTMLElement {
   const bestRow = r.best !== null ? r.rows[r.best] : null;
   const summary = bestRow
     ? el('div', 'rw-best', 'Best: ', el('b', '', `${bestRow.count}× ${bestRow.name}`), ` · ${total(bestRow.totalExalted!)}`)
-    : el('div', 'rw-best muted', 'No prices found for these rewards.');
+    : el('div', 'rw-best muted', r.rows.length ? 'Nothing recognised for certain – check the "possibly" items.' : 'No uniques or currency recognised.');
   const rate = r.exaltedPerDivine ? ` · 1 Div = ${amount(r.exaltedPerDivine)} Ex` : '';
   return el(
     'div',
@@ -1044,6 +1049,7 @@ function renderRewards(r: RewardsResult): HTMLElement {
     header(null, undefined, r.title),
     summary,
     el('div', 'rw-list', ...rows),
+    r.note ? el('div', 'rw-note', r.note) : null,
     el('div', 'foot', `poe.ninja · ${r.league}${rate} · read from screen in ${r.ms} ms`),
   );
 }

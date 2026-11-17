@@ -12,7 +12,9 @@ import { cleanWatchlist, type MarketData } from '../shared/market';
 import type { AppState, AppStatus, HistoryEntry, HotkeySetting, ParsedItem, PriceResult, SaveResult, Settings, TradeSelection } from '../shared/types';
 import { log, logFile } from './log';
 import { buildPriceIndex, CACHE_TTL_MS, fetchLeagues, lookupPrice, makeFetchJson, type PriceIndex } from './ninja';
-import { bestRow, readRuneshape } from '../shared/rewards';
+import { bestRow, readRuneshape, type OcrLine, type RewardRow } from '../shared/rewards';
+import { CELL_PX, COLS, downscaleBgra, isRitualTitle, matchRitual, rgbaToRgb, ritualGrid, ROWS, unmatchedCells } from '../shared/ritual';
+import { IconCache } from './icons';
 import { WindowsOcr } from './ocr';
 import { applySelection, idleRareResult, loadStatIndex, newRareRequest, runRareSearch, type RareRequest } from './rare';
 import { TradeClient } from '@poe2/core/trade';
@@ -913,11 +915,14 @@ function wikiHotkey() {
 let ocr: WindowsOcr | null = null;
 const getOcr = () => (ocr ??= new WindowsOcr(app.getPath('userData')));
 
+let iconCache: IconCache | null = null;
+const getIcons = () => (iconCache ??= new IconCache(join(app.getPath('userData'), 'icons'), userAgent()));
+
 /**
- * Bereich, in dem das Runeshape-Fenster liegt: linke Bildschirmseite (wie Inventar-Panels links), ein
- * Drittel breit. Bezogen auf die Bildschirmgröße – passt so für 1080p bis 4K und verschiedene UI-Größen.
+ * Bereich, in dem die Belohnungsfenster liegen: Runeshape links (wie Inventar-Panels), Ritual-Favours
+ * links der Mitte. Bezogen auf die Bildschirmgröße – passt so für 1080p bis 4K und verschiedene UI-Größen.
  */
-const SCAN_AREA = { x: 0, y: 0.05, width: 0.34, height: 0.72 };
+const SCAN_AREA = { x: 0, y: 0.05, width: 0.6, height: 0.72 };
 /** Kleinere Bildschirme vergrößert erkennen – die Schrift ist sonst zu klein für die Texterkennung. */
 const OCR_REFERENCE_HEIGHT = 1440;
 
@@ -953,10 +958,15 @@ async function scanRewards() {
     // Zurück in Bildschirm-Pixel.
     const lines = raw.map((l) => ({ ...l, x0: area.x + l.x0 / factor, x1: area.x + l.x1 / factor, y0: area.y + l.y0 / factor, y1: area.y + l.y1 / factor }));
     const idx = await getIndex();
+    const favours = lines.find((l) => isRitualTitle(l.text));
+    if (favours) {
+      await scanRitual(shot, H, favours, idx, t0);
+      return;
+    }
     const rows = readRuneshape(lines, idx.currency);
     log('info', `Reward scan: ${rows ? rows.length : 'no'} rows, capture ${tOcr - t0} ms, text recognition ${Date.now() - tOcr} ms`);
     if (!rows) {
-      showOverlay({ kind: 'error', message: `No reward window found. Open the Runeshape Combinations window and press ${config.hotkeyScan} again.` });
+      showOverlay({ kind: 'error', message: `No reward window found. Open the Runeshape Combinations or the Ritual Favours window and press ${config.hotkeyScan} again.` });
       return;
     }
     showOverlay({ kind: 'rewards', title: 'Runeshape Combinations', league: idx.league, exaltedPerDivine: idx.exaltedPerDivine, rows, best: bestRow(rows), ms: Date.now() - t0 });
@@ -971,6 +981,57 @@ async function scanRewards() {
     }
     busy = false;
   }
+}
+
+/**
+ * Ritual-Favours: Raster aus der Überschrift berechnen, verkleinern und die Items an ihren Bildern erkennen
+ * (Uniques und Währung/Omen mit poe.ninja-Preis). Rares und Basen bleiben übrig – die zählt der Hinweis.
+ */
+async function scanRitual(shot: Electron.NativeImage, H: number, title: OcrLine, idx: PriceIndex, t0: number) {
+  const g = ritualGrid(title, H);
+  const rect = { x: Math.round(g.x), y: Math.round(g.y), width: Math.round(g.cell * COLS), height: Math.round(g.cell * ROWS) };
+  const size = shot.getSize();
+  if (rect.x < 0 || rect.y < 0 || rect.x + rect.width > size.width || rect.y + rect.height > size.height) {
+    throw new Error('The Favours window is only partly on the screen.');
+  }
+  const crop = shot.crop(rect);
+  const cs = crop.getSize();
+  const rgb = rgbaToRgb(downscaleBgra(crop.toBitmap(), cs.width, cs.height, COLS * CELL_PX, ROWS * CELL_PX));
+  const grid = { width: COLS * CELL_PX, height: ROWS * CELL_PX, data: rgb };
+  // Alle Bilder mit Preis: Währung, Omen, Runen … und Uniques. Beim ersten Mal werden sie geladen.
+  const all = [...idx.currency.values(), ...[...idx.uniquesByName.values()].flat()];
+  const icons = await getIcons().load(all, (done, total) => {
+    if (done === 1 || done % 100 === 0) showOverlay({ kind: 'error', message: `Loading item pictures for the first scan… ${done}/${total}` });
+  });
+  const tMatch = Date.now();
+  const matches = matchRitual(grid, icons);
+  const cell = g.cell;
+  const rows: RewardRow[] = matches.map((m) => ({
+    count: 1,
+    name: m.ref.name,
+    raw: `${m.w}×${m.h}`,
+    match: m.ref,
+    confidence: m.shape,
+    totalExalted: m.ref.exalted,
+    rect: { x0: g.x + m.col * cell, y0: g.y + m.row * cell, x1: g.x + (m.col + m.w) * cell, y1: g.y + (m.row + m.h) * cell },
+    ...(m.confidence === 'possible' ? { possible: true } : {}),
+    where: `column ${m.col + 1}, row ${m.row + 1}`,
+  }));
+  rows.sort((a, b) => (b.totalExalted ?? 0) - (a.totalExalted ?? 0));
+  const other = unmatchedCells(grid, matches);
+  log('info', `Ritual scan: ${matches.length} items recognised, ${other} other cells, matching ${Date.now() - tMatch} ms`);
+  if (process.env.POE2PC_TEST) for (const m of matches) log('info', `  ${m.confidence} ${m.shape.toFixed(2)}/${m.color.toFixed(3)} ${m.w}x${m.h} r${m.row}c${m.col} ${m.ref.name}`);
+  showOverlay({
+    kind: 'rewards',
+    title: 'Ritual Favours',
+    league: idx.league,
+    exaltedPerDivine: idx.exaltedPerDivine,
+    rows,
+    // Nach Wert sortiert: die wertvollste sicher erkannte Zeile ist die beste.
+    best: rows.findIndex((r) => !r.possible) >= 0 ? rows.findIndex((r) => !r.possible) : null,
+    ms: Date.now() - t0,
+    ...(other ? { note: `Other items (rares, bases or unknown) are not priced – hover one and press ${config.hotkey}.` } : {}),
+  });
 }
 
 /** Zeigt eine Divine Orb als Beispiel, damit man Position und Aussehen prüfen kann. */

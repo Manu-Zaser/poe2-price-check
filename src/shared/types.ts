@@ -140,6 +140,8 @@ export type PriceResult =
       best: number | null;
       /** Dauer der Texterkennung. */
       ms: number;
+      /** Hinweis unter der Liste, z. B. nicht erkannte Items. */
+      note?: string;
     }
   | { kind: 'error'; message: string };
 

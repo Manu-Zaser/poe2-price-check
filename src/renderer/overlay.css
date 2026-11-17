@@ -400,3 +400,6 @@ input[type="checkbox"]:disabled { opacity: .35; cursor: default; }
 .rw-unit { font-size: 11px; color: var(--faint); white-space: nowrap; }
 .rw-total { font-weight: 700; white-space: nowrap; text-align: right; min-width: 64px; }
 .rw-row.best .rw-total { color: #b5d3a6; }
+.rw-row.possible { opacity: .75; }
+.rw-row.possible .rw-line { font-style: italic; }
+.rw-note { margin-top: 8px; font-size: 11.5px; color: var(--faint); }
