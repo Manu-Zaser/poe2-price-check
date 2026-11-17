@@ -47,16 +47,25 @@ export interface RitualMatch<T> {
   confidence: 'sure' | 'possible';
 }
 
-/** Lage des Rasters relativ zur Überschrift bei 1440 Pixeln Bildschirmhöhe (gemessen an echten Screenshots). */
-const AT_1440 = { dx: -421.5, dy: 165, cell: 70.33 };
+/**
+ * Lage des Rasters relativ zur Überschrift bei 1440 Pixeln Bildschirmhöhe und Standard-UI (gemessen an echten
+ * Screenshots); die Überschrift "FAVOURS" ist dort 127 px breit.
+ */
+const AT_1440 = { dx: -421.5, dy: 165, cell: 70.33, titleWidth: 127 };
 
 export function isRitualTitle(text: string): boolean {
   return /^\s*favou?rs\s*$/i.test(text);
 }
 
-/** Raster in Bildschirm-Pixeln aus der Überschrift "FAVOURS". */
+/**
+ * Raster in Bildschirm-Pixeln aus der Überschrift "FAVOURS". Die Größe kommt aus der Breite der Überschrift –
+ * sie wächst mit Auflösung und UI-Skalierung des Spiels mit (auch bei einem verkleinert angezeigten Bild).
+ * Nur wenn die Breite unplausibel ist, gilt die Bildschirmhöhe.
+ */
 export function ritualGrid(title: OcrLine, screenHeight: number): { x: number; y: number; cell: number } {
-  const f = screenHeight / 1440;
+  const byHeight = screenHeight / 1440;
+  const byTitle = (title.x1 - title.x0) / AT_1440.titleWidth;
+  const f = byTitle > byHeight * 0.4 && byTitle < byHeight * 2.5 ? byTitle : byHeight;
   return { x: (title.x0 + title.x1) / 2 + AT_1440.dx * f, y: title.y0 + AT_1440.dy * f, cell: AT_1440.cell * f };
 }
 

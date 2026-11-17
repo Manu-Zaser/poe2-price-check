@@ -33,7 +33,11 @@ describe('ritual grid', () => {
     expect(Math.round(g.x)).toBe(410);
     expect(Math.round(g.y)).toBe(357);
     expect(g.cell).toBeCloseTo(70.33);
-    expect(ritualGrid({ text: 'FAVOURS', x0: 576, y0: 144, x1: 671, y1: 162 }, 1080).cell).toBeCloseTo(52.75);
+    expect(ritualGrid({ text: 'FAVOURS', x0: 576, y0: 144, x1: 671, y1: 162 }, 1080).cell).toBeCloseTo(52.6, 1);
+    // Smaller UI (or a picture shown at 91 %): the title is narrower, so is the grid – whatever the screen height.
+    expect(ritualGrid({ text: 'FAVOURS', x0: 700, y0: 180, x1: 815.6, y1: 202 }, 1440).cell).toBeCloseTo(64.0, 1);
+    // Implausible title width (misread): fall back to the screen height.
+    expect(ritualGrid({ text: 'FAVOURS', x0: 700, y0: 180, x1: 710, y1: 202 }, 1440).cell).toBeCloseTo(70.33);
   });
 
   it('reads the item size from the picture address', () => {
