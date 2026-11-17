@@ -129,6 +129,18 @@ export type PriceResult =
     }
   | { kind: 'not-found'; item: ParsedItem; league: string; reason: string }
   | { kind: 'unsupported'; item: ParsedItem; reason: string }
+  | {
+      kind: 'rewards';
+      /** Welches Fenster gelesen wurde, z. B. "Runeshape Combinations". */
+      title: string;
+      league: string;
+      exaltedPerDivine: number;
+      rows: import('./rewards').RewardRow[];
+      /** Index der wertvollsten Zeile. */
+      best: number | null;
+      /** Dauer der Texterkennung. */
+      ms: number;
+    }
   | { kind: 'error'; message: string };
 
 /** Einstellungen, die in der Oberfläche änderbar sind. */
@@ -147,6 +159,8 @@ export interface Settings {
   hotkeyTrade: string;
   /** Hotkey: Item im Wiki öffnen ("" = aus). */
   hotkeyWiki: string;
+  /** Belohnungs-Scanner (Runeshape-Fenster per Texterkennung); "" = aus. */
+  hotkeyScan: string;
   /** Schließen des Hauptfensters lässt das Tool im Infobereich weiterlaufen. */
   closeToTray: boolean;
   /** Mit Windows starten (unsichtbar, nur im Infobereich). */
@@ -171,7 +185,7 @@ export interface SavedSearch {
   at: string;
 }
 
-export type HotkeySetting = 'hotkey' | 'hotkeyTrade' | 'hotkeyWiki';
+export type HotkeySetting = 'hotkey' | 'hotkeyTrade' | 'hotkeyWiki' | 'hotkeyScan';
 
 export interface AppStatus {
   league: string | null;

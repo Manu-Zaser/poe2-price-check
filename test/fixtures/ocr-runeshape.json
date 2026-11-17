@@ -1,0 +1,157 @@
+{
+ "runen1": [
+  {
+   "y1": 90,
+   "y0": 61,
+   "x0": 276,
+   "x1": 500,
+   "text": "Zuneshape Combimttou"
+  },
+  {
+   "y1": 194,
+   "y0": 168,
+   "x0": 532,
+   "x1": 715,
+   "text": "IX Uhtred's Saga"
+  },
+  {
+   "y1": 297,
+   "y0": 276,
+   "x0": 476,
+   "x1": 755,
+   "text": "3x Greater Chaos Orb r.'"
+  }
+ ],
+ "runen2": [
+  {
+   "y1": 90,
+   "y0": 61,
+   "x0": 276,
+   "x1": 500,
+   "text": "Zuneshape Combimttou"
+  },
+  {
+   "y1": 144,
+   "y0": 118,
+   "x0": 526,
+   "x1": 714,
+   "text": "Unique Jewellery"
+  },
+  {
+   "y1": 205,
+   "y0": 181,
+   "x0": 441,
+   "x1": 714,
+   "text": "IX Greater Jeweller's Orb"
+  },
+  {
+   "y1": 270,
+   "y0": 244,
+   "x0": 528,
+   "x1": 714,
+   "text": "IX Cyclonic Alloy"
+  },
+  {
+   "y1": 328,
+   "y0": 307,
+   "x0": 554,
+   "x1": 714,
+   "text": "3x Exalted Orb"
+  }
+ ],
+ "runen3": [
+  {
+   "y1": 90,
+   "y0": 61,
+   "x0": 276,
+   "x1": 500,
+   "text": "Zuneshape Combimttou"
+  },
+  {
+   "y1": 194,
+   "y0": 168,
+   "x0": 308,
+   "x1": 714,
+   "text": "IX Countess Seske's Rune of Archery"
+  },
+  {
+   "y1": 246,
+   "y0": 226,
+   "x0": 383,
+   "x1": 713,
+   "text": "Perfect Orb Of Transmutation"
+  },
+  {
+   "y1": 315,
+   "y0": 289,
+   "x0": 391,
+   "x1": 713,
+   "text": "Perfect Orb Of Augmentation"
+  },
+  {
+   "y1": 372,
+   "y0": 352,
+   "x0": 484,
+   "x1": 715,
+   "text": "IX Masterwork Rune"
+  }
+ ],
+ "runen4": [
+  {
+   "y1": 90,
+   "y0": 61,
+   "x0": 276,
+   "x1": 500,
+   "text": "Zuneshape Combimttou"
+  },
+  {
+   "y1": 144,
+   "y0": 118,
+   "x0": 528,
+   "x1": 714,
+   "text": "IX Cyclonic Alloy"
+  },
+  {
+   "y1": 213,
+   "y0": 179,
+   "x0": 509,
+   "x1": 759,
+   "text": "3x Orb of Alchemy )"
+  },
+  {
+   "y1": 265,
+   "y0": 244,
+   "x0": 448,
+   "x1": 715,
+   "text": "3x Glassblower's Bauble"
+  },
+  {
+   "y1": 333,
+   "y0": 307,
+   "x0": 513,
+   "x1": 714,
+   "text": "IX Expansive Alloy"
+  },
+  {
+   "y1": 390,
+   "y0": 370,
+   "x0": 449,
+   "x1": 715,
+   "text": "2x Glassblower's Bauble"
+  },
+  {
+   "y1": 459,
+   "y0": 433,
+   "x0": 575,
+   "x1": 714,
+   "text": "3x Regal Orb"
+  },
+  {
+   "y1": 516,
+   "y0": 496,
+   "x0": 555,
+   "x1": 714,
+   "text": "2x Exalted Orb"
+  }
+ ]
+}

@@ -15,6 +15,7 @@ A small overlay for Path of Exile 2: hover over an item, press **Ctrl+D**, and t
 - [What it prices](#what-it-prices)
 - [Rare and magic items](#rare-and-magic-items)
 - [Listings: hover, compare, click](#listings-hover-compare-click)
+- [Reward scanner](#reward-scanner)
 - [Market and watchlist](#market-and-watchlist)
 - [Main window](#main-window)
 - [Hotkeys](#hotkeys)
@@ -135,6 +136,20 @@ The overlay is laid out like the trade site, top to bottom:
   - It compares with the item you scanned, not with your equipped gear (the tool cannot see that).
 - **Click a row** to open the trade site with the same search narrowed to that seller, so the offer is on top.
 
+## Reward scanner
+
+With the **Runeshape Combinations** window open, press **Alt+R**: the overlay lists every reward with its
+poe.ninja price (per item and for the whole row, e.g. "3× Greater Chaos Orb · 436 Ex") in the game's order, and
+marks the most valuable one with ★. Rewards without a poe.ninja price (e.g. "Unique Jewellery") are shown faded.
+
+- The tool takes **one screenshot** of your screen when you press the hotkey and reads the left part with the text
+  recognition built into Windows – nothing is installed, nothing is sent anywhere, no key is sent to the game. The
+  image only lives in memory; a temporary file for the text recognition is deleted right away.
+- Names are matched against the poe.ninja names tolerantly (text recognition reads "1x" as "lx", adds stray
+  characters, …), so it works at 1080p to 4K and different UI sizes. English game text; Windows uses its English
+  text recognition if installed (Settings → Time & language → Language), otherwise your Windows language.
+- If no window is found, the overlay says so. Change or turn off the hotkey under Settings → Hotkeys.
+
 ## Market and watchlist
 
 <p align="center">
@@ -187,9 +202,10 @@ sends **no extra requests**:
 | **Ctrl+D** | Price check – opens the overlay for the item under the cursor |
 | **Ctrl+Alt+D** | Opens the item on pathofexile.com/trade in your browser, with the same default filters as the overlay (one trade search) |
 | **Alt+W** | Opens the unique – or the item's base – on [poe2wiki.net](https://www.poe2wiki.net) |
+| **Alt+R** | Reward scanner: reads the open Runeshape Combinations window from the screen and prices the rewards (sends nothing to the game) |
 
-Each press sends exactly one copy keystroke to the game. Change them under Settings → Hotkeys (the two extra hotkeys
-can be turned off): press the new combination – Ctrl/Alt + key or a single F key. Combinations such as Ctrl+C are
+Each press of the first three sends exactly one copy keystroke to the game; the reward scanner sends none (it only
+takes a screenshot). Change them under Settings → Hotkeys (all but the price check can be turned off): press the new combination – Ctrl/Alt + key or a single F key. Combinations such as Ctrl+C are
 rejected because the game needs them. Esc cancels.
 
 ## Overlay and settings

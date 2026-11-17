@@ -382,3 +382,21 @@ input[type="checkbox"]:disabled { opacity: .35; cursor: default; }
 .zoom { width: 22px; height: 20px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 14px; line-height: 1; }
 .zoom + .zoom { border-left: 1px solid var(--line); }
 .zoom:hover { color: var(--text); background: var(--surface-3); }
+
+/* Belohnungs-Scanner */
+.rw-best { margin: 10px 0 8px; padding: 8px 10px; border-radius: 8px; background: rgba(127,176,105,.10); border: 1px solid rgba(127,176,105,.35); font-size: 13px; color: var(--muted); }
+.rw-best b { color: #b5d3a6; }
+.rw-best.muted { background: var(--surface-2); border-color: var(--line); }
+.rw-list { display: flex; flex-direction: column; gap: 3px; }
+.card-rewards { width: 430px; }
+.rw-row { display: grid; grid-template-columns: 14px 26px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 7px; background: var(--surface-2); font-size: 13px; }
+.rw-row.best { background: rgba(127,176,105,.12); outline: 1px solid rgba(127,176,105,.4); }
+.rw-row.unpriced { opacity: .6; }
+.rw-mark { color: var(--gold-bright); font-size: 12px; }
+.rw-icon { width: 26px; height: 26px; object-fit: contain; }
+.rw-name { min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.rw-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rw-count { color: var(--gold); font-weight: 700; }
+.rw-unit { font-size: 11px; color: var(--faint); white-space: nowrap; }
+.rw-total { font-weight: 700; white-space: nowrap; text-align: right; min-width: 64px; }
+.rw-row.best .rw-total { color: #b5d3a6; }

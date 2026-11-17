@@ -1,5 +1,5 @@
-import { app, BrowserWindow, clipboard, globalShortcut, ipcMain, Menu, nativeImage, screen, shell, Tray } from 'electron';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { app, BrowserWindow, clipboard, desktopCapturer, globalShortcut, ipcMain, Menu, nativeImage, screen, shell, Tray } from 'electron';
+import { readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readItemText as readGameItemText } from '@poe2/core/clipboard';
 import { validateHotkey } from '@poe2/core/hotkey';
@@ -12,6 +12,8 @@ import { cleanWatchlist, type MarketData } from '../shared/market';
 import type { AppState, AppStatus, HistoryEntry, HotkeySetting, ParsedItem, PriceResult, SaveResult, Settings, TradeSelection } from '../shared/types';
 import { log, logFile } from './log';
 import { buildPriceIndex, CACHE_TTL_MS, fetchLeagues, lookupPrice, makeFetchJson, type PriceIndex } from './ninja';
+import { bestRow, readRuneshape } from '../shared/rewards';
+import { WindowsOcr } from './ocr';
 import { applySelection, idleRareResult, loadStatIndex, newRareRequest, runRareSearch, type RareRequest } from './rare';
 import { TradeClient } from '@poe2/core/trade';
 import { checkForUpdates, downloadUpdate, initUpdates, installUpdate, openReleasePage, updateState } from './updater';
@@ -67,6 +69,7 @@ const DEFAULT_CONFIG: Config = {
   overlayPosition: null,
   hotkeyTrade: 'Ctrl+Alt+D',
   hotkeyWiki: 'Alt+W',
+  hotkeyScan: 'Alt+R',
   closeToTray: true,
   startWithWindows: false,
   dangerMods: DEFAULT_DANGER_MODS,
@@ -88,7 +91,7 @@ function loadConfig(): Config {
   }
   if (validateHotkey(loaded.hotkey)) loaded.hotkey = DEFAULT_CONFIG.hotkey;
   // Zusatz-Hotkeys: "" = bewusst aus; Ungültiges zurück auf den Standard.
-  for (const key of ['hotkeyTrade', 'hotkeyWiki'] as const) {
+  for (const key of ['hotkeyTrade', 'hotkeyWiki', 'hotkeyScan'] as const) {
     if (typeof loaded[key] !== 'string' || (loaded[key] && validateHotkey(loaded[key]))) loaded[key] = DEFAULT_CONFIG[key];
   }
   loaded.dangerMods = Array.isArray(loaded.dangerMods) ? cleanDangerList(loaded.dangerMods.map(String)) : [...DEFAULT_DANGER_MODS];
@@ -192,12 +195,12 @@ function currencyRates(): AppStatus['currencyRates'] {
 }
 
 function state(): AppState {
-  const { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity, hotkeyTrade, hotkeyWiki, closeToTray, startWithWindows, dangerMods, keyMods, lowMods, watchlist, savedSearches } = config;
+  const { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity, hotkeyTrade, hotkeyWiki, hotkeyScan, closeToTray, startWithWindows, dangerMods, keyMods, lowMods, watchlist, savedSearches } = config;
   return {
     status: status(),
     update: updateState(),
     leagueAuto: !league,
-    settings: { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity, hotkeyTrade, hotkeyWiki, closeToTray, startWithWindows, dangerMods, keyMods, lowMods, watchlist, savedSearches },
+    settings: { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity, hotkeyTrade, hotkeyWiki, hotkeyScan, closeToTray, startWithWindows, dangerMods, keyMods, lowMods, watchlist, savedSearches },
     overlayPositionSaved: config.overlayPosition !== null,
     logFile: logFile(),
     leagues,
@@ -266,13 +269,14 @@ function refreshIndex(): Promise<PriceIndex> {
 
 // ---------- Hotkey ----------
 
-const HOTKEYS: HotkeySetting[] = ['hotkey', 'hotkeyTrade', 'hotkeyWiki'];
+const HOTKEYS: HotkeySetting[] = ['hotkey', 'hotkeyTrade', 'hotkeyWiki', 'hotkeyScan'];
 
 /** Was jeder Hotkey tut – jeder Druck ist genau eine Kopier-Aktion im Spiel. */
 const HOTKEY_ACTIONS: Record<HotkeySetting, () => void> = {
   hotkey: () => void priceCheck(),
   hotkeyTrade: () => void tradeHotkey(),
   hotkeyWiki: () => void wikiHotkey(),
+  hotkeyScan: () => void scanRewards(),
 };
 
 /** Alle Hotkeys neu registrieren; Ergebnis je Hotkey (false = von einem anderen Programm belegt). */
@@ -295,7 +299,7 @@ function activateHotkey() {
   hotkeysActive = registerHotkeys(config);
   hotkeyActive = !!hotkeysActive.hotkey;
   lastError = hotkeyActive ? lastError : `Hotkey ${config.hotkey} is already used by another program.`;
-  for (const key of ['hotkeyTrade', 'hotkeyWiki'] as const) {
+  for (const key of ['hotkeyTrade', 'hotkeyWiki', 'hotkeyScan'] as const) {
     if (config[key] && !hotkeysActive[key]) log('warn', `Hotkey ${config[key]} (${key}) is already used by another program`);
   }
 }
@@ -904,6 +908,71 @@ function wikiHotkey() {
   });
 }
 
+// ---------- Belohnungs-Scanner ----------
+
+let ocr: WindowsOcr | null = null;
+const getOcr = () => (ocr ??= new WindowsOcr(app.getPath('userData')));
+
+/**
+ * Bereich, in dem das Runeshape-Fenster liegt: linke Bildschirmseite (wie Inventar-Panels links), ein
+ * Drittel breit. Bezogen auf die Bildschirmgröße – passt so für 1080p bis 4K und verschiedene UI-Größen.
+ */
+const SCAN_AREA = { x: 0, y: 0.05, width: 0.34, height: 0.72 };
+/** Kleinere Bildschirme vergrößert erkennen – die Schrift ist sonst zu klein für die Texterkennung. */
+const OCR_REFERENCE_HEIGHT = 1440;
+
+/**
+ * Hotkey: einmal den Bildschirm aufnehmen (keine Eingabe ans Spiel), den Bereich des Runeshape-Fensters
+ * mit der Windows-Texterkennung lesen und die Belohnungen mit poe.ninja-Preisen im Overlay zeigen.
+ * Das Bild bleibt im Speicher; die Datei für die Texterkennung wird sofort wieder gelöscht.
+ */
+async function scanRewards() {
+  if (busy) return;
+  busy = true;
+  const tmp = join(app.getPath('temp'), `poe2pc-scan-${process.pid}.png`);
+  try {
+    const t0 = Date.now();
+    const cursor = screen.getCursorScreenPoint();
+    const display = screen.getDisplayNearestPoint(cursor);
+    const px = { width: Math.round(display.size.width * display.scaleFactor), height: Math.round(display.size.height * display.scaleFactor) };
+    // Das eigene Overlay nicht mitlesen.
+    if (alive(overlayWin) && overlayWin.isVisible()) overlayWin.hide();
+    const [ocrReady, sources] = await Promise.all([getOcr().start(), desktopCapturer.getSources({ types: ['screen'], thumbnailSize: px })]);
+    void ocrReady;
+    const source = sources.find((src) => src.display_id === String(display.id)) ?? sources[0];
+    if (!source || source.thumbnail.isEmpty()) throw new Error('Could not capture the screen.');
+    const shot = source.thumbnail;
+    const { width: W, height: H } = shot.getSize();
+    const area = { x: Math.round(W * SCAN_AREA.x), y: Math.round(H * SCAN_AREA.y), width: Math.round(W * SCAN_AREA.width), height: Math.round(H * SCAN_AREA.height) };
+    let crop = shot.crop(area);
+    const factor = Math.max(1, OCR_REFERENCE_HEIGHT / H);
+    if (factor > 1.05) crop = crop.resize({ width: Math.round(area.width * factor), quality: 'best' });
+    writeFileSync(tmp, crop.toPNG());
+    const tOcr = Date.now();
+    const raw = await getOcr().recognize(tmp);
+    // Zurück in Bildschirm-Pixel.
+    const lines = raw.map((l) => ({ ...l, x0: area.x + l.x0 / factor, x1: area.x + l.x1 / factor, y0: area.y + l.y0 / factor, y1: area.y + l.y1 / factor }));
+    const idx = await getIndex();
+    const rows = readRuneshape(lines, idx.currency);
+    log('info', `Reward scan: ${rows ? rows.length : 'no'} rows, capture ${tOcr - t0} ms, text recognition ${Date.now() - tOcr} ms`);
+    if (!rows) {
+      showOverlay({ kind: 'error', message: `No reward window found. Open the Runeshape Combinations window and press ${config.hotkeyScan} again.` });
+      return;
+    }
+    showOverlay({ kind: 'rewards', title: 'Runeshape Combinations', league: idx.league, exaltedPerDivine: idx.exaltedPerDivine, rows, best: bestRow(rows), ms: Date.now() - t0 });
+  } catch (e) {
+    log('error', 'Reward scan failed', e);
+    showOverlay({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
+  } finally {
+    try {
+      unlinkSync(tmp);
+    } catch {
+      // nichts zu löschen
+    }
+    busy = false;
+  }
+}
+
 /** Zeigt eine Divine Orb als Beispiel, damit man Position und Aussehen prüfen kann. */
 async function testOverlay() {
   try {
@@ -967,6 +1036,8 @@ app.on('child-process-gone', (_e, d) => log('warn', `Child process gone: ${d.typ
 
 app.whenReady().then(() => {
   config = loadConfig();
+  // Unsichtbare Tests rufen den Scanner direkt auf (ohne Hotkey, ohne Tastendruck).
+  if (process.env.POE2PC_TEST) (globalThis as Record<string, unknown>).__pcTest = { scanRewards };
   log('info', `Start ${app.getVersion()}, GPU ${config.gpuAcceleration ? 'on' : 'off'}`);
 
   ipcMain.handle('state:get', safe('state:get', () => state()));
@@ -1084,4 +1155,7 @@ app.whenReady().then(() => {
   setInterval(() => pushState(), 60_000);
 });
 
-app.on('will-quit', () => globalShortcut.unregisterAll());
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
+  ocr?.stop();
+});
