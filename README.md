@@ -197,6 +197,8 @@ rejected because the game needs them. Esc cancels.
 - **Overlay:** stays open until you close it with **×** (or Esc); a new price check replaces its content. Drag it by
   any empty spot to move it – the position is remembered (Settings → "Reset position" = back next to the cursor).
   If the overlay content crashes, the window is recreated so nothing invisible is left on top of the game.
+- **Size in the overlay:** **−** / **+** next to the title, or **Ctrl + mouse wheel** over the overlay – saved like
+  the size setting below.
 - **Appearance:** overlay size (80–160%) and background opacity (40–100%) – lower values let the game show through;
   text and buttons stay fully visible. Check with "Show test overlay".
 - **League:** "Automatic" follows the current challenge league on poe.ninja and switches to a new league within an

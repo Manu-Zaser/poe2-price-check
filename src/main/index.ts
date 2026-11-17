@@ -1019,6 +1019,16 @@ app.whenReady().then(() => {
   ipcMain.on('overlay:drag-move', safe('overlay:drag-move', () => moveDrag()));
   ipcMain.on('overlay:drag-end', safe('overlay:drag-end', () => endDrag()));
   ipcMain.on('overlay:ready', safe('overlay:ready', (_e, size: { width: number; height: number }) => placeOverlay(size)));
+  ipcMain.on('overlay:zoom', safe('overlay:zoom', (_e, delta: unknown) => {
+    const d = Number(delta);
+    if (!Number.isFinite(d) || d === 0) return;
+    const next = Math.min(1.6, Math.max(0.8, Math.round((config.overlayScale + Math.sign(d) * 0.05) * 100) / 100));
+    if (next === config.overlayScale) return;
+    config.overlayScale = next;
+    saveConfig(config);
+    applyOverlayScale();
+    pushState(); // Einstellungsseite zeigt die neue Größe
+  }));
   ipcMain.on('trade:search', safe('trade:search', (_e, selection: TradeSelection) => rareResearch(selection)));
   ipcMain.on('clipboard:write', safe('clipboard:write', (_e, text: string) => {
     // Nur kurze Preis-Notizen zulassen, nichts Beliebiges aus dem Renderer.

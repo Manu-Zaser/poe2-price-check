@@ -33,6 +33,8 @@ const api = {
   // Overlay
   onResult: (cb: (r: PriceResult) => void) => ipcRenderer.on('result', (_e, r: PriceResult) => cb(r)),
   overlayReady: (size: { width: number; height: number }) => ipcRenderer.send('overlay:ready', size),
+  /** Overlay smaller/larger by a step (saved like "Overlay size" in the settings). */
+  zoomOverlay: (delta: number) => ipcRenderer.send('overlay:zoom', delta),
   /** Größe hat sich geändert (Skalierung) – Overlay soll sich neu vermessen. */
   onRemeasure: (cb: () => void) => ipcRenderer.on('remeasure', () => cb()),
   /** Deckkraft des Hintergrunds aus den Einstellungen (0.4–1). */

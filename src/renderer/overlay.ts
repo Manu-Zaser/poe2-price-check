@@ -38,6 +38,30 @@ function candidateRow(m: PriceMatch): HTMLElement {
   return el('div', 'cand', itemIcon(m.icon, 'cand-icon'), el('span', 'cand-name', m.name), el('span', 'cand-price', priceText(m)));
 }
 
+/** Overlay kleiner/größer (wie "Overlay size" in den Einstellungen; wird gespeichert). */
+function zoomButtons(): HTMLElement {
+  const btn = (label: string, delta: number, title: string) => {
+    const b = el('button', 'zoom', label);
+    b.title = title;
+    b.addEventListener('click', () => api.zoomOverlay(delta));
+    return b;
+  };
+  return el('span', 'zoom-group', btn('−', -ZOOM_STEP, 'Smaller (Ctrl + mouse wheel)'), btn('+', ZOOM_STEP, 'Larger (Ctrl + mouse wheel)'));
+}
+
+const ZOOM_STEP = 0.05;
+
+// Strg + Mausrad über dem Overlay ändert die Größe (wie im Browser).
+window.addEventListener(
+  'wheel',
+  (e) => {
+    if (!e.ctrlKey) return;
+    e.preventDefault();
+    api.zoomOverlay(e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP);
+  },
+  { passive: false },
+);
+
 function closeButton(): HTMLElement {
   const b = el('button', 'close', '×');
   b.title = 'Close (Esc)';
@@ -92,7 +116,7 @@ function header(r: Result | null, icon?: string, title?: string, showTags = true
   }
   const grip = el('span', 'grip', '⠿');
   grip.title = 'Drag anywhere on the overlay to move it';
-  return el('div', 'head', icon ? itemIcon(icon, 'head-icon') : null, text, grip, closeButton());
+  return el('div', 'head', icon ? itemIcon(icon, 'head-icon') : null, text, zoomButtons(), grip, closeButton());
 }
 
 // ---------- Gemerkte Ansicht ----------
@@ -933,7 +957,7 @@ function renderTrade(r: TradeResult): HTMLElement {
     ...(missingBox ? [missingBox] : []),
     stats,
     statsBar,
-    el('div', 'results-bar', matched, instantChip, el('span', 'spacer'), searchBtn, openBtn, saveBtn),
+    el('div', 'results-bar', matched, instantChip, el('span', 'bar-actions', searchBtn, openBtn, saveBtn)),
     results,
     el('div', 'foot', `pathofexile.com/trade · ${r.league}${rate}`),
   );
