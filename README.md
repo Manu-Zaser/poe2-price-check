@@ -144,11 +144,11 @@ Press **Alt+R** with one of these windows open:
   "3× Greater Chaos Orb · 436 Ex") in the game's order, the most valuable marked with ★. Rewards without a
   poe.ninja price (e.g. "Unique Jewellery") are shown faded.
 - **Ritual Favours:** the window shows only pictures, so the items are recognised by their **pictures** – every
-  unique, currency item and omen poe.ninja prices, compared by shape *and* colour (many unique pictures are
-  recoloured base pictures, so a grey rare must not count as the unique). The list is sorted by value, with the
+  unique and omen poe.ninja prices (Favours only offer those), compared by shape and colour; items shown greyed out
+  (e.g. not enough tribute) are compared by shape only. The list is sorted by value, with the
   size and position in the grid ("2×4 · column 4, row 3"); unsure matches say "possibly" – price-check those with
-  Ctrl+D. Rares and bases have no market price and are not listed. The first ritual scan loads the item pictures
-  once (about 1000 small images, ~13 MB from poe.ninja's image CDN, kept in `%APPDATA%\poe2-pricecheck\icons`).
+  Ctrl+D, as well as anything not recognised. The first ritual scan loads the item pictures
+  once (about 500 small images from poe.ninja's image CDN, kept in `%APPDATA%\poe2-pricecheck\icons`).
 
 - The tool takes **one screenshot** of your screen when you press the hotkey and reads the left part with the text
   recognition built into Windows (window titles and Runeshape rewards) – nothing is installed, nothing is sent anywhere, no key is sent to the game. The

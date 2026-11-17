@@ -998,8 +998,9 @@ async function scanRitual(shot: Electron.NativeImage, H: number, title: OcrLine,
   const cs = crop.getSize();
   const rgb = rgbaToRgb(downscaleBgra(crop.toBitmap(), cs.width, cs.height, COLS * CELL_PX, ROWS * CELL_PX));
   const grid = { width: COLS * CELL_PX, height: ROWS * CELL_PX, data: rgb };
-  // Alle Bilder mit Preis: Währung, Omen, Runen … und Uniques. Beim ersten Mal werden sie geladen.
-  const all = [...idx.currency.values(), ...[...idx.uniquesByName.values()].flat()];
+  // Im Favours-Fenster liegen nur Uniques und Omen – nur deren Bilder vergleichen (weniger Fehltreffer).
+  // Beim ersten Mal werden sie geladen.
+  const all = [...[...idx.currency.values()].filter((m) => /^Omen of /i.test(m.name)), ...[...idx.uniquesByName.values()].flat()];
   const icons = await getIcons().load(all, (done, total) => {
     if (done === 1 || done % 100 === 0) showOverlay({ kind: 'error', message: `Loading item pictures for the first scan… ${done}/${total}` });
   });
@@ -1030,7 +1031,7 @@ async function scanRitual(shot: Electron.NativeImage, H: number, title: OcrLine,
     // Nach Wert sortiert: die wertvollste sicher erkannte Zeile ist die beste.
     best: rows.findIndex((r) => !r.possible) >= 0 ? rows.findIndex((r) => !r.possible) : null,
     ms: Date.now() - t0,
-    ...(other ? { note: `Other items (rares, bases or unknown) are not priced – hover one and press ${config.hotkey}.` } : {}),
+    ...(other ? { note: `Some items were not recognised – hover one and press ${config.hotkey} to price it.` } : {}),
   });
 }
 

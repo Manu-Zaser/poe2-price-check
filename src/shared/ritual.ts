@@ -45,6 +45,8 @@ export interface RitualMatch<T> {
   /** Farbabstand (0 = gleich). */
   color: number;
   confidence: 'sure' | 'possible';
+  /** Ausgegraut angezeigt (z. B. nicht genug Tribut) – nur an der Form erkannt. */
+  dimmed: boolean;
 }
 
 /**
@@ -162,27 +164,37 @@ export function occupancy(grid: Rgb): boolean[][] {
   return occ;
 }
 
-/** Ab hier gilt ein Treffer als sicher bzw. möglich. */
+/** Ab hier gilt ein Treffer als sicher bzw. möglich (farbig angezeigte Items: Form und Farbe). */
 export const SURE = { shape: 0.66, color: 0.33 };
 export const POSSIBLE = { shape: 0.6, color: 0.26 };
+/** Ausgegraute Items (z. B. nicht genug Tribut): nur die Form in Graustufen zählt. */
+export const DIMMED_SURE = 0.72;
+export const DIMMED_POSSIBLE = 0.64;
+/** Unter dieser Farbigkeit (ohne Hintergrund) gilt ein Ausschnitt als ausgegraut. */
+export const DIMMED_COLOURFULNESS = 0.26;
 /** Kandidaten darunter werden gar nicht weiter betrachtet. */
 const MIN_SHAPE = 0.55;
 
 interface Prepared<T> {
   icon: IconImage<T>;
-  /** Pixel-Indizes im Icon (deckende Pixel) und dazu passende Versätze im Raster-Ausschnitt. */
-  idx: Int32Array;
+  /** Versätze der deckenden Icon-Pixel im Raster-Ausschnitt. */
   off: Int32Array;
-  /** Icon-Werte je Kanal minus Mittelwert. */
+  /** Icon-Werte je Kanal minus Mittelwert, und die Helligkeit minus Mittelwert. */
   cen: Float32Array;
   norm: number;
+  lum: Float32Array;
+  lumNorm: number;
   chroma: Float32Array;
+  /** Farbigkeit des Bildes (mittlerer Farbanteil). */
+  colourfulness: number;
 }
 
 function chroma2(r: number, g: number, b: number): [number, number] {
   const lum = (r + g + b) / 3 + 8;
   return [(r - g) / lum, (b - (r + g) / 2) / lum];
 }
+
+const isNavy = (r: number, g: number, b: number) => b > r + 15 && b > g + 10 && b < 110;
 
 function prepare<T>(icon: IconImage<T>, gridWidth: number): Prepared<T> | null {
   const W = icon.w * CELL_PX;
@@ -202,24 +214,46 @@ function prepare<T>(icon: IconImage<T>, gridWidth: number): Prepared<T> | null {
   const mean = [0, 0, 0];
   for (const i of idx) for (let k = 0; k < 3; k++) mean[k] += icon.rgba[i * 4 + k];
   for (let k = 0; k < 3; k++) mean[k] /= n;
+  const lumMean = (mean[0] + mean[1] + mean[2]) / 3;
   const cen = new Float32Array(n * 3);
+  const lum = new Float32Array(n);
   const chroma = new Float32Array(n * 2);
   let norm = 0;
+  let lumNorm = 0;
+  let colourful = 0;
   idx.forEach((i, j) => {
+    const r = icon.rgba[i * 4];
+    const g = icon.rgba[i * 4 + 1];
+    const b = icon.rgba[i * 4 + 2];
     for (let k = 0; k < 3; k++) {
       const v = icon.rgba[i * 4 + k] - mean[k];
       cen[j * 3 + k] = v;
       norm += v * v;
     }
-    const [a, b] = chroma2(icon.rgba[i * 4], icon.rgba[i * 4 + 1], icon.rgba[i * 4 + 2]);
-    chroma[j * 2] = a;
-    chroma[j * 2 + 1] = b;
+    const l = (r + g + b) / 3 - lumMean;
+    lum[j] = l;
+    lumNorm += l * l;
+    const [ca, cb] = chroma2(r, g, b);
+    chroma[j * 2] = ca;
+    chroma[j * 2 + 1] = cb;
+    colourful += Math.abs(ca) + Math.abs(cb);
   });
-  return { icon, idx: Int32Array.from(idx), off: Int32Array.from(off), cen, norm: Math.sqrt(norm), chroma };
+  return { icon, off: Int32Array.from(off), cen, norm: Math.sqrt(norm), lum, lumNorm: Math.sqrt(lumNorm), chroma, colourfulness: colourful / n };
 }
 
-/** Form (Kreuzkorrelation über die deckenden Pixel) und Farbabstand an einer Rasterstelle. */
-function score<T>(p: Prepared<T>, grid: Rgb, row: number, col: number): { shape: number; color: number } {
+interface Score {
+  /** Form in Farbe (Kreuzkorrelation über RGB). */
+  shape: number;
+  /** Form in Graustufen. */
+  shapeGray: number;
+  /** Farbabstand (0 = gleich). */
+  color: number;
+  /** Farbigkeit des Ausschnitts ohne Hintergrund und fast schwarze Pixel. */
+  colourfulness: number;
+}
+
+/** Vergleich eines vorbereiteten Bildes mit einer Rasterstelle. */
+function score<T>(p: Prepared<T>, grid: Rgb, row: number, col: number): Score {
   const base = row * CELL_PX * grid.width + col * CELL_PX;
   const n = p.off.length;
   const mean = [0, 0, 0];
@@ -232,9 +266,14 @@ function score<T>(p: Prepared<T>, grid: Rgb, row: number, col: number): { shape:
   mean[0] /= n;
   mean[1] /= n;
   mean[2] /= n;
+  const lumMean = (mean[0] + mean[1] + mean[2]) / 3;
   let dot = 0;
   let norm = 0;
+  let dotL = 0;
+  let normL = 0;
   let col2 = 0;
+  let colourful = 0;
+  let counted = 0;
   for (let j = 0; j < n; j++) {
     const i = (base + p.off[j]) * 3;
     const r = grid.data[i];
@@ -245,11 +284,32 @@ function score<T>(p: Prepared<T>, grid: Rgb, row: number, col: number): { shape:
     const vb = b - mean[2];
     dot += vr * p.cen[j * 3] + vg * p.cen[j * 3 + 1] + vb * p.cen[j * 3 + 2];
     norm += vr * vr + vg * vg + vb * vb;
+    const l = (r + g + b) / 3 - lumMean;
+    dotL += l * p.lum[j];
+    normL += l * l;
     const [ca, cb] = chroma2(r, g, b);
     col2 += Math.abs(ca - p.chroma[j * 2]) + Math.abs(cb - p.chroma[j * 2 + 1]);
+    if (!isNavy(r, g, b) && r + g + b >= 60) {
+      colourful += Math.abs(ca) + Math.abs(cb);
+      counted++;
+    }
   }
   const d = Math.sqrt(norm) * p.norm;
-  return { shape: d > 0 ? dot / d : 0, color: col2 / (2 * n) };
+  const dL = Math.sqrt(normL) * p.lumNorm;
+  return { shape: d > 0 ? dot / d : 0, shapeGray: dL > 0 ? dotL / dL : 0, color: col2 / (2 * n), colourfulness: counted ? colourful / counted : 0 };
+}
+
+/** Sicher, möglich oder nichts – für farbig angezeigte und für ausgegraute Items. */
+function judge(s: Score): { confidence: 'sure' | 'possible'; dimmed: boolean; shape: number } | null {
+  if (s.colourfulness < DIMMED_COLOURFULNESS) {
+    // Ausgegraut: Farben fehlen, nur die Form zählt.
+    if (s.shapeGray >= DIMMED_SURE) return { confidence: 'sure', dimmed: true, shape: s.shapeGray };
+    if (s.shapeGray >= DIMMED_POSSIBLE) return { confidence: 'possible', dimmed: true, shape: s.shapeGray };
+    return null;
+  }
+  if (s.shape >= SURE.shape && s.color <= SURE.color) return { confidence: 'sure', dimmed: false, shape: s.shape };
+  if (s.shape >= POSSIBLE.shape && s.color <= POSSIBLE.color) return { confidence: 'possible', dimmed: false, shape: s.shape };
+  return null;
 }
 
 /**
@@ -270,11 +330,10 @@ export function matchRitual<T>(grid: Rgb, icons: IconImage<T>[]): RitualMatch<T>
         if (prepared === undefined) prepared = prepare(icon, grid.width);
         if (!prepared) break;
         const s = score(prepared, grid, r, c);
-        if (s.shape < MIN_SHAPE) continue;
-        const sure = s.shape >= SURE.shape && s.color <= SURE.color;
-        const possible = s.shape >= POSSIBLE.shape && s.color <= POSSIBLE.color;
-        if (!sure && !possible) continue;
-        cands.push({ ref: icon.ref, row: r, col: c, w: icon.w, h: icon.h, shape: s.shape, color: s.color, confidence: sure ? 'sure' : 'possible' });
+        if (Math.max(s.shape, s.shapeGray) < MIN_SHAPE) continue;
+        const j = judge(s);
+        if (!j) continue;
+        cands.push({ ref: icon.ref, row: r, col: c, w: icon.w, h: icon.h, shape: j.shape, color: s.color, confidence: j.confidence, dimmed: j.dimmed });
       }
       if (prepared === null) break;
     }

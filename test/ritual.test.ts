@@ -9,7 +9,10 @@ import { CELL_PX, COLS, downscaleBgra, iconCells, isRitualTitle, matchRitual, oc
 // and the real poe.ninja pictures of the items found there plus look-alikes that must be rejected.
 const dir = join(__dirname, 'fixtures/ritual');
 const grid = (n: number) => ({ width: COLS * CELL_PX, height: ROWS * CELL_PX, data: new Uint8Array(gunzipSync(readFileSync(join(dir, `ritual${n}-grid.rgb.gz`)))) });
-const list = JSON.parse(readFileSync(join(dir, 'icons.json'), 'utf8')) as { name: string; file: string; url: string }[];
+// Favours only offer uniques and omens – the app compares only those pictures.
+const list = (JSON.parse(readFileSync(join(dir, 'icons.json'), 'utf8')) as { name: string; kind: string; file: string; url: string }[]).filter(
+  (it) => it.kind === 'unique' || it.name.startsWith('Omen of '),
+);
 const icons: IconImage<string>[] = list.map((it) => {
   const png = decodePng(readFileSync(join(dir, it.file)))!;
   const { w, h } = iconCells(it.url);
@@ -42,7 +45,7 @@ describe('ritual grid', () => {
 
   it('reads the item size from the picture address', () => {
     expect(iconCells(list.find((x) => x.name === 'Hoghunt')!.url)).toEqual({ w: 2, h: 4 });
-    expect(iconCells(list.find((x) => x.name === 'Omen of Gambling')!.url)).toEqual({ w: 1, h: 1 });
+    expect(iconCells(list.find((x) => x.name === 'Omen of Bartering')!.url)).toEqual({ w: 1, h: 1 });
   });
 
   it('tells occupied cells from empty ones', () => {
@@ -54,29 +57,30 @@ describe('ritual grid', () => {
 });
 
 describe('recognising items in real screenshots', () => {
-  it('finds uniques and currency, sure ones plain and unsure ones marked', () => {
+  it('finds uniques and omens, sure ones plain and unsure ones marked', () => {
     expect(found(1)).toEqual([
       'Silverthorne @3,1',
       'Omen of Bartering @3,10',
       'Wandering Reliquary @3,7',
       'Hoghunt @4,3',
       "Daevata's Wind @1,6",
-      'Shankgonne @2,5',
-      'Greymake @1,1',
+      '? Shankgonne @2,5',
+      '? Greymake @1,1',
     ]);
-    expect(found(2)).toEqual(['The Devouring Diadem @1,8', 'Birth of Fury @1,5', 'Revered Resin @1,7', 'Greymake @1,1', '? Shyaba @3,5']);
-    expect(found(3)).toEqual(['The Vile Knight @1,5', 'Glowswarm @2,1', "Brynhand's Mark @1,7", 'The Everlasting Gaze @1,10', 'Sacred Bloom @1,1']);
+    expect(found(2)).toEqual(['The Devouring Diadem @1,8', 'Birth of Fury @1,5', '? Greymake @1,1', 'Revered Resin @1,7', '? Shyaba @3,5']);
+    expect(found(3)).toEqual(['The Vile Knight @1,5', 'Glowswarm @2,1', "Brynhand's Mark @1,7", 'The Everlasting Gaze @1,10']);
+  });
+
+  it('recognises items shown greyed out (not enough tribute) by their shape', () => {
+    // In ritual4 everything is greyed out: grey versions of coloured unique pictures.
+    const m = matchRitual(grid(4), icons);
+    expect(m.map((x) => x.ref)).toEqual(expect.arrayContaining(['The Rat Cage', 'Leer Cast', 'Surge of the Tide', 'Demon Stitcher', 'Gifts from Above']));
+    expect(m.find((x) => x.ref === 'The Rat Cage')).toMatchObject({ confidence: 'sure', dimmed: true, col: 1, row: 0 });
     expect(found(5)).toEqual(['Gloamgown @3,1', 'Omen of Gambling @3,10']);
   });
 
-  it('rejects grey bases that only share the shape of a coloured unique picture', () => {
-    // ritual4 has a grey body armour shaped like The Rat Cage, and grey helmets/gloves like Leer Cast,
-    // Surge of the Tide and Demon Stitcher – none of them may be reported.
-    expect(found(4)).toEqual(['Gifts from Above @1,6']);
-  });
-
-  it('counts the cells nobody recognised (rares, bases)', () => {
-    const g = grid(4);
-    expect(unmatchedCells(g, matchRitual(g, icons))).toBe(23);
+  it('counts the cells nobody recognised', () => {
+    const g = grid(1);
+    expect(unmatchedCells(g, matchRitual(g, icons))).toBe(12);
   });
 });

@@ -26,7 +26,7 @@ export class IconCache {
 
   /**
    * Bilder für alle Preise mit Icon bereitstellen. Fehlende werden geladen (höchstens 6 gleichzeitig) –
-   * nur beim ersten Mal nennenswert (rund 1000 Bilder, ~13 MB).
+   * nur beim ersten Mal nennenswert (rund 500 Bilder für Uniques und Omen).
    */
   async load(matches: PriceMatch[], onProgress?: (done: number, total: number) => void): Promise<IconImage<PriceMatch>[]> {
     mkdirSync(this.dir, { recursive: true });
