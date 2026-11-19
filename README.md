@@ -63,6 +63,12 @@ From the [latest release](https://github.com/Manu-Zaser/poe2-price-check/release
   <img src="docs/images/overlay-unique.png" width="380" alt="Unique overlay: roll with min/max, typical price, listings and the poe.ninja price for comparison">
 </p>
 
+**Thin markets:** for currency, runes, omens and other exchange items poe.ninja takes the price of the trade pair
+with the most volume – with few trades that can be a handful of odd trades (e.g. a rune at 11 Chaos while it sells
+for 10 Exalted). The tool also checks the rates of all pairs (one extra request to poe.ninja, cached 30 minutes);
+if they differ by more than 3×, it shows the lower price with a warning and hides the 7-day trend. The reward
+scanner does the same.
+
 Anything poe.ninja knows is priced via poe.ninja, even as a white item. For identified uniques no mod is ticked by
 default, so you see the cheapest copies.
 

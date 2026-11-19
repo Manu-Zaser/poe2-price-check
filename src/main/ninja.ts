@@ -136,6 +136,7 @@ export async function buildPriceIndex(fetchJson: FetchJson, league: string): Pro
       const name = meta.name;
       const match: PriceMatch = {
         name,
+        ninjaRef: { type, id: line.id },
         icon: absoluteImage(meta.image),
         divine: line.primaryValue,
         exalted: line.primaryValue * (rate || index.exaltedPerDivine),
@@ -169,6 +170,63 @@ export async function buildPriceIndex(fetchJson: FetchJson, league: string): Pro
   index.market = dedupe(index.market);
 
   return index;
+}
+
+// ---------- Kurse je Handelspaar ----------
+
+export interface PairQuote {
+  /** Währung des Paares, z. B. "exalted". */
+  currency: string;
+  /** Preis eines Stücks in dieser Währung. */
+  rate: number;
+  /** Umgerechnet in Divine. */
+  divine: number;
+}
+
+interface DetailsResponse {
+  core?: { rates?: Record<string, number> };
+  pairs?: { id: string; rate: number; volumePrimaryValue?: number }[];
+}
+
+/**
+ * Kurse eines Börsen-Items je Handelspaar (Divine, Exalted, Chaos …). poe.ninja nimmt als Preis das Paar mit
+ * dem meisten Volumen; bei dünnem Handel kann das ein Ausreißer sein (z. B. ein paar Chaos-Tausche).
+ */
+export async function fetchPairs(fetchJson: FetchJson, league: string, ref: { type: string; id: string }): Promise<PairQuote[]> {
+  const data = (await fetchJson(`${BASE}/exchange/current/details?league=${encodeURIComponent(league)}&type=${encodeURIComponent(ref.type)}&id=${encodeURIComponent(ref.id)}`)) as DetailsResponse;
+  const rates = data.core?.rates ?? {};
+  const out: PairQuote[] = [];
+  for (const p of data.pairs ?? []) {
+    if (!(p.rate > 0)) continue;
+    const perDivine = p.id === 'divine' ? 1 : rates[p.id];
+    if (!(perDivine > 0)) continue;
+    out.push({ currency: p.id, rate: p.rate, divine: p.rate / perDivine });
+  }
+  return out;
+}
+
+/** Ab diesem Faktor zwischen günstigstem und teuerstem Paar gilt der Preis als widersprüchlich. */
+export const PAIR_SPREAD = 3;
+
+const CURRENCY_NAME: Record<string, string> = { divine: 'Divine', exalted: 'Exalted', chaos: 'Chaos' };
+const amountText = (q: PairQuote) => `${Number(q.rate.toPrecision(3))} ${CURRENCY_NAME[q.currency] ?? q.currency}`;
+
+/**
+ * Widersprechen sich die Paare (Faktor > PAIR_SPREAD), gilt vorsichtshalber der niedrigste Kurs, mit Hinweis.
+ * Sonst bleibt der poe.ninja-Preis unverändert.
+ */
+export function checkPairs(match: PriceMatch, quotes: PairQuote[], exaltedPerDivine: number): PriceMatch {
+  if (quotes.length < 2) return match;
+  const sorted = [...quotes].sort((a, b) => a.divine - b.divine);
+  const low = sorted[0];
+  const high = sorted[sorted.length - 1];
+  if (high.divine / low.divine <= PAIR_SPREAD) return match;
+  return {
+    ...match,
+    divine: low.divine,
+    exalted: low.divine * exaltedPerDivine,
+    warning: `poe.ninja's trades disagree: ${amountText(low)} vs ${amountText(high)} – few trades, check the in-game exchange. Showing the lower price.`,
+  };
 }
 
 /** Sucht den Preis eines geparsten Items im Index. */

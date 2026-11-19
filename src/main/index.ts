@@ -9,9 +9,9 @@ import { cleanDangerList, CRAFT_OF_EXILE_URL, DEFAULT_DANGER_MODS, isCraftable, 
 import { applyWeights, cleanWeightList, DEFAULT_KEY_MODS, DEFAULT_LOW_MODS, LEGACY_DEFAULTS, upgradeDefaults } from '../shared/weights';
 import { buildSearchQuery, cleanSavedSearches, isNamedUnique, tradeSearchUrl, type StatIndex } from '../shared/stats';
 import { cleanWatchlist, type MarketData } from '../shared/market';
-import type { AppState, AppStatus, HistoryEntry, HotkeySetting, ParsedItem, PriceResult, SaveResult, Settings, TradeSelection } from '../shared/types';
+import type { AppState, AppStatus, HistoryEntry, HotkeySetting, ParsedItem, PriceMatch, PriceResult, SaveResult, Settings, TradeSelection } from '../shared/types';
 import { log, logFile } from './log';
-import { buildPriceIndex, CACHE_TTL_MS, fetchLeagues, lookupPrice, makeFetchJson, type PriceIndex } from './ninja';
+import { buildPriceIndex, CACHE_TTL_MS, checkPairs, fetchLeagues, fetchPairs, lookupPrice, makeFetchJson, mapLimit, type PairQuote, type PriceIndex } from './ninja';
 import { bestRow, readRuneshape, type OcrLine, type RewardRow } from '../shared/rewards';
 import { CELL_PX, COLS, downscaleBgra, isRitualTitle, matchRitual, rgbaToRgb, ritualGrid, ROWS, unmatchedCells } from '../shared/ritual';
 import { IconCache } from './icons';
@@ -815,14 +815,48 @@ function updateHistory(result: PriceResult) {
   pushState();
 }
 
+// ---------- Kurse je Handelspaar prüfen ----------
+
+/** Geprüfte Börsen-Preise (poe.ninja rechnet stündlich neu; 30 Minuten reichen). */
+const pairCache = new Map<string, { at: number; quotes: PairQuote[] }>();
+const PAIR_CACHE_MS = 30 * 60_000;
+
+/**
+ * Börsen-Items (Währung, Runen …): Kurse aller Handelspaare holen und bei Widerspruch den niedrigeren Preis
+ * mit Hinweis nehmen. Eine Anfrage an poe.ninja je Item, zwischengespeichert; schlägt sie fehl, bleibt der Preis.
+ */
+async function verifyPrice(match: PriceMatch): Promise<PriceMatch> {
+  if (!match.ninjaRef) return match;
+  const idx = await getIndex();
+  const key = `${idx.league}|${match.ninjaRef.type}|${match.ninjaRef.id}`;
+  let cached = pairCache.get(key);
+  if (!cached || Date.now() - cached.at > PAIR_CACHE_MS) {
+    try {
+      const quotes = await Promise.race([
+        fetchPairs(makeFetchJson(userAgent()), idx.league, match.ninjaRef),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500)),
+      ]);
+      cached = { at: Date.now(), quotes };
+      pairCache.set(key, cached);
+    } catch (e) {
+      log('warn', `Pair rates for ${match.name} not available`, e);
+      return match;
+    }
+  }
+  const checked = checkPairs(match, cached.quotes, idx.exaltedPerDivine);
+  if (checked.warning) log('info', `Price of ${match.name}: ${checked.warning}`);
+  return checked;
+}
+
 /** Das zuletzt per Hotkey geprüfte Item mit seinem Kopiertext (für "Craft of Exile"). */
 let lastCheck: { item: ParsedItem; text: string } | null = null;
 
-async function priceCheck() {
+async function priceCheck(textForTest?: string) {
   if (busy) return; // ein Tastendruck = ein Durchlauf
   busy = true;
   try {
-    const text = await readItemText();
+    // Nur unsichtbare Tests übergeben den Text direkt – sonst genau ein Kopier-Tastendruck ans Spiel.
+    const text = textForTest !== undefined && process.env.POE2PC_TEST ? textForTest : await readItemText();
     const item = parseItemText(text);
     if (!item) {
       showOverlay({ kind: 'error', message: 'No item in the clipboard. Hover over an item and press the hotkey again.' });
@@ -838,8 +872,9 @@ async function priceCheck() {
     if (isRareLike || ((item.rarity === 'Normal' || item.rarity === 'Gem') && ninja?.kind !== 'priced')) {
       addHistory(await rareCheck(item)); // rareCheck zeigt das Overlay selbst
     } else if (ninja) {
-      showOverlay(ninja);
-      addHistory(ninja);
+      const checked = ninja.kind === 'priced' ? { ...ninja, matches: [await verifyPrice(ninja.matches[0]), ...ninja.matches.slice(1)] } : ninja;
+      showOverlay(checked);
+      addHistory(checked);
     }
   } catch (e) {
     log('error', 'Price check failed', e);
@@ -969,7 +1004,8 @@ async function scanRewards() {
       showOverlay({ kind: 'error', message: `No reward window found. Open the Runeshape Combinations or the Ritual Favours window and press ${config.hotkeyScan} again.` });
       return;
     }
-    showOverlay({ kind: 'rewards', title: 'Runeshape Combinations', league: idx.league, exaltedPerDivine: idx.exaltedPerDivine, rows, best: bestRow(rows), ms: Date.now() - t0 });
+    const checkedRows = await verifyRows(rows);
+    showOverlay({ kind: 'rewards', title: 'Runeshape Combinations', league: idx.league, exaltedPerDivine: idx.exaltedPerDivine, rows: checkedRows, best: bestRow(checkedRows), ms: Date.now() - t0 });
   } catch (e) {
     log('error', 'Reward scan failed', e);
     showOverlay({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
@@ -981,6 +1017,15 @@ async function scanRewards() {
     }
     busy = false;
   }
+}
+
+/** Belohnungen mit Börsenpreis (Runen, Omen …) gegen alle Handelspaare prüfen, höchstens 4 gleichzeitig. */
+async function verifyRows(rows: RewardRow[]): Promise<RewardRow[]> {
+  return mapLimit(rows, 4, async (row) => {
+    if (!row.match?.ninjaRef) return row;
+    const match = await verifyPrice(row.match);
+    return match === row.match ? row : { ...row, match, totalExalted: match.exalted * row.count };
+  });
 }
 
 /**
@@ -1018,6 +1063,8 @@ async function scanRitual(shot: Electron.NativeImage, H: number, title: OcrLine,
     ...(m.confidence === 'possible' ? { possible: true } : {}),
     where: `column ${m.col + 1}, row ${m.row + 1}`,
   }));
+  const checked = await verifyRows(rows);
+  rows.splice(0, rows.length, ...checked);
   rows.sort((a, b) => (b.totalExalted ?? 0) - (a.totalExalted ?? 0));
   const other = unmatchedCells(grid, matches);
   log('info', `Ritual scan: ${matches.length} items recognised, ${other} other cells, matching ${Date.now() - tMatch} ms`);
@@ -1099,7 +1146,7 @@ app.on('child-process-gone', (_e, d) => log('warn', `Child process gone: ${d.typ
 app.whenReady().then(() => {
   config = loadConfig();
   // Unsichtbare Tests rufen den Scanner direkt auf (ohne Hotkey, ohne Tastendruck).
-  if (process.env.POE2PC_TEST) (globalThis as Record<string, unknown>).__pcTest = { scanRewards };
+  if (process.env.POE2PC_TEST) (globalThis as Record<string, unknown>).__pcTest = { scanRewards, priceCheck };
   log('info', `Start ${app.getVersion()}, GPU ${config.gpuAcceleration ? 'on' : 'off'}`);
 
   ipcMain.handle('state:get', safe('state:get', () => state()));

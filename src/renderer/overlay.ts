@@ -29,8 +29,9 @@ function ninjaPrice(m: PriceMatch): HTMLElement {
   const p = priceParts(m.divine, m.exalted);
   const meta = el('div', 'price-meta');
   if (p.alt) meta.append(el('span', '', p.alt));
-  const t = trend(m.change7d);
-  if (m.sparkline) meta.append(sparkline(m.sparkline, m.change7d));
+  // Bei widersprüchlichen Kursen stammt auch die 7-Tage-Kurve aus dem fragwürdigen Paar – dann weglassen.
+  const t = m.warning ? null : trend(m.change7d);
+  if (m.sparkline && !m.warning) meta.append(sparkline(m.sparkline, m.change7d));
   if (t) meta.append(t, el('span', 'faint', '7 days'));
   return bigPrice(p.value, p.unit, undefined, meta);
 }
@@ -161,6 +162,7 @@ function renderNinja(r: Extract<PriceResult, { kind: 'priced' }>): HTMLElement {
     if (r.matches.length > 5) card.append(el('div', 'note', `+ ${r.matches.length - 5} more`));
   } else {
     card.append(ninjaPrice(first));
+    if (first.warning) card.append(el('div', 'price-warn', `⚠ ${first.warning}`));
     if (r.stackSize && r.stackSize > 1) {
       card.append(el('div', 'stack', el('span', '', `Stack × ${r.stackSize}`), el('strong', '', priceText(first, r.stackSize))));
     }
@@ -1024,6 +1026,10 @@ function renderRewards(r: RewardsResult): HTMLElement {
       row.match && row.count > 1 ? el('span', 'rw-unit', `${priceText(row.match)} each`) : null,
     );
     name.title = row.match ? row.name : `Read as "${row.raw}" – no price on poe.ninja`;
+    if (row.match?.warning) {
+      name.append(el('span', 'rw-unit rw-warn', '⚠ few trades – lower price shown'));
+      name.title = row.match.warning;
+    }
     if (row.where) {
       // Ritual: Lage im Raster, bei unsicherer Erkennung als "possibly" markiert.
       name.append(el('span', 'rw-unit', `${row.possible ? 'possibly · ' : ''}${row.raw} · ${row.where}`));

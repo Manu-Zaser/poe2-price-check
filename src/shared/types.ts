@@ -16,6 +16,10 @@ export interface PriceMatch {
   sparkline?: number[];
   /** Absolute Bild-URL (web.poecdn.com). */
   icon?: string;
+  /** Börsen-Items (Währung, Runen …): wo poe.ninja die Kurse je Handelspaar führt. */
+  ninjaRef?: { type: string; id: string };
+  /** Hinweis, wenn der Preis unsicher ist (z. B. Handelspaare widersprechen sich). */
+  warning?: string;
 }
 
 /** Ein Mod eines Rares, wie er im Overlay zur Auswahl steht. */
