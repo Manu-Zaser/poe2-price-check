@@ -64,8 +64,10 @@ From the [latest release](https://github.com/Manu-Zaser/poe2-price-check/release
 
 **Thin markets:** for currency, runes, omens and other exchange items poe.ninja takes the price of the trade pair
 with the most volume – with few trades that can be a handful of odd trades (e.g. a rune at 11 Chaos while it sells
-for 10 Exalted). The tool also checks the rates of all pairs (one extra request to poe.ninja, cached 30 minutes);
-if they differ by more than 3×, it shows the lower price with a warning and hides the 7-day trend.
+for 10 Exalted). The tool also checks the rates of all pairs (one extra request to poe.ninja, cached 30 minutes),
+weighted by their trade volume: pairs with hardly any volume – single orders, like someone offering 1750 Exalted for an
+omen that sells for 15 Divine – are ignored. If the remaining pairs differ by more than 3×, it shows the lower price
+with a warning; if the item is hardly traded at all, it keeps the price but warns. Both hide the 7-day trend.
 
 Anything poe.ninja knows is priced via poe.ninja, even as a white item. For identified uniques no mod is ticked by
 default, so you see the cheapest copies.

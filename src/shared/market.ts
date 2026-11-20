@@ -59,8 +59,10 @@ export interface MarketCheck {
   checked: boolean;
   divine: number;
   exalted: number;
-  /** Gesetzt, wenn sich die Paare widersprechen – dann gilt der niedrigere Preis. */
+  /** Hinweis: Paare widersprechen sich (dann priceAdjusted) oder das Item wird kaum gehandelt. */
   warning?: string;
+  /** Preis auf den niedrigeren der widersprüchlichen Paare gesetzt. */
+  priceAdjusted?: boolean;
 }
 
 export function marketKey(name: string, baseType?: string): string {

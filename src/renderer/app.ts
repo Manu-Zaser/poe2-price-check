@@ -701,8 +701,8 @@ function starButton(it: MarketItem): HTMLElement {
 function marketPrice(it: MarketItem): HTMLElement {
   // Nach Nachprüfung mit Widerspruch gilt der niedrigere Preis der Handelspaare.
   const check = checks.get(it.key);
-  const divine = check?.warning ? check.divine : it.divine;
-  const exalted = check?.warning ? check.exalted : it.exalted;
+  const divine = check?.priceAdjusted ? check.divine : it.divine;
+  const exalted = check?.priceAdjusted ? check.exalted : it.exalted;
   // Der Divine Orb selbst ist immer "1 Div" – interessant ist sein Wert in Exalted.
   const p = it.key === 'divine orb' ? { value: amount(exalted), unit: 'Ex', alt: undefined } : priceParts(divine, exalted);
   const box = el('div', 'mk-price', check?.warning ? el('span', 'mk-flag', '⚠') : null, el('span', 'mk-value', p.value), el('span', `unit unit-${p.unit.toLowerCase()}`, p.unit));
@@ -725,7 +725,7 @@ function checkNote(it: MarketItem): HTMLElement | null {
   const check = checks.get(it.key);
   if (checking.has(it.key)) return el('span', 'mk-warn', ' · checking trade pairs …');
   if (check?.warning) {
-    const n = el('span', 'mk-warn', ' · ⚠ trades disagree – lower price shown');
+    const n = el('span', 'mk-warn', check.priceAdjusted ? ' · ⚠ trades disagree – lower price shown' : ' · ⚠ hardly traded – price uncertain');
     n.title = check.warning;
     return n;
   }

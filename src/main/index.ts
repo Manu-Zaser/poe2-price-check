@@ -842,6 +842,7 @@ async function verifyMarket(keys: string[]): Promise<MarketCheck[]> {
       divine: checked.divine,
       exalted: checked.exalted,
       ...(checked.warning ? { warning: checked.warning } : {}),
+      ...(checked.priceAdjusted ? { priceAdjusted: true } : {}),
     };
   });
 }
