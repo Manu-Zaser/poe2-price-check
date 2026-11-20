@@ -39,7 +39,7 @@ describe('buildTradeMods – Handschuhe (Grim Claw)', () => {
     // Leben ist jetzt in der Summe "total maximum Life" enthalten und deshalb abgewählt.
     expect(byText('maximum Life')).toMatchObject({ statId: 'explicit.stat_3299347043', value: 10, enabled: false, coveredBy: 'total' });
     expect(byText('Cold damage to Attacks')).toMatchObject({ statId: 'explicit.stat_4067062424', value: 18 });
-    expect(byText('Dexterity')).toMatchObject({ statId: 'explicit.stat_3261801346', value: 30, min: 30 });
+    expect(byText('Dexterity')).toMatchObject({ statId: 'explicit.stat_3261801346', value: 30, min: 24 });
     expect(byText('Fire Resistance')).toMatchObject({ kind: 'rune', statId: 'rune.stat_3372524247', enabled: false });
   });
 });
@@ -51,7 +51,7 @@ describe('buildTradeMods – Bogen (Morbid Stinger)', () => {
   const byText = (t: string) => mods.find((m) => m.kind !== 'pseudo' && m.text.includes(t))!;
 
   it('erkennt den Implicit ohne Marker und negiert "reduced"', () => {
-    expect(byText('Projectile Range')).toMatchObject({ kind: 'implicit', statId: 'implicit.stat_3398402065', value: 50, min: 50, invert: true, enabled: false });
+    expect(byText('Projectile Range')).toMatchObject({ kind: 'implicit', statId: 'implicit.stat_3398402065', value: 50, min: 40, invert: true, enabled: false });
   });
 
   it('bevorzugt lokale Stats auf Waffen', () => {
@@ -66,14 +66,14 @@ describe('buildTradeMods – Bogen (Morbid Stinger)', () => {
   it('fasst gleiche Stats zusammen (144 % + 63 % increased Physical Damage)', () => {
     const phys = mods.filter((m) => m.statId === 'explicit.stat_1509134228');
     expect(phys).toHaveLength(1);
-    expect(phys[0]).toMatchObject({ value: 207, min: 207, combined: true, text: '207% increased Physical Damage' });
+    expect(phys[0]).toMatchObject({ value: 207, min: 165, combined: true, text: '207% increased Physical Damage' });
     // Die Rune mit demselben Text bleibt eigenständig (andere Gruppe).
     expect(mods.find((m) => m.statId === 'rune.stat_1509134228')).toBeDefined();
   });
 
   it('übernimmt Dezimalwerte', () => {
-    expect(byText('to Critical Hit Chance')).toMatchObject({ statId: 'explicit.stat_518292764', value: 3.44, min: 3.4 });
-    expect(byText('Leeches')).toMatchObject({ value: 7.05, min: 7 });
+    expect(byText('to Critical Hit Chance')).toMatchObject({ statId: 'explicit.stat_518292764', value: 3.44, min: 2.7 });
+    expect(byText('Leeches')).toMatchObject({ value: 7.05, min: 5.6 });
   });
 });
 
@@ -84,7 +84,7 @@ describe('buildSearchQuery', () => {
     expect(q.query.type).toBe('Barbed Bracers');
     // 4 explizite Mods + 3 Summen (Elementar-Resistenzen, Leben, Geschick)
     expect(q.query.stats[0].filters).toHaveLength(7);
-    expect(q.query.stats[0].filters).toContainEqual({ id: 'pseudo.pseudo_total_life', value: { min: 10 } });
+    expect(q.query.stats[0].filters).toContainEqual({ id: 'pseudo.pseudo_total_life', value: { min: 8 } });
     expect(q.query.stats[0].filters).not.toContainEqual(expect.objectContaining({ id: 'explicit.stat_3299347043' }));
     expect(q.sort).toEqual({ price: 'asc' });
   });
@@ -108,12 +108,16 @@ describe('buildSearchQuery', () => {
 });
 
 describe('defaultMin', () => {
-  it('nimmt den eigenen Wert, auf eine Nachkommastelle abgerundet', () => {
-    expect(defaultMin(100)).toBe(100);
+  it('starts at 80 % of the item value, rounded down; small counts stay exact', () => {
+    expect(defaultMin(100)).toBe(80);
+    expect(defaultMin(30)).toBe(24);
+    expect(defaultMin(207)).toBe(165);
+    expect(defaultMin(432.9)).toBe(346.3);
+    expect(defaultMin(3.44)).toBe(2.7);
+    expect(defaultMin(7.05)).toBe(5.6);
+    expect(defaultMin(24.5)).toBe(19.6);
+    expect(defaultMin(3)).toBe(3);
     expect(defaultMin(2)).toBe(2);
-    expect(defaultMin(3.44)).toBe(3.4);
-    expect(defaultMin(7.05)).toBe(7);
-    expect(defaultMin(24.5)).toBe(24.5);
     expect(defaultMin(0.7)).toBe(0.7);
     expect(defaultMin(-50)).toBeUndefined();
     expect(defaultMin(null)).toBeUndefined();
@@ -146,7 +150,7 @@ describe('uniques via trade search', () => {
 
   it('lists the mods but only ticks the corrupted filter by default', () => {
     const es = mods.find((m) => m.kind === 'explicit' && m.text.includes('maximum Energy Shield'))!;
-    expect(es).toMatchObject({ value: 137, min: 137, enabled: false });
+    expect(es).toMatchObject({ value: 137, min: 109, enabled: false });
     expect(mods.filter((m) => m.enabled).map((m) => m.filter)).toEqual(['corrupted']);
   });
 
@@ -161,7 +165,7 @@ describe('uniques via trade search', () => {
   it('adds ticked rolls with the item value as minimum', () => {
     const ticked = mods.map((m) => (m.kind === 'explicit' && m.statId ? { ...m, enabled: true } : m));
     const q = buildSearchQuery(item, ticked, { useBaseType: true, matchAll: true });
-    expect(q.query.stats[0].filters).toEqual([expect.objectContaining({ value: { min: 137 } })]);
+    expect(q.query.stats[0].filters).toEqual([expect.objectContaining({ value: { min: 109 } })]);
   });
 });
 
@@ -192,7 +196,7 @@ describe('min/max and "reduced" mods', () => {
     const mods = buildTradeMods(item, stats).map((m) =>
       m.text.includes('Projectile Range') ? { ...m, enabled: true, max: 60 } : { ...m, enabled: false });
     const q = buildSearchQuery(item, mods, { useBaseType: true, matchAll: true });
-    expect(q.query.stats[0].filters).toEqual([{ id: 'implicit.stat_3398402065', value: { min: -60, max: -50 } }]);
+    expect(q.query.stats[0].filters).toEqual([{ id: 'implicit.stat_3398402065', value: { min: -60, max: -40 } }]);
   });
 });
 

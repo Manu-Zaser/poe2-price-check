@@ -40,20 +40,44 @@ function candidateRow(m: PriceMatch): HTMLElement {
   return el('div', 'cand', itemIcon(m.icon, 'cand-icon'), el('span', 'cand-name', m.name), el('span', 'cand-price', priceText(m)));
 }
 
-/** Overlay kleiner/größer (wie "Overlay size" in den Einstellungen; wird gespeichert). */
-function zoomButtons(): HTMLElement {
-  const btn = (label: string, delta: number, title: string) => {
-    const b = el('button', 'zoom', label);
-    b.title = title;
-    b.addEventListener('click', () => api.zoomOverlay(delta));
-    return b;
-  };
-  return el('span', 'zoom-group', btn('−', -ZOOM_STEP, 'Smaller (Ctrl + mouse wheel)'), btn('+', ZOOM_STEP, 'Larger (Ctrl + mouse wheel)'));
-}
-
 const ZOOM_STEP = 0.05;
 
-// Strg + Mausrad über dem Overlay ändert die Größe (wie im Browser).
+// Größe ändern wie bei anderen Fenstern: an den Rändern ziehen (rechts, links, unten, untere Ecken).
+// Die Greifzonen liegen fest am Fensterrand – das Fenster ist genau so groß wie die Karte.
+for (const edge of ['r', 'l', 'b', 'br', 'bl'] as const) {
+  const handle = document.createElement('div');
+  handle.className = `rz rz-${edge}`;
+  handle.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    e.stopPropagation(); // kein Verschieben
+    e.preventDefault();
+    try {
+      handle.setPointerCapture(e.pointerId);
+    } catch {
+      // ohne Capture endet das Ziehen beim Loslassen im Fenster
+    }
+    document.body.classList.add('resizing', `resizing-${edge}`);
+    api.resizeStart(edge);
+  });
+  handle.addEventListener('pointermove', (e) => {
+    if (handle.hasPointerCapture(e.pointerId)) api.resizeMove();
+  });
+  const end = (e: PointerEvent) => {
+    if (!document.body.classList.contains('resizing')) return;
+    document.body.classList.remove('resizing', `resizing-${edge}`);
+    try {
+      handle.releasePointerCapture(e.pointerId);
+    } catch {
+      // schon frei
+    }
+    api.resizeEnd();
+  };
+  handle.addEventListener('pointerup', end);
+  handle.addEventListener('pointercancel', end);
+  document.body.append(handle);
+}
+
+// Strg + Mausrad über dem Overlay ändert die Größe ebenfalls (wie im Browser).
 window.addEventListener(
   'wheel',
   (e) => {
@@ -118,7 +142,7 @@ function header(r: Result | null, icon?: string, title?: string, showTags = true
   }
   const grip = el('span', 'grip', '⠿');
   grip.title = 'Drag anywhere on the overlay to move it';
-  return el('div', 'head', icon ? itemIcon(icon, 'head-icon') : null, text, zoomButtons(), grip, closeButton());
+  return el('div', 'head', icon ? itemIcon(icon, 'head-icon') : null, text, grip, closeButton());
 }
 
 // ---------- Gemerkte Ansicht ----------

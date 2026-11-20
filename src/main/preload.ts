@@ -43,6 +43,10 @@ const api = {
   /** Maus hat sich beim Ziehen bewegt – das Fenster folgt dem Mauszeiger. */
   dragMove: () => ipcRenderer.send('overlay:drag-move'),
   dragEnd: () => ipcRenderer.send('overlay:drag-end'),
+  /** Resize from an edge: r, l, b, br or bl. */
+  resizeStart: (edge: string) => ipcRenderer.send('overlay:resize-start', edge),
+  resizeMove: () => ipcRenderer.send('overlay:resize-move'),
+  resizeEnd: () => ipcRenderer.send('overlay:resize-end'),
   hideOverlay: () => ipcRenderer.send('overlay:hide'),
   tradeSearch: (selection: TradeSelection) => ipcRenderer.send('trade:search', selection),
   openTrade: (url: string) => ipcRenderer.send('trade:open', url),

@@ -564,6 +564,10 @@ function placeOverlay(size: { width: number; height: number }) {
   const width = Math.max(100, Math.ceil((Number(size.width) || OVERLAY_WIDTH) * scale));
   const rawHeight = Math.ceil((Number(size.height) || 200) * scale);
   const origin = overlayOrigin(width, rawHeight);
+  if (keepRightEdge !== null) {
+    origin.x = keepRightEdge - width;
+    if (!resize) keepRightEdge = null; // nach dem Loslassen nur noch für diese eine Neuvermessung
+  }
   const area = screen.getDisplayNearestPoint(origin).workArea;
   const height = Math.max(60, Math.min(rawHeight, area.height));
   // Unten nicht aus dem Bildschirm ragen lassen.
@@ -655,6 +659,51 @@ function endDrag() {
   config.overlayPosition = { x, y };
   saveConfig(config);
   pushState();
+}
+
+// ---------- Größe durch Ziehen am Rand ----------
+
+type ResizeEdge = 'r' | 'l' | 'b' | 'br' | 'bl';
+/** Beim Ziehen am linken Rand: dort soll der rechte Rand des Overlays bleiben. */
+let keepRightEdge: number | null = null;
+let resize: { edge: ResizeEdge; cursor: Electron.Point; bounds: Electron.Rectangle; scale: number } | null = null;
+const OVERLAY_SCALE = { min: 0.8, max: 1.6 };
+
+/**
+ * Am Rand ziehen ändert die Größe des ganzen Overlays (wie "Overlay size" in den Einstellungen): die neue
+ * Breite bzw. Höhe im Verhältnis zur alten ergibt den Zoom. Links gezogen bleibt der rechte Rand stehen.
+ */
+function startResize(edge: unknown) {
+  if (!alive(overlayWin) || !['r', 'l', 'b', 'br', 'bl'].includes(String(edge))) return;
+  resize = { edge: edge as ResizeEdge, cursor: screen.getCursorScreenPoint(), bounds: overlayWin.getBounds(), scale: config.overlayScale };
+}
+
+function moveResize() {
+  if (!resize || !alive(overlayWin)) return;
+  const p = screen.getCursorScreenPoint();
+  const { edge, bounds, cursor } = resize;
+  const dx = edge.includes('l') ? cursor.x - p.x : edge.includes('r') ? p.x - cursor.x : 0;
+  const dy = edge.includes('b') ? p.y - cursor.y : 0;
+  // Die stärkere der beiden Richtungen bestimmt die Größe (Ecken).
+  const ratio = Math.max((bounds.width + dx) / bounds.width, edge === 'r' || edge === 'l' ? 0 : (bounds.height + dy) / bounds.height);
+  const next = Math.min(OVERLAY_SCALE.max, Math.max(OVERLAY_SCALE.min, Math.round(resize.scale * ratio * 100) / 100));
+  if (next === config.overlayScale) return;
+  config.overlayScale = next;
+  // Links gezogen: der rechte Rand bleibt stehen – angewendet, sobald das Overlay seine neue Größe meldet.
+  keepRightEdge = edge.includes('l') ? bounds.x + bounds.width : null;
+  applyOverlayScale();
+}
+
+function endResize() {
+  if (!resize) return;
+  resize = null;
+  log('info', `Overlay size set to ${Math.round(config.overlayScale * 100)}%`);
+  if (alive(overlayWin)) {
+    const { x, y } = overlayWin.getBounds();
+    if (config.overlayPosition) config.overlayPosition = { x, y };
+  }
+  saveConfig(config);
+  pushState(); // Einstellungsseite zeigt die neue Größe
 }
 
 /** Das Overlay bleibt offen, bis man es schließt (× oder Esc). */
@@ -1198,6 +1247,9 @@ app.whenReady().then(() => {
   ipcMain.on('overlay:drag-start', safe('overlay:drag-start', () => startDrag()));
   ipcMain.on('overlay:drag-move', safe('overlay:drag-move', () => moveDrag()));
   ipcMain.on('overlay:drag-end', safe('overlay:drag-end', () => endDrag()));
+  ipcMain.on('overlay:resize-start', safe('overlay:resize-start', (_e, edge: unknown) => startResize(edge)));
+  ipcMain.on('overlay:resize-move', safe('overlay:resize-move', () => moveResize()));
+  ipcMain.on('overlay:resize-end', safe('overlay:resize-end', () => endResize()));
   ipcMain.on('overlay:ready', safe('overlay:ready', (_e, size: { width: number; height: number }) => placeOverlay(size)));
   ipcMain.on('overlay:zoom', safe('overlay:zoom', (_e, delta: unknown) => {
     const d = Number(delta);

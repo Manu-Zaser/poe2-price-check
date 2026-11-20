@@ -376,12 +376,7 @@ input[type="checkbox"]:disabled { opacity: .35; cursor: default; }
 .bar-actions { display: flex; gap: 8px; margin-left: auto; }
 .results-bar .btn-save { padding-left: 9px; padding-right: 9px; }
 
-/* Größe des Overlays: − / + im Kopf */
-.zoom-group { display: inline-flex; align-self: flex-start; margin-top: 1px; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; opacity: .55; transition: opacity .15s; }
-.card:hover .zoom-group { opacity: 1; }
-.zoom { width: 22px; height: 20px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 14px; line-height: 1; }
-.zoom + .zoom { border-left: 1px solid var(--line); }
-.zoom:hover { color: var(--text); background: var(--surface-3); }
+
 
 /* Belohnungs-Scanner */
 .rw-best { margin: 10px 0 8px; padding: 8px 10px; border-radius: 8px; background: rgba(127,176,105,.10); border: 1px solid rgba(127,176,105,.35); font-size: 13px; color: var(--muted); }
@@ -407,3 +402,16 @@ input[type="checkbox"]:disabled { opacity: .35; cursor: default; }
 /* Unsicherer poe.ninja-Preis (Handelspaare widersprechen sich) */
 .price-warn { margin-top: 8px; padding: 7px 10px; border-radius: 8px; font-size: 12px; line-height: 1.4; color: var(--gold-bright); background: rgba(201,168,92,.08); border: 1px solid rgba(201,168,92,.35); }
 .rw-warn { color: var(--gold-bright) !important; }
+
+/* Größe ändern: Greifzonen an den Fensterrändern */
+.rz { position: fixed; z-index: 50; }
+.rz-r { top: 12px; bottom: 12px; right: 0; width: 7px; cursor: ew-resize; }
+.rz-l { top: 12px; bottom: 12px; left: 0; width: 7px; cursor: ew-resize; }
+.rz-b { left: 12px; right: 12px; bottom: 0; height: 7px; cursor: ns-resize; }
+.rz-br { right: 0; bottom: 0; width: 14px; height: 14px; cursor: nwse-resize; }
+.rz-bl { left: 0; bottom: 0; width: 14px; height: 14px; cursor: nesw-resize; }
+body.resizing, body.resizing * { user-select: none; }
+body.resizing-r *, body.resizing-l * { cursor: ew-resize !important; }
+body.resizing-b * { cursor: ns-resize !important; }
+body.resizing-br * { cursor: nwse-resize !important; }
+body.resizing-bl * { cursor: nesw-resize !important; }

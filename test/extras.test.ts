@@ -27,9 +27,9 @@ describe('Pseudo-Summen (Grim Claw)', () => {
   const get = (key: string) => mods.find((m) => m.key === key);
 
   it('bildet Summen aus allen Quellen (inkl. Rune) und wählt die Einzel-Mods ab', () => {
-    expect(get('p:ele')).toMatchObject({ statId: 'pseudo.pseudo_total_elemental_resistance', value: 18, min: 18, enabled: true });
-    expect(get('p:life')).toMatchObject({ value: 10, min: 10, enabled: true });
-    expect(get('p:dex')).toMatchObject({ value: 30, min: 30, enabled: true });
+    expect(get('p:ele')).toMatchObject({ statId: 'pseudo.pseudo_total_elemental_resistance', value: 18, min: 14, enabled: true });
+    expect(get('p:life')).toMatchObject({ value: 10, min: 8, enabled: true });
+    expect(get('p:dex')).toMatchObject({ value: 30, min: 24, enabled: true });
     expect(mods.find((m) => m.text.includes('to Dexterity') && m.kind === 'explicit')).toMatchObject({ enabled: false, coveredBy: 'total' });
   });
 
@@ -50,7 +50,7 @@ describe('Pseudo-Summen (Grim Claw)', () => {
     const q = buildSearchQuery(item, mods, { useBaseType: true, matchAll: false, instantOnly: false });
     expect(q.query.status).toEqual({ option: 'available' });
     // Handschuhe: Ausweichen 196 ist als Verteidigungswert aktiv, sonst keine Equipment-Filter
-    expect(q.query.filters).toMatchObject({ equipment_filters: { filters: { ev: { min: 196 } } } });
+    expect(q.query.filters).toMatchObject({ equipment_filters: { filters: { ev: { min: 156 } } } });
     expect(Object.keys((q.query.filters as { equipment_filters: { filters: object } }).equipment_filters.filters)).toEqual(['ev']);
   });
 });
@@ -65,23 +65,23 @@ describe('Waffen-DPS (Morbid Stinger)', () => {
 
   it('searches the overall critical hit chance instead of the local crit mod', () => {
     const mods = buildTradeMods(item, stats);
-    // "Critical Hit Chance: 8.44%" from the properties (base + local mod + quality), minimum rounded down
-    expect(mods.find((m) => m.key === 'w:crit')).toMatchObject({ kind: 'weapon', filter: 'crit', value: 8.44, min: 8.4, enabled: true });
+    // "Critical Hit Chance: 8.44%" from the properties (base + local mod + quality), minimum 80 % rounded down
+    expect(mods.find((m) => m.key === 'w:crit')).toMatchObject({ kind: 'weapon', filter: 'crit', value: 8.44, min: 6.7, enabled: true });
     expect(mods.find((m) => m.text === '+3.44% to Critical Hit Chance')).toMatchObject({ enabled: false, coveredBy: 'crit' });
     const q = buildSearchQuery(item, mods, { useBaseType: true, matchAll: true });
-    expect(q.query.filters.equipment_filters?.filters).toMatchObject({ crit: { min: 8.4 } });
+    expect(q.query.filters.equipment_filters?.filters).toMatchObject({ crit: { min: 6.7 } });
   });
 
   it('sucht standardmäßig nach pDPS und wählt die enthaltenen Schadens-Mods ab', () => {
     const mods = buildTradeMods(item, stats);
-    expect(mods.find((m) => m.key === 'w:pdps')).toMatchObject({ enabled: true, min: 380.1 });
+    expect(mods.find((m) => m.key === 'w:pdps')).toMatchObject({ enabled: true, min: 304 });
     expect(mods.find((m) => m.key === 'w:dps')).toMatchObject({ enabled: false });
     expect(mods.find((m) => m.text === '207% increased Physical Damage')).toMatchObject({ enabled: false, coveredBy: 'DPS' });
     expect(mods.find((m) => m.text.startsWith('Adds 37 to 59 Cold Damage'))).toMatchObject({ enabled: false, coveredBy: 'DPS' });
     expect(mods.find((m) => m.text.includes('Accuracy'))).toMatchObject({ enabled: true });
 
     const q = buildSearchQuery(item, mods, { useBaseType: true, matchAll: false });
-    expect(q.query.filters).toMatchObject({ equipment_filters: { filters: { pdps: { min: 380.1 } } } });
+    expect(q.query.filters).toMatchObject({ equipment_filters: { filters: { pdps: { min: 304 } } } });
   });
 
   it('liefert für Nicht-Waffen keine DPS', () => {
@@ -129,8 +129,8 @@ describe('Verteidigung (Rüstungen)', () => {
   });
 
   it('sucht nach Ausweichen und Energieschild und wählt die lokalen Verteidigungs-Mods ab', () => {
-    expect(get('d:ev')).toMatchObject({ kind: 'defence', filter: 'ev', value: 812, min: 812, enabled: true });
-    expect(get('d:es')).toMatchObject({ filter: 'es', value: 245, min: 245, enabled: true });
+    expect(get('d:ev')).toMatchObject({ kind: 'defence', filter: 'ev', value: 812, min: 649, enabled: true });
+    expect(get('d:es')).toMatchObject({ filter: 'es', value: 245, min: 196, enabled: true });
     expect(get('d:ar')).toBeUndefined();
     expect(mods.find((m) => m.text.includes('increased Evasion and Energy Shield'))).toMatchObject({ enabled: false, coveredBy: 'defence' });
     expect(mods.find((m) => m.text.includes('to Evasion Rating'))).toMatchObject({ enabled: false, coveredBy: 'defence' });
@@ -141,7 +141,7 @@ describe('Verteidigung (Rüstungen)', () => {
 
   it('schreibt Verteidigungswerte als Equipment-Filter in die Suche', () => {
     const q = buildSearchQuery(item, mods, { useBaseType: true, matchAll: false, instantOnly: true });
-    expect(q.query.filters).toMatchObject({ equipment_filters: { filters: { ev: { min: 812 }, es: { min: 245 } } } });
+    expect(q.query.filters).toMatchObject({ equipment_filters: { filters: { ev: { min: 649 }, es: { min: 196 } } } });
   });
 });
 

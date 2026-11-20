@@ -3,6 +3,7 @@
  * Waffen-DPS, Item-Level und Rune-Sockel – plus ein Verkaufspreis-Vorschlag.
  */
 import type { ModLine } from '@poe2/core/item';
+import { defaultMin } from './stats';
 import type { Listing, ParsedItem, TradeMod } from './types';
 
 // ---------- Pseudo-Summen ----------
@@ -171,10 +172,9 @@ export function coveredByDefence(template: string): boolean {
 
 // ---------- Zusatz-Kriterien ----------
 
-/** Mindestwert = eigener Wert, auf eine Nachkommastelle abgerundet. */
+/** Mindestwert wie bei den Mods: 80 % vom eigenen Wert (siehe defaultMin). */
 function minOf(value: number): number {
-  if (Number.isInteger(value)) return value;
-  return Math.floor(value * 10 + 1e-9) / 10;
+  return defaultMin(value) ?? value;
 }
 
 /**

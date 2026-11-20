@@ -82,8 +82,9 @@ The overlay is laid out like the trade site, top to bottom:
   them*, e.g. "3 of 5").
 - **Stat lines** with a checkbox, **Min** and **Max**. Under each mod: where it comes from (Explicit, Implicit,
   Augment = rune/soul core, Desecrated, Fractured …) and its tier (e.g. "P T3"; in PoE2 a higher tier is better).
-  Click to tick, change values with the **mouse wheel** or type them (empty = no limit). Default minimum = your
-  item's own value.
+  Click to tick, change values with the **mouse wheel** or type them (empty = no limit). Default minimum = **80 %**
+  of your item's value, rounded down (as other price check tools do – finds comparable items, not only better
+  ones); small values up to 3 (e.g. +1 arrow, +2 skill levels) stay exact.
 - **Key mods:** a rare's price depends on 2–3 mods, not on all of them. Only the **key mods** of the item type are
   ticked by default (e.g. movement speed on boots, skill levels and Spirit on amulets, flat attack damage and rarity on
   rings), together with the totals for life and resistances. **Low value** mods (light radius, thorns, stun …) are
@@ -227,8 +228,8 @@ rejected because the game needs them. Esc cancels.
 - **Overlay:** stays open until you close it with **×** (or Esc); a new price check replaces its content. Drag it by
   any empty spot to move it – the position is remembered (Settings → "Reset position" = back next to the cursor).
   If the overlay content crashes, the window is recreated so nothing invisible is left on top of the game.
-- **Size in the overlay:** **−** / **+** next to the title, or **Ctrl + mouse wheel** over the overlay – saved like
-  the size setting below.
+- **Size:** drag an edge or a lower corner of the overlay, like any window – the whole overlay grows or shrinks
+  (80–160 %). **Ctrl + mouse wheel** over the overlay does the same. Saved like the size setting below.
 - **Appearance:** overlay size (80–160%) and background opacity (40–100%) – lower values let the game show through;
   text and buttons stay fully visible. Check with "Show test overlay".
 - **League:** "Automatic" follows the current challenge league on poe.ninja and switches to a new league within an

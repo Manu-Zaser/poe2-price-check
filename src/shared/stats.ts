@@ -96,13 +96,20 @@ function round(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+/** Startwert für das Minimum: dieser Anteil vom Wert des Items (wie bei anderen Preischeck-Tools). */
+export const DEFAULT_MIN_SHARE = 0.8;
+/** Kleine Zählwerte (+1 Pfeil, +2 Skill-Level …) bleiben genau – 80 % davon würde die Suche verwässern. */
+const EXACT_UP_TO = 3;
+
 /**
- * Standard-Mindestwert = der Wert des Items selbst, auf eine Nachkommastelle abgerundet
- * (ganze Zahlen bleiben ganz): 30 → 30, 3.44 → 3.4, 7.05 → 7.
+ * Standard-Mindestwert = 80 % vom Wert des Items, abgerundet (ganze Zahlen ganz, sonst eine
+ * Nachkommastelle): 30 → 24, 432.9 → 346.3, 8.44 → 6.7; Werte bis 3 bleiben, wie sie sind.
  */
 export function defaultMin(value: number | null): number | undefined {
   if (value === null || value <= 0) return undefined;
-  return floorOneDecimal(value);
+  if (value <= EXACT_UP_TO) return floorOneDecimal(value);
+  const v = value * DEFAULT_MIN_SHARE;
+  return Number.isInteger(value) ? Math.floor(v + 1e-9) : floorOneDecimal(v);
 }
 
 export function floorOneDecimal(value: number): number {
