@@ -137,6 +137,8 @@ export interface Settings {
   hotkeyWiki: string;
   /** Schließen des Hauptfensters lässt das Tool im Infobereich weiterlaufen. */
   closeToTray: boolean;
+  /** Overlay schließen, sobald man wieder ins Spiel klickt (sonst bleibt es offen, bis × oder Esc). */
+  closeOnGameClick: boolean;
   /** Mit Windows starten (unsichtbar, nur im Infobereich). */
   startWithWindows: boolean;
   /** Waystones/Tablets: Textstücke gefährlicher Mods. */

@@ -373,6 +373,9 @@
               <label for="opacity">Background <span class="info" title="Lower values let the game show through. Text stays fully visible.">ⓘ</span></label>
               <div class="slider"><input type="range" id="opacity" min="40" max="100" step="5" /><output id="opacity-out"></output></div>
             </div>
+            <div class="field">
+              <label class="check"><input type="checkbox" id="close-game-click" /> <span>Close when you click into the game</span> <span class="info" title="Clicking anywhere in the game outside the overlay closes it. Off: it stays open until you press × or Esc. Clicks into other programs (e.g. your browser) never close it.">ⓘ</span></label>
+            </div>
             <div class="field line">
               <label>Position <span class="info" title="Drag the overlay anywhere to move it – the position is remembered.">ⓘ</span></label>
               <div class="line-end"><output id="pos-out"></output><button class="btn sm" id="pos-reset">Reset</button></div>

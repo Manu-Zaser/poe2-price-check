@@ -507,9 +507,13 @@ function renderStartup(s: AppState) {
   help.hidden = s.status.canStartWithWindows;
   help.textContent = s.status.canStartWithWindows ? '' : 'Only available in the installed or portable exe, not when running from source.';
   $<HTMLInputElement>('close-tray').checked = s.settings.closeToTray;
+  $<HTMLInputElement>('close-game-click').checked = s.settings.closeOnGameClick;
 }
 $<HTMLInputElement>('start-windows').addEventListener('change', (e) => {
   void api.saveSettings({ startWithWindows: (e.target as HTMLInputElement).checked });
+});
+$<HTMLInputElement>('close-game-click').addEventListener('change', (e) => {
+  void api.saveSettings({ closeOnGameClick: (e.target as HTMLInputElement).checked });
 });
 $<HTMLInputElement>('close-tray').addEventListener('change', (e) => {
   void api.saveSettings({ closeToTray: (e.target as HTMLInputElement).checked });

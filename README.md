@@ -208,7 +208,7 @@ rejected because the game needs them. Esc cancels.
 
 ## Overlay and settings
 
-- **Overlay:** stays open until you close it with **×** (or Esc); a new price check replaces its content. Drag it by
+- **Overlay:** closes when you click back into the game, or with **×** / Esc; a new price check replaces its content. Prefer it to stay open? Turn off Settings → Overlay → "Close when you click into the game" (the tool then only reads whether a mouse button is pressed while the overlay is open – nothing is sent to the game). Drag it by
   any empty spot to move it – the position is remembered (Settings → Overlay → Reset = back next to the cursor).
   If the overlay content crashes, the window is recreated so nothing invisible is left on top of the game.
 - **Size:** drag an edge or a lower corner of the overlay, like any window – the whole overlay grows or shrinks

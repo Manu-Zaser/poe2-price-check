@@ -4,10 +4,11 @@ import { join } from 'node:path';
 import { readItemText as readGameItemText } from '@poe2/core/clipboard';
 import { validateHotkey } from '@poe2/core/hotkey';
 import { parseItemText } from '@poe2/core/item';
-import { focusWindowByTitle, foregroundWindowHandle, foregroundWindowTitle } from '@poe2/core/win32';
+import { focusWindowByTitle, foregroundWindowHandle, foregroundWindowTitle, mouseButtonDown } from '@poe2/core/win32';
 import { cleanDangerList, CRAFT_OF_EXILE_URL, DEFAULT_DANGER_MODS, isCraftable, isMapItem, markDangerous, poe2dbUrl, wikiUrl } from '../shared/maps';
 import { applyWeights, cleanWeightList, DEFAULT_KEY_MODS, DEFAULT_LOW_MODS, LEGACY_DEFAULTS, upgradeDefaults } from '../shared/weights';
 import { buildSearchQuery, cleanSavedSearches, isNamedUnique, tradeSearchUrl, type StatIndex } from '../shared/stats';
+import { stepGameClick, type GameClickState } from '../shared/gameclick';
 import { cleanWatchlist, type MarketCheck, type MarketData } from '../shared/market';
 import type { AppState, AppStatus, HistoryEntry, HotkeySetting, ParsedItem, PriceMatch, PriceResult, SaveResult, Settings, TradeSelection } from '../shared/types';
 import { log, logFile } from './log';
@@ -68,6 +69,7 @@ const DEFAULT_CONFIG: Config = {
   hotkeyTrade: 'Ctrl+Alt+D',
   hotkeyWiki: 'Alt+W',
   closeToTray: true,
+  closeOnGameClick: true,
   startWithWindows: false,
   dangerMods: DEFAULT_DANGER_MODS,
   keyMods: DEFAULT_KEY_MODS,
@@ -194,12 +196,12 @@ function currencyRates(): AppStatus['currencyRates'] {
 }
 
 function state(): AppState {
-  const { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity, hotkeyTrade, hotkeyWiki, closeToTray, startWithWindows, dangerMods, keyMods, lowMods, watchlist, savedSearches } = config;
+  const { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity, hotkeyTrade, hotkeyWiki, closeToTray, closeOnGameClick, startWithWindows, dangerMods, keyMods, lowMods, watchlist, savedSearches } = config;
   return {
     status: status(),
     update: updateState(),
     leagueAuto: !league,
-    settings: { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity, hotkeyTrade, hotkeyWiki, closeToTray, startWithWindows, dangerMods, keyMods, lowMods, watchlist, savedSearches },
+    settings: { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity, hotkeyTrade, hotkeyWiki, closeToTray, closeOnGameClick, startWithWindows, dangerMods, keyMods, lowMods, watchlist, savedSearches },
     overlayPositionSaved: config.overlayPosition !== null,
     logFile: logFile(),
     leagues,
@@ -341,6 +343,7 @@ async function saveSettings(patch: Partial<Settings>): Promise<SaveResult> {
   }
 
   if (patch.closeToTray !== undefined) config.closeToTray = !!patch.closeToTray;
+  if (patch.closeOnGameClick !== undefined) config.closeOnGameClick = !!patch.closeOnGameClick;
   if (patch.startWithWindows !== undefined) {
     config.startWithWindows = !!patch.startWithWindows;
     applyLoginItem();
@@ -575,6 +578,7 @@ function placeOverlay(size: { width: number; height: number }) {
     setTimeout(() => (placing = false), 50);
   }
   if (!overlayWin.isVisible()) {
+    overlayShownAt = Date.now();
     overlayWin.showInactive(); // Spiel behält den Fokus
     log('info', `Overlay shown at ${Math.round(origin.x)},${Math.round(y)} (${width}×${height})`);
   }
@@ -582,6 +586,55 @@ function placeOverlay(size: { width: number; height: number }) {
   overlayWin.setAlwaysOnTop(true, 'screen-saver');
   overlayWin.moveTop();
   startOverlayWatch();
+  startGameClickWatch();
+}
+
+// ---------- Schließen bei Klick ins Spiel ----------
+
+let overlayShownAt = 0;
+let clickWatch: NodeJS.Timeout | null = null;
+let clickState: GameClickState = { wasDown: false, outsideAt: 0 };
+
+/**
+ * Solange das Overlay offen ist und die Einstellung an ist: alle 50 ms den Zustand der Maustasten bei
+ * Windows lesen (nichts wird gesendet). Wird außerhalb des Overlays geklickt und ist danach das Spiel vorne,
+ * schließt sich das Overlay. Klicks in andere Programme (Browser, zweiter Bildschirm) lassen es offen.
+ */
+function startGameClickWatch() {
+  if (clickWatch || !config.closeOnGameClick) return;
+  clickState = { wasDown: mouseButtonDown(), outsideAt: 0 };
+  clickWatch = setInterval(() => {
+    if (!alive(overlayWin) || !overlayWin.isVisible() || !config.closeOnGameClick) return stopGameClickWatch();
+    const down = mouseButtonDown();
+    let inside = false;
+    if (down && !clickState.wasDown) {
+      const p = screen.getCursorScreenPoint();
+      const b = overlayWin.getBounds();
+      inside = p.x >= b.x && p.x < b.x + b.width && p.y >= b.y && p.y < b.y + b.height;
+    }
+    // Vordergrund nur abfragen, wenn ein Klick außerhalb wartet (oder gerade passiert ist).
+    const waiting = clickState.outsideAt > 0 || (down && !clickState.wasDown && !inside);
+    const step = stepGameClick(clickState, {
+      now: Date.now(),
+      down,
+      inside,
+      busy: !!drag || !!resize,
+      shownAt: overlayShownAt,
+      gameInFront: waiting && foregroundWindowTitle() === config.gameWindowTitle,
+    });
+    clickState = step.state;
+    if (step.close) {
+      log('info', 'Clicked into the game – closing the overlay');
+      hideOverlay();
+    }
+  }, 50);
+}
+
+function stopGameClickWatch() {
+  if (!clickWatch) return;
+  clearInterval(clickWatch);
+  clickWatch = null;
+  clickState = { wasDown: false, outsideAt: 0 };
 }
 
 // ---------- Overlay nach Alt+Tab ----------
@@ -707,6 +760,7 @@ function hideOverlay() {
   if (!alive(overlayWin)) return;
   endDrag(); // ein laufendes Verschieben endet spätestens hier
   stopOverlayWatch();
+  stopGameClickWatch();
   log('info', 'Overlay closed');
   returnFocusToGame('overlay closed'); // erst Fokus ans Spiel, dann ausblenden
   overlayWin.hide();
