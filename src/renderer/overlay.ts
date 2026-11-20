@@ -9,8 +9,7 @@ import { ageFromIso, amount, currencyShort, parseMin, priceParts, priceText } fr
 
 const root = document.getElementById('root')!;
 
-type Result = Exclude<PriceResult, { kind: 'error' } | { kind: 'rewards' }>;
-type RewardsResult = Extract<PriceResult, { kind: 'rewards' }>;
+type Result = Exclude<PriceResult, { kind: 'error' }>;
 type TradeResult = Extract<PriceResult, { kind: 'trade' }>;
 
 // ---------- Bausteine ----------
@@ -1036,54 +1035,6 @@ function updateTrade(v: TradeView, r: TradeResult) {
   v.refresh();
 }
 
-// ---------- Belohnungs-Scanner ----------
-
-/** Runeshape-Fenster: jede Zeile mit Stückpreis und Gesamtwert, die wertvollste markiert – in Spielreihenfolge. */
-function renderRewards(r: RewardsResult): HTMLElement {
-  const total = (ex: number) => priceText({ divine: ex / (r.exaltedPerDivine || 1), exalted: ex });
-  const rows = r.rows.map((row, i) => {
-    const best = i === r.best;
-    const name = el(
-      'span',
-      'rw-name',
-      el('span', 'rw-line', el('span', 'rw-count', `${row.count}×`), ` ${row.name}`),
-      row.match && row.count > 1 ? el('span', 'rw-unit', `${priceText(row.match)} each`) : null,
-    );
-    name.title = row.match ? row.name : `Read as "${row.raw}" – no price on poe.ninja`;
-    if (row.match?.warning) {
-      name.append(el('span', 'rw-unit rw-warn', '⚠ few trades – lower price shown'));
-      name.title = row.match.warning;
-    }
-    if (row.where) {
-      // Ritual: Lage im Raster, bei unsicherer Erkennung als "possibly" markiert.
-      name.append(el('span', 'rw-unit', `${row.possible ? 'possibly · ' : ''}${row.raw} · ${row.where}`));
-      if (row.possible) name.title = `Looks like ${row.name}, but not certain – hover it and price-check to be sure`;
-    }
-    return el(
-      'div',
-      `rw-row${best ? ' best' : ''}${row.match ? '' : ' unpriced'}${row.possible ? ' possible' : ''}`,
-      el('span', 'rw-mark', best ? '★' : ''),
-      row.match ? itemIcon(row.match.icon, 'rw-icon') : el('span', 'rw-icon'),
-      name,
-      el('span', 'rw-total', row.totalExalted !== undefined ? total(row.totalExalted) : 'no price'),
-    );
-  });
-  const bestRow = r.best !== null ? r.rows[r.best] : null;
-  const summary = bestRow
-    ? el('div', 'rw-best', 'Best: ', el('b', '', `${bestRow.count}× ${bestRow.name}`), ` · ${total(bestRow.totalExalted!)}`)
-    : el('div', 'rw-best muted', r.rows.length ? 'Nothing recognised for certain – check the "possibly" items.' : 'No uniques or currency recognised.');
-  const rate = r.exaltedPerDivine ? ` · 1 Div = ${amount(r.exaltedPerDivine)} Ex` : '';
-  return el(
-    'div',
-    'card card-rewards',
-    header(null, undefined, r.title),
-    summary,
-    el('div', 'rw-list', ...rows),
-    r.note ? el('div', 'rw-note', r.note) : null,
-    el('div', 'foot', `poe.ninja · ${r.league}${rate} · read from screen in ${r.ms} ms`),
-  );
-}
-
 // ---------- Einstieg ----------
 
 function render(r: PriceResult): HTMLElement {
@@ -1092,7 +1043,6 @@ function render(r: PriceResult): HTMLElement {
   }
   if (r.kind === 'priced') return renderNinja(r);
   if (r.kind === 'trade') return renderTrade(r);
-  if (r.kind === 'rewards') return renderRewards(r);
   return el('div', 'card', header(r), el('div', 'note', r.reason));
 }
 

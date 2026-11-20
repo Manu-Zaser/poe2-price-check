@@ -2,25 +2,9 @@
 import type { ModMeta, ParsedItem, Rarity } from '@poe2/core/item';
 export type { ModMeta, ParsedItem, Rarity };
 
-export interface PriceMatch {
-  name: string;
-  baseType?: string;
-  /** Preis pro Stück in Divine Orbs. */
-  divine: number;
-  /** Preis pro Stück in Exalted Orbs. */
-  exalted: number;
-  listingCount?: number;
-  /** Kursänderung der letzten 7 Tage in Prozent. */
-  change7d?: number;
-  /** Verlauf der letzten Tage (Änderung in % je Tag, poe.ninja) – für die Mini-Grafik. */
-  sparkline?: number[];
-  /** Absolute Bild-URL (web.poecdn.com). */
-  icon?: string;
-  /** Börsen-Items (Währung, Runen …): wo poe.ninja die Kurse je Handelspaar führt. */
-  ninjaRef?: { type: string; id: string };
-  /** Hinweis, wenn der Preis unsicher ist (z. B. Handelspaare widersprechen sich). */
-  warning?: string;
-}
+/** Preis eines Items laut poe.ninja (gemeinsamer Typ aus @poe2/core/prices). */
+export type { PriceMatch } from '@poe2/core/prices';
+import type { PriceMatch } from '@poe2/core/prices';
 
 /** Ein Mod eines Rares, wie er im Overlay zur Auswahl steht. */
 export interface TradeMod {
@@ -133,20 +117,6 @@ export type PriceResult =
     }
   | { kind: 'not-found'; item: ParsedItem; league: string; reason: string }
   | { kind: 'unsupported'; item: ParsedItem; reason: string }
-  | {
-      kind: 'rewards';
-      /** Welches Fenster gelesen wurde, z. B. "Runeshape Combinations". */
-      title: string;
-      league: string;
-      exaltedPerDivine: number;
-      rows: import('./rewards').RewardRow[];
-      /** Index der wertvollsten Zeile. */
-      best: number | null;
-      /** Dauer der Texterkennung. */
-      ms: number;
-      /** Hinweis unter der Liste, z. B. nicht erkannte Items. */
-      note?: string;
-    }
   | { kind: 'error'; message: string };
 
 /** Einstellungen, die in der Oberfläche änderbar sind. */
@@ -165,8 +135,6 @@ export interface Settings {
   hotkeyTrade: string;
   /** Hotkey: Item im Wiki öffnen ("" = aus). */
   hotkeyWiki: string;
-  /** Belohnungs-Scanner (Runeshape-Fenster per Texterkennung); "" = aus. */
-  hotkeyScan: string;
   /** Schließen des Hauptfensters lässt das Tool im Infobereich weiterlaufen. */
   closeToTray: boolean;
   /** Mit Windows starten (unsichtbar, nur im Infobereich). */
@@ -191,7 +159,7 @@ export interface SavedSearch {
   at: string;
 }
 
-export type HotkeySetting = 'hotkey' | 'hotkeyTrade' | 'hotkeyWiki' | 'hotkeyScan';
+export type HotkeySetting = 'hotkey' | 'hotkeyTrade' | 'hotkeyWiki';
 
 export interface AppStatus {
   league: string | null;

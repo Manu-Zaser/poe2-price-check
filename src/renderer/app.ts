@@ -302,9 +302,6 @@ function historyContent(h: HistoryEntry): { className: string; children: Node[] 
   if (r.kind === 'error') {
     return { className: 'h-row muted', children: [itemIcon(undefined, 'h-icon'), el('div', 'h-main', el('span', 'h-name', 'Error'), el('span', 'h-sub', r.message)), el('span', ''), time] };
   }
-  if (r.kind === 'rewards') {
-    return { className: 'h-row', children: [itemIcon(undefined, 'h-icon'), el('div', 'h-main', el('span', 'h-name', r.title), el('span', 'h-sub', `${r.rows.length} rewards`)), el('span', ''), time] };
-  }
   const item = r.item;
   const name = el('span', `h-name rarity-${item.rarity.toLowerCase()}`, item.name ?? item.baseType);
   if (r.kind === 'trade') {

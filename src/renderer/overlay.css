@@ -376,32 +376,8 @@ input[type="checkbox"]:disabled { opacity: .35; cursor: default; }
 .bar-actions { display: flex; gap: 8px; margin-left: auto; }
 .results-bar .btn-save { padding-left: 9px; padding-right: 9px; }
 
-
-
-/* Belohnungs-Scanner */
-.rw-best { margin: 10px 0 8px; padding: 8px 10px; border-radius: 8px; background: rgba(127,176,105,.10); border: 1px solid rgba(127,176,105,.35); font-size: 13px; color: var(--muted); }
-.rw-best b { color: #b5d3a6; }
-.rw-best.muted { background: var(--surface-2); border-color: var(--line); }
-.rw-list { display: flex; flex-direction: column; gap: 3px; }
-.card-rewards { width: 430px; }
-.rw-row { display: grid; grid-template-columns: 14px 26px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 7px; background: var(--surface-2); font-size: 13px; }
-.rw-row.best { background: rgba(127,176,105,.12); outline: 1px solid rgba(127,176,105,.4); }
-.rw-row.unpriced { opacity: .6; }
-.rw-mark { color: var(--gold-bright); font-size: 12px; }
-.rw-icon { width: 26px; height: 26px; object-fit: contain; }
-.rw-name { min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
-.rw-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rw-count { color: var(--gold); font-weight: 700; }
-.rw-unit { font-size: 11px; color: var(--faint); white-space: nowrap; }
-.rw-total { font-weight: 700; white-space: nowrap; text-align: right; min-width: 64px; }
-.rw-row.best .rw-total { color: #b5d3a6; }
-.rw-row.possible { opacity: .75; }
-.rw-row.possible .rw-line { font-style: italic; }
-.rw-note { margin-top: 8px; font-size: 11.5px; color: var(--faint); }
-
 /* Unsicherer poe.ninja-Preis (Handelspaare widersprechen sich) */
 .price-warn { margin-top: 8px; padding: 7px 10px; border-radius: 8px; font-size: 12px; line-height: 1.4; color: var(--gold-bright); background: rgba(201,168,92,.08); border: 1px solid rgba(201,168,92,.35); }
-.rw-warn { color: var(--gold-bright) !important; }
 
 /* Größe ändern: Greifzonen an den Fensterrändern */
 .rz { position: fixed; z-index: 50; }

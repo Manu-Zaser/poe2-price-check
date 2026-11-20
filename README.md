@@ -15,7 +15,6 @@ A small overlay for Path of Exile 2: hover over an item, press **Ctrl+D**, and t
 - [What it prices](#what-it-prices)
 - [Rare and magic items](#rare-and-magic-items)
 - [Listings: hover, compare, click](#listings-hover-compare-click)
-- [Reward scanner](#reward-scanner)
 - [Market and watchlist](#market-and-watchlist)
 - [Main window](#main-window)
 - [Hotkeys](#hotkeys)
@@ -66,8 +65,7 @@ From the [latest release](https://github.com/Manu-Zaser/poe2-price-check/release
 **Thin markets:** for currency, runes, omens and other exchange items poe.ninja takes the price of the trade pair
 with the most volume – with few trades that can be a handful of odd trades (e.g. a rune at 11 Chaos while it sells
 for 10 Exalted). The tool also checks the rates of all pairs (one extra request to poe.ninja, cached 30 minutes);
-if they differ by more than 3×, it shows the lower price with a warning and hides the 7-day trend. The reward
-scanner does the same.
+if they differ by more than 3×, it shows the lower price with a warning and hides the 7-day trend.
 
 Anything poe.ninja knows is priced via poe.ninja, even as a white item. For identified uniques no mod is ticked by
 default, so you see the cheapest copies.
@@ -143,28 +141,6 @@ The overlay is laid out like the trade site, top to bottom:
   - It compares with the item you scanned, not with your equipped gear (the tool cannot see that).
 - **Click a row** to open the trade site with the same search narrowed to that seller, so the offer is on top.
 
-## Reward scanner
-
-Press **Alt+R** with one of these windows open:
-
-- **Runeshape Combinations:** every reward with its poe.ninja price (per item and for the whole row, e.g.
-  "3× Greater Chaos Orb · 436 Ex") in the game's order, the most valuable marked with ★. Rewards without a
-  poe.ninja price (e.g. "Unique Jewellery") are shown faded.
-- **Ritual Favours:** the window shows only pictures, so the items are recognised by their **pictures** – every
-  unique and omen poe.ninja prices (Favours only offer those), compared by shape and colour; items shown greyed out
-  (e.g. not enough tribute) are compared by shape only. The list is sorted by value, with the
-  size and position in the grid ("2×4 · column 4, row 3"); unsure matches say "possibly" – price-check those with
-  Ctrl+D, as well as anything not recognised. The first ritual scan loads the item pictures
-  once (about 500 small images from poe.ninja's image CDN, kept in `%APPDATA%\poe2-pricecheck\icons`).
-
-- The tool takes **one screenshot** of your screen when you press the hotkey and reads the left part with the text
-  recognition built into Windows (window titles and Runeshape rewards) – nothing is installed, nothing is sent anywhere, no key is sent to the game. The
-  image only lives in memory; a temporary file for the text recognition is deleted right away.
-- Names are matched against the poe.ninja names tolerantly (text recognition reads "1x" as "lx", adds stray
-  characters, …), so it works at 1080p to 4K and different UI sizes. English game text; Windows uses its English
-  text recognition if installed (Settings → Time & language → Language), otherwise your Windows language.
-- If no window is found, the overlay says so. Change or turn off the hotkey under Settings → Hotkeys.
-
 ## Market and watchlist
 
 <p align="center">
@@ -217,10 +193,8 @@ sends **no extra requests**:
 | **Ctrl+D** | Price check – opens the overlay for the item under the cursor |
 | **Ctrl+Alt+D** | Opens the item on pathofexile.com/trade in your browser, with the same default filters as the overlay (one trade search) |
 | **Alt+W** | Opens the unique – or the item's base – on [poe2wiki.net](https://www.poe2wiki.net) |
-| **Alt+R** | Reward scanner: reads the open Runeshape Combinations or Ritual Favours window from the screen and prices the rewards (sends nothing to the game) |
 
-Each press of the first three sends exactly one copy keystroke to the game; the reward scanner sends none (it only
-takes a screenshot). Change them under Settings → Hotkeys (all but the price check can be turned off): press the new combination – Ctrl/Alt + key or a single F key. Combinations such as Ctrl+C are
+Each press sends exactly one copy keystroke to the game. Change them under Settings → Hotkeys (all but the price check can be turned off): press the new combination – Ctrl/Alt + key or a single F key. Combinations such as Ctrl+C are
 rejected because the game needs them. Esc cancels.
 
 ## Overlay and settings

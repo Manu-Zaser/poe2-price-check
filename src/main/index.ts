@@ -1,5 +1,5 @@
-import { app, BrowserWindow, clipboard, desktopCapturer, globalShortcut, ipcMain, Menu, nativeImage, screen, shell, Tray } from 'electron';
-import { readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { app, BrowserWindow, clipboard, globalShortcut, ipcMain, Menu, nativeImage, screen, shell, Tray } from 'electron';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readItemText as readGameItemText } from '@poe2/core/clipboard';
 import { validateHotkey } from '@poe2/core/hotkey';
@@ -11,11 +11,7 @@ import { buildSearchQuery, cleanSavedSearches, isNamedUnique, tradeSearchUrl, ty
 import { cleanWatchlist, type MarketData } from '../shared/market';
 import type { AppState, AppStatus, HistoryEntry, HotkeySetting, ParsedItem, PriceMatch, PriceResult, SaveResult, Settings, TradeSelection } from '../shared/types';
 import { log, logFile } from './log';
-import { buildPriceIndex, CACHE_TTL_MS, checkPairs, fetchLeagues, fetchPairs, lookupPrice, makeFetchJson, mapLimit, type PairQuote, type PriceIndex } from './ninja';
-import { bestRow, readRuneshape, type OcrLine, type RewardRow } from '../shared/rewards';
-import { CELL_PX, COLS, downscaleBgra, isRitualTitle, matchRitual, rgbaToRgb, ritualGrid, ROWS, unmatchedCells } from '../shared/ritual';
-import { IconCache } from './icons';
-import { WindowsOcr } from './ocr';
+import { buildPriceIndex, CACHE_TTL_MS, checkPairs, fetchLeagues, fetchPairs, lookupPrice, makeFetchJson, type PairQuote, type PriceIndex } from './ninja';
 import { applySelection, idleRareResult, loadStatIndex, newRareRequest, runRareSearch, type RareRequest } from './rare';
 import { TradeClient } from '@poe2/core/trade';
 import { checkForUpdates, downloadUpdate, initUpdates, installUpdate, openReleasePage, updateState } from './updater';
@@ -71,7 +67,6 @@ const DEFAULT_CONFIG: Config = {
   overlayPosition: null,
   hotkeyTrade: 'Ctrl+Alt+D',
   hotkeyWiki: 'Alt+W',
-  hotkeyScan: 'Alt+R',
   closeToTray: true,
   startWithWindows: false,
   dangerMods: DEFAULT_DANGER_MODS,
@@ -93,7 +88,7 @@ function loadConfig(): Config {
   }
   if (validateHotkey(loaded.hotkey)) loaded.hotkey = DEFAULT_CONFIG.hotkey;
   // Zusatz-Hotkeys: "" = bewusst aus; Ungültiges zurück auf den Standard.
-  for (const key of ['hotkeyTrade', 'hotkeyWiki', 'hotkeyScan'] as const) {
+  for (const key of ['hotkeyTrade', 'hotkeyWiki'] as const) {
     if (typeof loaded[key] !== 'string' || (loaded[key] && validateHotkey(loaded[key]))) loaded[key] = DEFAULT_CONFIG[key];
   }
   loaded.dangerMods = Array.isArray(loaded.dangerMods) ? cleanDangerList(loaded.dangerMods.map(String)) : [...DEFAULT_DANGER_MODS];
@@ -104,7 +99,9 @@ function loadConfig(): Config {
   // Unveränderte frühere Vorgaben auf die aktuellen Listen heben (eigene Anpassungen bleiben).
   loaded.keyMods = upgradeDefaults(loaded.keyMods, LEGACY_DEFAULTS.key, DEFAULT_KEY_MODS);
   loaded.lowMods = upgradeDefaults(loaded.lowMods, LEGACY_DEFAULTS.low, DEFAULT_LOW_MODS);
-  delete (loaded as Partial<Config> & { overlaySeconds?: number }).overlaySeconds; // aus älteren Versionen
+  // aus älteren Versionen (der Belohnungs-Scanner ist jetzt ein eigenes Programm)
+  delete (loaded as Partial<Config> & { overlaySeconds?: number }).overlaySeconds;
+  delete (loaded as Partial<Config> & { hotkeyScan?: string }).hotkeyScan;
   saveConfig(loaded);
   return loaded;
 }
@@ -197,12 +194,12 @@ function currencyRates(): AppStatus['currencyRates'] {
 }
 
 function state(): AppState {
-  const { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity, hotkeyTrade, hotkeyWiki, hotkeyScan, closeToTray, startWithWindows, dangerMods, keyMods, lowMods, watchlist, savedSearches } = config;
+  const { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity, hotkeyTrade, hotkeyWiki, closeToTray, startWithWindows, dangerMods, keyMods, lowMods, watchlist, savedSearches } = config;
   return {
     status: status(),
     update: updateState(),
     leagueAuto: !league,
-    settings: { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity, hotkeyTrade, hotkeyWiki, hotkeyScan, closeToTray, startWithWindows, dangerMods, keyMods, lowMods, watchlist, savedSearches },
+    settings: { league, hotkey, gpuAcceleration, overlayScale, overlayOpacity, hotkeyTrade, hotkeyWiki, closeToTray, startWithWindows, dangerMods, keyMods, lowMods, watchlist, savedSearches },
     overlayPositionSaved: config.overlayPosition !== null,
     logFile: logFile(),
     leagues,
@@ -271,14 +268,13 @@ function refreshIndex(): Promise<PriceIndex> {
 
 // ---------- Hotkey ----------
 
-const HOTKEYS: HotkeySetting[] = ['hotkey', 'hotkeyTrade', 'hotkeyWiki', 'hotkeyScan'];
+const HOTKEYS: HotkeySetting[] = ['hotkey', 'hotkeyTrade', 'hotkeyWiki'];
 
 /** Was jeder Hotkey tut – jeder Druck ist genau eine Kopier-Aktion im Spiel. */
 const HOTKEY_ACTIONS: Record<HotkeySetting, () => void> = {
   hotkey: () => void priceCheck(),
   hotkeyTrade: () => void tradeHotkey(),
   hotkeyWiki: () => void wikiHotkey(),
-  hotkeyScan: () => void scanRewards(),
 };
 
 /** Alle Hotkeys neu registrieren; Ergebnis je Hotkey (false = von einem anderen Programm belegt). */
@@ -301,7 +297,7 @@ function activateHotkey() {
   hotkeysActive = registerHotkeys(config);
   hotkeyActive = !!hotkeysActive.hotkey;
   lastError = hotkeyActive ? lastError : `Hotkey ${config.hotkey} is already used by another program.`;
-  for (const key of ['hotkeyTrade', 'hotkeyWiki', 'hotkeyScan'] as const) {
+  for (const key of ['hotkeyTrade', 'hotkeyWiki'] as const) {
     if (config[key] && !hotkeysActive[key]) log('warn', `Hotkey ${config[key]} (${key}) is already used by another program`);
   }
 }
@@ -994,143 +990,6 @@ function wikiHotkey() {
   });
 }
 
-// ---------- Belohnungs-Scanner ----------
-
-let ocr: WindowsOcr | null = null;
-const getOcr = () => (ocr ??= new WindowsOcr(app.getPath('userData')));
-
-let iconCache: IconCache | null = null;
-const getIcons = () => (iconCache ??= new IconCache(join(app.getPath('userData'), 'icons'), userAgent()));
-
-/**
- * Bereich, in dem die Belohnungsfenster liegen: Runeshape links (wie Inventar-Panels), Ritual-Favours
- * links der Mitte. Bezogen auf die Bildschirmgröße – passt so für 1080p bis 4K und verschiedene UI-Größen.
- */
-const SCAN_AREA = { x: 0, y: 0.05, width: 0.6, height: 0.72 };
-/** Kleinere Bildschirme vergrößert erkennen – die Schrift ist sonst zu klein für die Texterkennung. */
-const OCR_REFERENCE_HEIGHT = 1440;
-
-/**
- * Hotkey: einmal den Bildschirm aufnehmen (keine Eingabe ans Spiel), den Bereich des Runeshape-Fensters
- * mit der Windows-Texterkennung lesen und die Belohnungen mit poe.ninja-Preisen im Overlay zeigen.
- * Das Bild bleibt im Speicher; die Datei für die Texterkennung wird sofort wieder gelöscht.
- */
-async function scanRewards() {
-  if (busy) return;
-  busy = true;
-  const tmp = join(app.getPath('temp'), `poe2pc-scan-${process.pid}.png`);
-  try {
-    const t0 = Date.now();
-    const cursor = screen.getCursorScreenPoint();
-    const display = screen.getDisplayNearestPoint(cursor);
-    const px = { width: Math.round(display.size.width * display.scaleFactor), height: Math.round(display.size.height * display.scaleFactor) };
-    // Das eigene Overlay nicht mitlesen.
-    if (alive(overlayWin) && overlayWin.isVisible()) overlayWin.hide();
-    const [ocrReady, sources] = await Promise.all([getOcr().start(), desktopCapturer.getSources({ types: ['screen'], thumbnailSize: px })]);
-    void ocrReady;
-    const source = sources.find((src) => src.display_id === String(display.id)) ?? sources[0];
-    if (!source || source.thumbnail.isEmpty()) throw new Error('Could not capture the screen.');
-    const shot = source.thumbnail;
-    const { width: W, height: H } = shot.getSize();
-    const area = { x: Math.round(W * SCAN_AREA.x), y: Math.round(H * SCAN_AREA.y), width: Math.round(W * SCAN_AREA.width), height: Math.round(H * SCAN_AREA.height) };
-    let crop = shot.crop(area);
-    const factor = Math.max(1, OCR_REFERENCE_HEIGHT / H);
-    if (factor > 1.05) crop = crop.resize({ width: Math.round(area.width * factor), quality: 'best' });
-    writeFileSync(tmp, crop.toPNG());
-    const tOcr = Date.now();
-    const raw = await getOcr().recognize(tmp);
-    // Zurück in Bildschirm-Pixel.
-    const lines = raw.map((l) => ({ ...l, x0: area.x + l.x0 / factor, x1: area.x + l.x1 / factor, y0: area.y + l.y0 / factor, y1: area.y + l.y1 / factor }));
-    const idx = await getIndex();
-    const favours = lines.find((l) => isRitualTitle(l.text));
-    if (favours) {
-      await scanRitual(shot, H, favours, idx, t0);
-      return;
-    }
-    const rows = readRuneshape(lines, idx.currency);
-    log('info', `Reward scan: ${rows ? rows.length : 'no'} rows, capture ${tOcr - t0} ms, text recognition ${Date.now() - tOcr} ms`);
-    if (!rows) {
-      showOverlay({ kind: 'error', message: `No reward window found. Open the Runeshape Combinations or the Ritual Favours window and press ${config.hotkeyScan} again.` });
-      return;
-    }
-    const checkedRows = await verifyRows(rows);
-    showOverlay({ kind: 'rewards', title: 'Runeshape Combinations', league: idx.league, exaltedPerDivine: idx.exaltedPerDivine, rows: checkedRows, best: bestRow(checkedRows), ms: Date.now() - t0 });
-  } catch (e) {
-    log('error', 'Reward scan failed', e);
-    showOverlay({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
-  } finally {
-    try {
-      unlinkSync(tmp);
-    } catch {
-      // nichts zu löschen
-    }
-    busy = false;
-  }
-}
-
-/** Belohnungen mit Börsenpreis (Runen, Omen …) gegen alle Handelspaare prüfen, höchstens 4 gleichzeitig. */
-async function verifyRows(rows: RewardRow[]): Promise<RewardRow[]> {
-  return mapLimit(rows, 4, async (row) => {
-    if (!row.match?.ninjaRef) return row;
-    const match = await verifyPrice(row.match);
-    return match === row.match ? row : { ...row, match, totalExalted: match.exalted * row.count };
-  });
-}
-
-/**
- * Ritual-Favours: Raster aus der Überschrift berechnen, verkleinern und die Items an ihren Bildern erkennen
- * (Uniques und Währung/Omen mit poe.ninja-Preis). Rares und Basen bleiben übrig – die zählt der Hinweis.
- */
-async function scanRitual(shot: Electron.NativeImage, H: number, title: OcrLine, idx: PriceIndex, t0: number) {
-  const g = ritualGrid(title, H);
-  const rect = { x: Math.round(g.x), y: Math.round(g.y), width: Math.round(g.cell * COLS), height: Math.round(g.cell * ROWS) };
-  const size = shot.getSize();
-  if (rect.x < 0 || rect.y < 0 || rect.x + rect.width > size.width || rect.y + rect.height > size.height) {
-    throw new Error('The Favours window is only partly on the screen.');
-  }
-  const crop = shot.crop(rect);
-  const cs = crop.getSize();
-  const rgb = rgbaToRgb(downscaleBgra(crop.toBitmap(), cs.width, cs.height, COLS * CELL_PX, ROWS * CELL_PX));
-  const grid = { width: COLS * CELL_PX, height: ROWS * CELL_PX, data: rgb };
-  // Im Favours-Fenster liegen nur Uniques und Omen – nur deren Bilder vergleichen (weniger Fehltreffer).
-  // Beim ersten Mal werden sie geladen.
-  const all = [...[...idx.currency.values()].filter((m) => /^Omen of /i.test(m.name)), ...[...idx.uniquesByName.values()].flat()];
-  const icons = await getIcons().load(all, (done, total) => {
-    if (done === 1 || done % 100 === 0) showOverlay({ kind: 'error', message: `Loading item pictures for the first scan… ${done}/${total}` });
-  });
-  const tMatch = Date.now();
-  const matches = matchRitual(grid, icons);
-  const cell = g.cell;
-  const rows: RewardRow[] = matches.map((m) => ({
-    count: 1,
-    name: m.ref.name,
-    raw: `${m.w}×${m.h}`,
-    match: m.ref,
-    confidence: m.shape,
-    totalExalted: m.ref.exalted,
-    rect: { x0: g.x + m.col * cell, y0: g.y + m.row * cell, x1: g.x + (m.col + m.w) * cell, y1: g.y + (m.row + m.h) * cell },
-    ...(m.confidence === 'possible' ? { possible: true } : {}),
-    where: `column ${m.col + 1}, row ${m.row + 1}`,
-  }));
-  const checked = await verifyRows(rows);
-  rows.splice(0, rows.length, ...checked);
-  rows.sort((a, b) => (b.totalExalted ?? 0) - (a.totalExalted ?? 0));
-  const other = unmatchedCells(grid, matches);
-  log('info', `Ritual scan: ${matches.length} items recognised, ${other} other cells, matching ${Date.now() - tMatch} ms`);
-  if (process.env.POE2PC_TEST) for (const m of matches) log('info', `  ${m.confidence} ${m.shape.toFixed(2)}/${m.color.toFixed(3)} ${m.w}x${m.h} r${m.row}c${m.col} ${m.ref.name}`);
-  showOverlay({
-    kind: 'rewards',
-    title: 'Ritual Favours',
-    league: idx.league,
-    exaltedPerDivine: idx.exaltedPerDivine,
-    rows,
-    // Nach Wert sortiert: die wertvollste sicher erkannte Zeile ist die beste.
-    best: rows.findIndex((r) => !r.possible) >= 0 ? rows.findIndex((r) => !r.possible) : null,
-    ms: Date.now() - t0,
-    ...(other ? { note: `Some items were not recognised – hover one and press ${config.hotkey} to price it.` } : {}),
-  });
-}
-
 /** Zeigt eine Divine Orb als Beispiel, damit man Position und Aussehen prüfen kann. */
 async function testOverlay() {
   try {
@@ -1194,8 +1053,8 @@ app.on('child-process-gone', (_e, d) => log('warn', `Child process gone: ${d.typ
 
 app.whenReady().then(() => {
   config = loadConfig();
-  // Unsichtbare Tests rufen den Scanner direkt auf (ohne Hotkey, ohne Tastendruck).
-  if (process.env.POE2PC_TEST) (globalThis as Record<string, unknown>).__pcTest = { scanRewards, priceCheck };
+  // Unsichtbare Tests rufen die Preisabfrage direkt auf (ohne Hotkey, ohne Tastendruck).
+  if (process.env.POE2PC_TEST) (globalThis as Record<string, unknown>).__pcTest = { priceCheck };
   log('info', `Start ${app.getVersion()}, GPU ${config.gpuAcceleration ? 'on' : 'off'}`);
 
   ipcMain.handle('state:get', safe('state:get', () => state()));
@@ -1318,5 +1177,4 @@ app.whenReady().then(() => {
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
-  ocr?.stop();
 });
