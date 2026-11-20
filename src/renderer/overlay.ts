@@ -357,12 +357,12 @@ function statRow(m: TradeMod, onChange: () => void): HTMLElement {
   if (m.danger) tags.append(el('span', 'kind kind-danger', '⚠ Dangerous'));
   if (m.keyMod) {
     const k = el('span', 'kind kind-key', 'Key');
-    k.title = 'Usually carries the price on this item type – searched by default (Settings → Mod value)';
+    k.title = 'Usually carries the price on this item type – searched by default (Settings → Mods)';
     tags.append(k);
   }
   if (m.low) {
     const l = el('span', 'kind kind-low', 'Low value');
-    l.title = 'Rarely affects the price – not searched by default (Settings → Mod value)';
+    l.title = 'Rarely affects the price – not searched by default (Settings → Mods)';
     tags.append(l);
   }
   if (reason) tags.append(el('span', 'tag-hidden', m.coveredBy ? `◌ in ${coveredLabel[m.coveredBy]}` : '◌ not searchable'));

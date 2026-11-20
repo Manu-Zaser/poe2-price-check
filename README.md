@@ -54,7 +54,7 @@ From the [latest release](https://github.com/Manu-Zaser/poe2-price-check/release
 | **Identified uniques** | Trade search by name and base; tick a roll to find copies at least as good as yours. The poe.ninja price ("any rolls") stays visible for comparison |
 | **Rare and magic items** | Trade search with your item's stats – see [below](#rare-and-magic-items) |
 | **Normal (white) items** such as crafting bases | Trade search for **this base type** with at least **your item level**, same corrupted state |
-| **Waystones and tablets** | Dangerous mods marked red, with a warning at the top (list under Settings → Map mods) |
+| **Waystones and tablets** | Dangerous mods marked red, with a warning at the top (list under Settings → Mods) |
 
 <p align="center">
   <img src="docs/images/overlay-currency.png" width="320" alt="Currency overlay: price in Exalted and Divine, 7-day trend graph and stack value">
@@ -107,7 +107,7 @@ The overlay is laid out like the trade site, top to bottom:
   "Hidden (n)" shows them in place, marked "◌ in DPS" etc. **Collapse** folds the stat list away. Both are remembered.
 - "Reduced" mods (e.g. "50% reduced Projectile Range") are shown as on the item; the search converts them.
   Summed mods show one tier value per source line. Hover a tier for its full range and your roll in %.
-- **Key mod and low value lists** can be edited under Settings → Mod value (`slot: text`, e.g.
+- **Key mod and low value lists** can be edited under Settings → Mods (`slot: text`, e.g.
   `boots: increased Movement Speed`; for attack weapons also `melee`, `ranged`, `bow`, `crossbow`). If an item has
   none of the key mods, all other mods are ticked. The defaults are based on research from November 2026 (poe2db mod
   tables for patch 0.5.x, the 0.5.0 patch notes and gear/selling guides); rules with thin evidence were left out, and
@@ -182,7 +182,7 @@ sends **no extra requests**:
 - **Settings:** hotkeys, startup, overlay size/background/position, league, map mods, mod value, updates, GPU
   acceleration.
 - **Tray:** closing the main window keeps the tool running in the tray (next to the clock) – the hotkeys keep
-  working. Quit with right-click on the tray icon → Quit. Under Settings → Startup you can turn this off or let the
+  working. Quit with right-click on the tray icon → Quit. Under Settings → General you can turn this off or let the
   tool **start with Windows** (quietly in the tray). For the portable exe, Windows starts it from where it is when
   you tick the option – tick it again if you move the file.
 
@@ -194,13 +194,13 @@ sends **no extra requests**:
 | **Ctrl+Alt+D** | Opens the item on pathofexile.com/trade in your browser, with the same default filters as the overlay (one trade search) |
 | **Alt+W** | Opens the unique – or the item's base – on [poe2wiki.net](https://www.poe2wiki.net) |
 
-Each press sends exactly one copy keystroke to the game. Change them under Settings → Hotkeys (all but the price check can be turned off): press the new combination – Ctrl/Alt + key or a single F key. Combinations such as Ctrl+C are
+Each press sends exactly one copy keystroke to the game. Change them under Settings → General (all but the price check can be turned off): press the new combination – Ctrl/Alt + key or a single F key. Combinations such as Ctrl+C are
 rejected because the game needs them. Esc cancels.
 
 ## Overlay and settings
 
 - **Overlay:** stays open until you close it with **×** (or Esc); a new price check replaces its content. Drag it by
-  any empty spot to move it – the position is remembered (Settings → "Reset position" = back next to the cursor).
+  any empty spot to move it – the position is remembered (Settings → Overlay → Reset = back next to the cursor).
   If the overlay content crashes, the window is recreated so nothing invisible is left on top of the game.
 - **Size:** drag an edge or a lower corner of the overlay, like any window – the whole overlay grows or shrinks
   (80–160 %). **Ctrl + mouse wheel** over the overlay does the same. Saved like the size setting below.
@@ -209,7 +209,7 @@ rejected because the game needs them. Esc cancels.
 - **League:** "Automatic" follows the current challenge league on poe.ninja and switches to a new league within an
   hour of its start. A league you picked by hand that no longer exists switches back to automatic.
 - **Performance:** by default the tool renders **without GPU acceleration** so it doesn't take graphics performance
-  away from the game (Settings → Performance, restart required).
+  away from the game (Settings → Advanced, restart required).
 - **Data:** poe.ninja is fetched at most once per hour, the trade search's stat list once per day. Errors are written
   to `%APPDATA%\poe2-pricecheck\poe2-pricecheck.log`.
 

@@ -242,7 +242,7 @@
             <dt>Weapons</dt>
             <dd>Below 20% quality, the DPS rows offer <b>Q20</b>: the DPS the weapon would have at 20% quality, as minimum. Elemental DPS lets you pick the element (Any, Cold …).</dd>
             <dt>Key &amp; Low value</dt>
-            <dd>For rares, only the mods that usually carry the price on that item type are ticked (<b>Key</b>), e.g. movement speed on boots. <b>Low value</b> mods are faded. "ⓘ key mods … not on this item" lists what the item is missing. Adjust both lists under Settings → Mod value.</dd>
+            <dd>For rares, only the mods that usually carry the price on that item type are ticked (<b>Key</b>), e.g. movement speed on boots. <b>Low value</b> mods are faded. "ⓘ key mods … not on this item" lists what the item is missing. Adjust both lists under Settings → Mods.</dd>
             <dt>Hidden &amp; Collapse</dt>
             <dd>Mods already counted in a total, the DPS or the defences are hidden; <b>Hidden</b> shows them. <b>Collapse</b> folds the stat list away.</dd>
             <dt>Search &amp; Trade ↗</dt>
@@ -265,10 +265,10 @@
             <div><b>Open in wiki</b><p>The unique – or the item's base – opens on poe2wiki.net.</p></div>
           </div>
         </div>
-        <p class="guide-note">Change or turn them off under Settings → Hotkeys.</p>
+        <p class="guide-note">Change or turn them off under Settings → General.</p>
 
         <h2 class="guide-h">Waystones and tablets</h2>
-        <p class="guide-text">Price-check a waystone or tablet and dangerous mods are marked <span class="danger-word">red</span>, with a warning at the top of the overlay – before you put it into the map device. Which mods count as dangerous is up to you: Settings → Map mods.</p>
+        <p class="guide-text">Price-check a waystone or tablet and dangerous mods are marked <span class="danger-word">red</span>, with a warning at the top of the overlay – before you put it into the map device. Which mods count as dangerous is up to you: Settings → Mods.</p>
 
         <h2 class="guide-h">Market</h2>
         <p class="guide-text">The <b>Market</b> page lists all poe.ninja prices of the league by category – currency, fragments, runes and soul cores, essences, gems and uniques – with the 7-day trend. <b>Rising / Falling this week</b> shows the biggest movers. Search across all categories, sort by value or change, click an item to show it in the overlay, and <b>☆ star</b> items to pin them to the watchlist on Home. Badges such as <b>Steady climb</b>, <b>Spike</b> or <b>Sliding</b> describe the 7-day curve (hover for details) – they don't predict prices. Prices update hourly; the page sends no extra requests.</p>
@@ -283,145 +283,156 @@
         </ul>
       </section>
 
-      <!-- EINSTELLUNGEN -->
+      <!-- EINSTELLUNGEN: vier Tabs, jede Zeile Beschriftung links, Bedienelement rechts -->
       <section class="page" data-page="settings" data-title="Settings" data-sub="Updates, hotkeys, overlay and prices">
-        <h2 class="group-h">Updates</h2>
-        <div class="card group">
-          <div class="field row">
-            <div>
-              <label>Version <output id="version-out"></output></label>
-              <p class="help" id="update-help">–</p>
-            </div>
-            <button class="btn" id="update-check">Check now</button>
-          </div>
+        <div class="tabs" role="tablist">
+          <button class="tab active" role="tab" data-tab="general">General</button>
+          <button class="tab" role="tab" data-tab="overlay">Overlay</button>
+          <button class="tab" role="tab" data-tab="mods">Mods</button>
+          <button class="tab" role="tab" data-tab="advanced">Advanced</button>
         </div>
 
-        <h2 class="group-h">Hotkeys</h2>
-        <div class="card group">
-          <div class="field hk" data-hotkey="hotkey">
-            <div class="hk-main">
-              <label>Price check</label>
-              <p class="help">Shows the price overlay for the item under the cursor.</p>
+        <!-- Allgemein -->
+        <div class="tab-panel active" data-tab="general">
+          <div class="group-h"><h2>Updates</h2></div>
+          <div class="card group">
+            <div class="field line">
+              <div>
+                <label>Version <output id="version-out"></output></label>
+                <p class="help" id="update-help">–</p>
+              </div>
+              <button class="btn sm" id="update-check">Check now</button>
             </div>
-            <div class="hk-keys"></div>
-            <div class="hk-actions"><button class="btn sm hk-change">Change</button></div>
-            <p class="hk-error" role="alert"></p>
           </div>
-          <div class="field hk" data-hotkey="hotkeyTrade">
-            <div class="hk-main">
-              <label>Open on trade site</label>
-              <p class="help">Opens the item on pathofexile.com/trade in your browser, with the same default filters as the overlay.</p>
-            </div>
-            <div class="hk-keys"></div>
-            <div class="hk-actions"><button class="btn sm hk-change">Change</button><button class="btn ghost sm hk-off">Turn off</button></div>
-            <p class="hk-error" role="alert"></p>
-          </div>
-          <div class="field hk" data-hotkey="hotkeyWiki">
-            <div class="hk-main">
-              <label>Open in wiki</label>
-              <p class="help">Opens the unique or the item's base on poe2wiki.net – handy for crafting and mod pools.</p>
-            </div>
-            <div class="hk-keys"></div>
-            <div class="hk-actions"><button class="btn sm hk-change">Change</button><button class="btn ghost sm hk-off">Turn off</button></div>
-            <p class="hk-error" role="alert"></p>
-          </div>
-        </div>
 
-        <h2 class="group-h">Startup</h2>
-        <div class="card group">
-          <div class="field">
-            <label class="check"><input type="checkbox" id="start-windows" /> <span>Start with Windows</span></label>
-            <p class="help" id="start-windows-help">Starts quietly in the tray when you log in, so the hotkeys are ready when you launch PoE2.</p>
-          </div>
-          <div class="field">
-            <label class="check"><input type="checkbox" id="close-tray" /> <span>Keep running in the tray when the window is closed</span></label>
-            <p class="help">The hotkeys keep working. Quit via the tray icon (right-click → Quit).</p>
-          </div>
-        </div>
-
-        <h2 class="group-h">Overlay</h2>
-        <div class="card group">
-          <div class="field">
-            <label for="scale">Size <output id="scale-out"></output></label>
-            <p class="help">Scales text and window of the price overlay.</p>
-            <input type="range" id="scale" min="80" max="160" step="5" />
-          </div>
-          <div class="field">
-            <label for="opacity">Background <output id="opacity-out"></output></label>
-            <p class="help">Lower values let the game show through. Text stays fully visible.</p>
-            <input type="range" id="opacity" min="40" max="100" step="5" />
-          </div>
-          <div class="field row">
-            <div>
-              <label>Position <output id="pos-out"></output></label>
-              <p class="help">Drag the overlay anywhere to move it – the position is remembered.</p>
+          <div class="group-h"><h2>Hotkeys</h2></div>
+          <div class="card group">
+            <div class="field hk" data-hotkey="hotkey">
+              <div class="hk-main">
+                <label>Price check <span class="info" title="Shows the price overlay for the item under the cursor.">ⓘ</span></label>
+              </div>
+              <div class="hk-keys"></div>
+              <div class="hk-actions"><button class="btn sm hk-change">Change</button></div>
+              <p class="hk-error" role="alert"></p>
             </div>
-            <button class="btn" id="pos-reset">Reset</button>
-          </div>
-          <div class="field row">
-            <div>
-              <label>Test overlay</label>
-              <p class="help">Shows a Divine Orb to check size, background and position.</p>
+            <div class="field hk" data-hotkey="hotkeyTrade">
+              <div class="hk-main">
+                <label>Open on trade site <span class="info" title="Opens the item on pathofexile.com/trade in your browser, with the same default filters as the overlay.">ⓘ</span></label>
+              </div>
+              <div class="hk-keys"></div>
+              <div class="hk-actions"><button class="btn sm hk-change">Change</button><button class="btn ghost sm hk-off">Turn off</button></div>
+              <p class="hk-error" role="alert"></p>
             </div>
-            <button class="btn" id="overlay-test">Show</button>
-          </div>
-        </div>
-
-        <h2 class="group-h">Prices</h2>
-        <div class="card group">
-          <div class="field">
-            <label for="league">League</label>
-            <p class="help">Automatic follows the current challenge league on poe.ninja – including new leagues.</p>
-            <div class="select-wrap"><select id="league"></select></div>
-          </div>
-        </div>
-
-        <h2 class="group-h">Mod value</h2>
-        <div class="card group">
-          <div class="field">
-            <p class="help">For rare and magic items, only <b>key mods</b> are searched by default – the price of a rare depends on 2–3 mods, not on all of them. <b>Low value</b> mods are shown faded and never searched by default. One rule per line: <code>slot: text</code>, where text is part of the mod (upper/lower case doesn't matter) and slot is one of <code>weapon caster amulet ring belt boots gloves helmet body shield quiver jewel</code>, for attack weapons also <code>melee ranged bow crossbow</code>, or <code>*</code> for all.</p>
-          </div>
-          <div class="field">
-            <label for="key-mods">Key mods</label>
-            <textarea id="key-mods" rows="8" spellcheck="false"></textarea>
-            <div class="row-actions">
-              <span class="saved-hint" id="key-saved" hidden>Saved</span>
-              <button class="btn ghost sm" id="key-reset">Restore defaults</button>
+            <div class="field hk" data-hotkey="hotkeyWiki">
+              <div class="hk-main">
+                <label>Open in wiki <span class="info" title="Opens the unique or the item&#39;s base on poe2wiki.net – handy for crafting and mod pools.">ⓘ</span></label>
+              </div>
+              <div class="hk-keys"></div>
+              <div class="hk-actions"><button class="btn sm hk-change">Change</button><button class="btn ghost sm hk-off">Turn off</button></div>
+              <p class="hk-error" role="alert"></p>
             </div>
           </div>
-          <div class="field">
-            <label for="low-mods">Low value mods</label>
-            <textarea id="low-mods" rows="5" spellcheck="false"></textarea>
-            <div class="row-actions">
-              <span class="saved-hint" id="low-saved" hidden>Saved</span>
-              <button class="btn ghost sm" id="low-reset">Restore defaults</button>
+
+          <div class="group-h"><h2>Prices</h2></div>
+          <div class="card group">
+            <div class="field line">
+              <label for="league">League <span class="info" title="Automatic follows the current challenge league on poe.ninja – including new leagues.">ⓘ</span></label>
+              <div class="select-wrap"><select id="league"></select></div>
+            </div>
+          </div>
+
+          <div class="group-h"><h2>Startup</h2></div>
+          <div class="card group">
+            <div class="field">
+              <label class="check"><input type="checkbox" id="start-windows" /> <span>Start with Windows</span> <span class="info" title="Starts quietly in the tray when you log in, so the hotkeys are ready when you launch PoE2.">ⓘ</span></label>
+              <p class="help" id="start-windows-help" hidden></p>
+            </div>
+            <div class="field">
+              <label class="check"><input type="checkbox" id="close-tray" /> <span>Keep running in the tray when the window is closed</span> <span class="info" title="The hotkeys keep working. Quit via the tray icon (right-click → Quit).">ⓘ</span></label>
             </div>
           </div>
         </div>
 
-        <h2 class="group-h">Map mods</h2>
-        <div class="card group">
-          <div class="field">
-            <label for="danger-mods">Dangerous mods on waystones and tablets</label>
-            <p class="help">Mods containing one of these texts are marked red in the overlay. One text per line, upper/lower case doesn't matter – adapt it to what your build can't handle.</p>
-            <textarea id="danger-mods" rows="8" spellcheck="false"></textarea>
-            <div class="row-actions">
-              <span class="saved-hint" id="danger-saved" hidden>Saved</span>
-              <button class="btn ghost sm" id="danger-reset">Restore defaults</button>
+        <!-- Overlay -->
+        <div class="tab-panel" data-tab="overlay">
+          <div class="group-h">
+            <h2>Look and position</h2>
+            <button class="btn sm" id="overlay-test" title="Shows a Divine Orb to check size, background and position">Show test overlay</button>
+          </div>
+          <div class="card group">
+            <div class="field line">
+              <label for="scale">Size <span class="info" title="Scales text and window of the price overlay. You can also drag an edge of the overlay or use Ctrl + mouse wheel over it.">ⓘ</span></label>
+              <div class="slider"><input type="range" id="scale" min="80" max="160" step="5" /><output id="scale-out"></output></div>
+            </div>
+            <div class="field line">
+              <label for="opacity">Background <span class="info" title="Lower values let the game show through. Text stays fully visible.">ⓘ</span></label>
+              <div class="slider"><input type="range" id="opacity" min="40" max="100" step="5" /><output id="opacity-out"></output></div>
+            </div>
+            <div class="field line">
+              <label>Position <span class="info" title="Drag the overlay anywhere to move it – the position is remembered.">ⓘ</span></label>
+              <div class="line-end"><output id="pos-out"></output><button class="btn sm" id="pos-reset">Reset</button></div>
             </div>
           </div>
         </div>
 
-        <h2 class="group-h">Advanced</h2>
-        <div class="card group">
-          <div class="field">
-            <label class="check"><input type="checkbox" id="gpu" /> <span>Use GPU acceleration</span></label>
-            <p class="help">Off draws the tool's windows on the CPU and takes no graphics power away from the game. Recommended: off.</p>
-            <button class="btn" id="gpu-restart" hidden>Restart now to apply</button>
+        <!-- Mods -->
+        <div class="tab-panel" data-tab="mods">
+          <div class="group-h"><h2>Mod value</h2></div>
+          <div class="card group">
+            <div class="field">
+              <p class="help">For rare and magic items, only <b>key mods</b> are searched by default – the price of a rare depends on 2–3 mods, not on all of them. <b>Low value</b> mods are shown faded and never searched by default.</p>
+              <details class="syntax">
+                <summary>Rule format</summary>
+                <p class="help">One rule per line: <code>slot: text</code>, where text is part of the mod (upper/lower case doesn't matter) and slot is one of <code>weapon caster amulet ring belt boots gloves helmet body shield quiver jewel</code>, for attack weapons also <code>melee ranged bow crossbow</code>, or <code>*</code> for all.</p>
+              </details>
+            </div>
+            <div class="field">
+              <label for="key-mods">Key mods</label>
+              <textarea id="key-mods" rows="8" spellcheck="false"></textarea>
+              <div class="row-actions">
+                <span class="saved-hint" id="key-saved" hidden>Saved</span>
+                <button class="btn ghost sm" id="key-reset">Restore defaults</button>
+              </div>
+            </div>
+            <div class="field">
+              <label for="low-mods">Low value mods</label>
+              <textarea id="low-mods" rows="5" spellcheck="false"></textarea>
+              <div class="row-actions">
+                <span class="saved-hint" id="low-saved" hidden>Saved</span>
+                <button class="btn ghost sm" id="low-reset">Restore defaults</button>
+              </div>
+            </div>
           </div>
-          <div class="field">
-            <label>Log file</label>
-            <p class="help">Errors and overlay events are written to <code id="log-path"></code></p>
+
+          <div class="group-h"><h2>Map mods</h2></div>
+          <div class="card group">
+            <div class="field">
+              <label for="danger-mods">Dangerous mods on waystones and tablets <span class="info" title="Mods containing one of these texts are marked red in the overlay. One text per line, upper/lower case doesn&#39;t matter – adapt it to what your build can&#39;t handle.">ⓘ</span></label>
+              <textarea id="danger-mods" rows="8" spellcheck="false"></textarea>
+              <div class="row-actions">
+                <span class="saved-hint" id="danger-saved" hidden>Saved</span>
+                <button class="btn ghost sm" id="danger-reset">Restore defaults</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Erweitert -->
+        <div class="tab-panel" data-tab="advanced">
+          <div class="group-h"><h2>Performance</h2></div>
+          <div class="card group">
+            <div class="field">
+              <label class="check"><input type="checkbox" id="gpu" /> <span>Use GPU acceleration</span></label>
+              <p class="help">Off draws the tool's windows on the CPU and takes no graphics power away from the game. Recommended: off.</p>
+              <button class="btn" id="gpu-restart" hidden>Restart now to apply</button>
+            </div>
+          </div>
+          <div class="group-h"><h2>Troubleshooting</h2></div>
+          <div class="card group">
+            <div class="field">
+              <label>Log file</label>
+              <p class="help">Errors and overlay events are written to <code id="log-path"></code></p>
+            </div>
           </div>
         </div>
       </section>

@@ -32,6 +32,23 @@ for (const item of document.querySelectorAll<HTMLButtonElement>('.nav-item')) {
   item.addEventListener('click', () => showPage(item.dataset.page!));
 }
 
+// Tabs der Einstellungen; der zuletzt offene Tab bleibt gemerkt.
+function showTab(name: string) {
+  for (const t of document.querySelectorAll<HTMLElement>('.tab')) {
+    t.classList.toggle('active', t.dataset.tab === name);
+    t.setAttribute('aria-selected', String(t.dataset.tab === name));
+  }
+  for (const p of document.querySelectorAll<HTMLElement>('.tab-panel')) p.classList.toggle('active', p.dataset.tab === name);
+  document.querySelector('main')!.scrollTop = 0;
+  if (rec) stopRecording();
+  try {
+    localStorage.setItem('settingsTab', name);
+  } catch {
+    // ohne Speicher startet es bei "General"
+  }
+}
+for (const tab of document.querySelectorAll<HTMLButtonElement>('.tab')) tab.addEventListener('click', () => showTab(tab.dataset.tab!));
+
 // ---------- Tastenkappen ----------
 
 function keycaps(labels: string[], size: 'lg' | 'sm' = 'lg'): HTMLElement[] {
@@ -486,7 +503,9 @@ function renderStartup(s: AppState) {
   const start = $<HTMLInputElement>('start-windows');
   start.checked = s.settings.startWithWindows;
   start.disabled = !s.status.canStartWithWindows;
-  if (!s.status.canStartWithWindows) $('start-windows-help').textContent = 'Only available in the installed or portable exe, not when running from source.';
+  const help = $('start-windows-help');
+  help.hidden = s.status.canStartWithWindows;
+  help.textContent = s.status.canStartWithWindows ? '' : 'Only available in the installed or portable exe, not when running from source.';
   $<HTMLInputElement>('close-tray').checked = s.settings.closeToTray;
 }
 $<HTMLInputElement>('start-windows').addEventListener('change', (e) => {
@@ -901,3 +920,11 @@ function render(s: AppState) {
 
 api.onState(render);
 void api.getState().then(render);
+
+// Zuletzt offenen Einstellungs-Tab wiederherstellen (am Ende: showTab braucht den Hotkey-Rekorder).
+try {
+  const saved = localStorage.getItem('settingsTab');
+  if (saved && document.querySelector(`.tab[data-tab="${saved}"]`)) showTab(saved);
+} catch {
+  // Standard-Tab
+}

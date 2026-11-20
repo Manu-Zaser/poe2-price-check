@@ -206,8 +206,30 @@ h2 { font: 600 12px var(--font-display); letter-spacing: .09em; text-transform: 
 .tips li { margin: 6px 0; }
 
 /* ---------- Einstellungen ---------- */
-.group-h { margin: 22px 0 8px; }
+.tabs { display: flex; gap: 4px; padding: 4px; margin-bottom: 18px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); width: fit-content; }
+.tab { background: none; border: 0; padding: 7px 16px; border-radius: 7px; color: var(--muted); cursor: pointer; font: inherit; font-weight: 500; }
+.tab:hover { color: var(--text); background: rgba(255,255,255,.04); }
+.tab.active { background: var(--surface-3); color: var(--gold-bright); }
+.tab:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+.group-h { display: flex; align-items: center; justify-content: space-between; min-height: 28px; margin: 22px 2px 8px; }
 .group-h:first-child { margin-top: 0; }
+.group-h h2 { margin: 0; font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); font-weight: 700; }
+.field.line { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.field.line label { justify-content: flex-start; align-items: center; gap: 6px; }
+.field.line .select-wrap { width: 300px; }
+.slider { display: flex; align-items: center; gap: 12px; width: 300px; }
+.slider output { min-width: 42px; text-align: right; }
+.line-end { display: flex; align-items: center; gap: 12px; }
+.field .line-end output { font-weight: 500; color: var(--muted); }
+#log-path { white-space: normal; word-break: break-all; }
+.info { color: var(--faint); font-weight: 400; font-size: 12px; cursor: help; }
+.info:hover { color: var(--gold-bright); }
+.field .hk-main label { justify-content: flex-start; align-items: center; gap: 6px; }
+.syntax { margin-top: 8px; font-size: 13px; }
+.syntax summary { cursor: pointer; color: var(--muted); width: fit-content; }
+.syntax summary:hover { color: var(--text); }
 .card.group { padding: 2px 18px; }
 .card.group + .group-h { margin-top: 22px; }
 .field { padding: 14px 0; border-bottom: 1px solid var(--line); }
@@ -252,7 +274,7 @@ code { font: 11.5px Consolas, monospace; color: var(--text); background: var(--s
 }
 
 /* ---------- Hotkey-Zeilen (Einstellungen) ---------- */
-.field.hk { display: grid; grid-template-columns: 1fr 190px 160px; align-items: center; gap: 4px 16px; }
+.field.hk { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 4px 16px; }
 .hk-keys { display: flex; align-items: center; justify-content: flex-end; min-height: 30px; }
 .hk-keys .keys-placeholder { font-size: 13px; }
 .hk-actions { display: flex; gap: 6px; justify-content: flex-end; min-width: 150px; }
