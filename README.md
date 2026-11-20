@@ -147,21 +147,28 @@ The overlay is laid out like the trade site, top to bottom:
   <img src="docs/images/market.png" width="640" alt="Market page: rising and falling items of the week, category tabs, search and the price list with 7-day trend">
 </p>
 
-The **Market** page shows all poe.ninja prices of the current league – the same data the price check uses, so it
-sends **no extra requests**:
+The **Market** page shows all poe.ninja prices of the current league – the same data the price check uses, so the
+list sends **no extra requests**:
 
 - **Categories:** Currency, Fragments & league items, Runes & soul cores, Essences, Gems, Uniques – each with price,
-  7-day graph and change. Search works across all categories; sort by value, rising, falling or name.
-- **Rising / Falling this week:** the biggest movers among items worth at least 20 Exalted (uniques with 10+
-  listings) – cheap items swing a lot in % without meaning much.
+  7-day graph and change. Search works across all categories; sort by value, rising, falling, trade volume or name.
+- **Trade volume:** three bars show how much an item is traded (currency, runes … by poe.ninja's trade volume, uniques
+  by listings). Rarely traded items are faded – a single odd trade can set their price – and valuable ones say
+  "⚠ few trades". "Well traded only" hides them.
+- **Rising / Falling this week:** the biggest movers among items worth at least 20 Exalted with enough trades (uniques
+  with 10+ listings) – cheap or rarely traded items swing a lot in % without meaning much.
 - **Trend signals:** a small badge describes what the 7-day curve did – **Steady climb** (up on most days),
   **Accelerating** (rising faster over the last two days), **Recovering** (fell, now clearly rising again),
   **Spike** (most of the rise in one recent day – often hype or price fixing) and **Sliding** (down on most days, near
   its weekly low). Filter by signal to see e.g. all steady climbers across categories. Signals only appear for items
   worth 5+ Exalted. They describe the last 7 days – **they don't predict prices**; patches, build trends and new
   crafting methods move prices in ways no curve shows.
-- **Watchlist:** star (☆) an item to pin it to the Home page, e.g. the currency and runes you farm.
-- **Click an item** to show it in the overlay like a price check.
+- **Watchlist:** star (☆) an item to pin it to the Home page, e.g. the currency and runes you farm. Currency, runes
+  and other exchange items on it are checked against all their trade pairs (one request each, at most once per
+  30 minutes and per poe.ninja update).
+- **Click an item** to show it in the overlay like a price check. For exchange items this also checks that one item
+  against all its trade pairs: "✓ trade pairs agree", or – when they differ by more than 3× – "⚠ trades disagree"
+  with the lower price, in the list and in the overlay.
 - Prices update hourly (as often as poe.ninja recalculates). Uniques with fewer than 5 listings often have fantasy
   prices; they are hidden in the list and only shown – marked – when you search for them.
 - Rares are not in the market list: there is no aggregated data for them, and polling the trade site would break

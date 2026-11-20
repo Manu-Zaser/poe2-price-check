@@ -1,7 +1,7 @@
 import { acceleratorFromEvent, formatHotkey, validateHotkey } from '@poe2/core/hotkey';
 import { DEFAULT_DANGER_MODS } from '../shared/maps';
 import { DEFAULT_KEY_MODS, DEFAULT_LOW_MODS } from '../shared/weights';
-import { filterMarket, isThin, itemSignal, MARKET_MIN_LISTINGS, MARKET_TABS, SIGNAL_INFO, SIGNAL_MIN_EXALTED, topMovers, type MarketData, type MarketItem, type MarketSort, type MarketTab, type TrendSignal } from '../shared/market';
+import { filterMarket, isSuspect, isThin, itemSignal, liquidity, volumeText, MARKET_MIN_LISTINGS, MARKET_TABS, SIGNAL_INFO, SIGNAL_MIN_EXALTED, topMovers, type MarketCheck, type MarketData, type MarketItem, type MarketSort, type MarketTab, type TrendSignal } from '../shared/market';
 import type { AppState, HistoryEntry, HotkeySetting, UpdateState } from '../shared/types';
 import { api, el, itemIcon } from './api';
 import { amount, clock, currencyShort, priceParts, timeAgo } from './format';
@@ -654,6 +654,10 @@ let marketTab: MarketTab = 'currency';
 let marketSort: MarketSort = 'price';
 let marketQuery = '';
 let marketSignal: TrendSignal | undefined;
+let marketTradedOnly = false;
+/** Nachgeprüfte Börsen-Items (Klick, Watchlist) – gilt bis zu den nächsten poe.ninja-Preisen. */
+const checks = new Map<string, MarketCheck>();
+const checking = new Set<string>();
 /** Mehr Zeilen auf einmal bremst das Fenster spürbar – Suche grenzt ein. */
 const MARKET_MAX_ROWS = 150;
 
@@ -663,6 +667,7 @@ async function loadMarket() {
   marketLoading = true;
   try {
     market = await api.getMarket();
+    checks.clear();
   } finally {
     marketLoading = false;
   }
@@ -694,11 +699,62 @@ function starButton(it: MarketItem): HTMLElement {
 }
 
 function marketPrice(it: MarketItem): HTMLElement {
+  // Nach Nachprüfung mit Widerspruch gilt der niedrigere Preis der Handelspaare.
+  const check = checks.get(it.key);
+  const divine = check?.warning ? check.divine : it.divine;
+  const exalted = check?.warning ? check.exalted : it.exalted;
   // Der Divine Orb selbst ist immer "1 Div" – interessant ist sein Wert in Exalted.
-  const p = it.key === 'divine orb' ? { value: amount(it.exalted), unit: 'Ex', alt: undefined } : priceParts(it.divine, it.exalted);
-  const box = el('div', 'mk-price', el('span', 'mk-value', p.value), el('span', `unit unit-${p.unit.toLowerCase()}`, p.unit));
-  if (p.alt) box.title = p.alt;
+  const p = it.key === 'divine orb' ? { value: amount(exalted), unit: 'Ex', alt: undefined } : priceParts(divine, exalted);
+  const box = el('div', 'mk-price', check?.warning ? el('span', 'mk-flag', '⚠') : null, el('span', 'mk-value', p.value), el('span', `unit unit-${p.unit.toLowerCase()}`, p.unit));
+  box.title = check?.warning ?? p.alt ?? '';
   return box;
+}
+
+/** Drei Balken fürs Handelsvolumen (aus der stündlichen poe.ninja-Übersicht, ohne Zusatzanfrage). */
+function liquidityBars(it: MarketItem): HTMLElement | null {
+  const liq = liquidity(it);
+  if (!liq) return null;
+  const bars = el('span', `liq liq-${liq}`, el('i', ''), el('i', ''), el('i', ''));
+  const label = { low: 'Rarely traded – the price can be far off', medium: 'Traded now and then', high: 'Traded a lot' }[liq];
+  bars.title = `${label} (${volumeText(it)} on poe.ninja)`;
+  return bars;
+}
+
+/** Hinweis in der Unterzeile: Ergebnis der Nachprüfung oder Warnung bei dünnem Handel. */
+function checkNote(it: MarketItem): HTMLElement | null {
+  const check = checks.get(it.key);
+  if (checking.has(it.key)) return el('span', 'mk-warn', ' · checking trade pairs …');
+  if (check?.warning) {
+    const n = el('span', 'mk-warn', ' · ⚠ trades disagree – lower price shown');
+    n.title = check.warning;
+    return n;
+  }
+  if (check?.checked) return el('span', 'mk-ok', ' · ✓ trade pairs agree');
+  if (isSuspect(it)) return el('span', 'mk-warn', it.ninjaRef ? ' · ⚠ few trades – click to check' : ' · ⚠ few listings – price unreliable');
+  return null;
+}
+
+/** Börsen-Items über alle Handelspaare prüfen lassen (nur die übergebenen) und die Zeilen neu zeichnen. */
+async function verifyItems(keys: string[]) {
+  const todo = keys.filter((k) => !checks.has(k) && !checking.has(k) && market?.items.some((it) => it.key === k && it.ninjaRef && it.ninjaRef.id !== 'divine'));
+  if (!todo.length) return;
+  for (const k of todo) checking.add(k);
+  renderMarket();
+  renderWatchlist();
+  try {
+    for (const c of await api.verifyMarket(todo)) checks.set(c.key, c);
+  } catch {
+    // ohne Ergebnis bleibt der poe.ninja-Preis
+  } finally {
+    // Auch ohne Antwort als erledigt merken – sonst würde jede neue Anzeige der Watchlist erneut fragen.
+    for (const k of todo) {
+      checking.delete(k);
+      const it = market?.items.find((x) => x.key === k);
+      if (!checks.has(k) && it) checks.set(k, { key: k, checked: false, divine: it.divine, exalted: it.exalted });
+    }
+  }
+  renderMarket();
+  renderWatchlist();
 }
 
 const TAB_LABEL = new Map(MARKET_TABS.map((t) => [t.id, t.label]));
@@ -714,16 +770,18 @@ function signalBadge(it: MarketItem): HTMLElement | null {
 
 /** Eine Zeile: Stern, Bild, Name, Verlauf, Änderung, Preis. Klick = im Overlay zeigen. */
 function marketRow(it: MarketItem, compact = false): HTMLElement {
-  const sub = (it.baseType ?? TAB_LABEL.get(it.tab) ?? '') + (isThin(it) ? ` · only ${it.listingCount} listing${it.listingCount === 1 ? '' : 's'} – price unreliable` : '');
+  const vol = volumeText(it);
+  const sub = (it.baseType ?? TAB_LABEL.get(it.tab) ?? '') + (isThin(it) ? ` · only ${it.listingCount} listing${it.listingCount === 1 ? '' : 's'} – price unreliable` : vol ? ` · ${vol}` : '');
+  const low = liquidity(it) === 'low';
   const row = el(
-    'div', `mk-row${compact ? ' compact' : ''}`,
+    'div', `mk-row${compact ? ' compact' : ''}${low && !compact ? ' low-volume' : ''}${checking.has(it.key) ? ' checking' : ''}`,
     compact ? null : starButton(it),
     itemIcon(it.icon, 'mk-icon'),
     // Kompakt (Top movers): Änderung unter dem Namen, damit der Name die volle Breite bekommt.
     el(
       'div', 'mk-main',
       el('span', `mk-name${it.tab === 'uniques' ? ' rarity-unique' : ''}`, it.name),
-      compact ? el('span', 'mk-sub', trend(it.change7d) ?? '–') : el('span', `mk-sub${isThin(it) ? ' thin' : ''}`, signalBadge(it), sub),
+      compact ? el('span', 'mk-sub', trend(it.change7d) ?? '–') : el('span', `mk-sub${isThin(it) ? ' thin' : ''}`, liquidityBars(it), signalBadge(it), sub, checkNote(it)),
     ),
     compact ? null : it.sparkline ? sparkline(it.sparkline, it.change7d) : el('span', ''),
     compact ? null : el('span', 'mk-trend', trend(it.change7d) ?? '–'),
@@ -731,8 +789,12 @@ function marketRow(it: MarketItem, compact = false): HTMLElement {
   );
   row.tabIndex = 0;
   row.setAttribute('role', 'button');
-  row.title = `${it.name}${it.baseType ? ` (${it.baseType})` : ''} – show in the overlay`;
-  const open = () => api.openMarketItem(it.key);
+  row.title = `${it.name}${it.baseType ? ` (${it.baseType})` : ''} – show in the overlay${it.ninjaRef ? ' and check the price against all trade pairs' : ''}`;
+  const open = () => {
+    api.openMarketItem(it.key);
+    // Klick prüft genau dieses eine Börsen-Item über alle Handelspaare (eine Anfrage, 30 Min. gemerkt).
+    void verifyItems([it.key]);
+  };
   row.addEventListener('click', open);
   row.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') open();
@@ -777,7 +839,8 @@ function renderMarket() {
   // Beim Suchen auch Uniques mit sehr wenigen Angeboten zeigen (markiert), sonst ausblenden.
   // Suche und Trend-Filter gelten für alle Kategorien.
   const everywhere = !!marketQuery || !!marketSignal;
-  const all = filterMarket(market.items, { tab: everywhere ? 'all' : marketTab, query: marketQuery, sort: marketSort, includeThin: !!marketQuery, signal: marketSignal });
+  const all = filterMarket(market.items, { tab: everywhere ? 'all' : marketTab, query: marketQuery, sort: marketSort, includeThin: !!marketQuery, signal: marketSignal, tradedOnly: marketTradedOnly });
+  const rare = marketTradedOnly && !everywhere ? market.items.filter((it) => it.tab === marketTab && !isThin(it) && liquidity(it) === 'low').length : 0;
   const thin = marketQuery ? 0 : market.items.filter((it) => it.tab === marketTab && isThin(it)).length;
   const shown = all.slice(0, MARKET_MAX_ROWS);
   list.replaceChildren(...shown.map((it) => marketRow(it)));
@@ -786,7 +849,7 @@ function renderMarket() {
   note.hidden = !marketSignal;
   if (marketSignal) note.textContent = `${SIGNAL_INFO[marketSignal].label}: ${SIGNAL_INFO[marketSignal].hint} Items worth ${SIGNAL_MIN_EXALTED}+ Exalted, all categories. Signals describe the last 7 days – they don't predict prices.`;
   const more = all.length > shown.length ? ` · showing ${shown.length} of ${all.length} – search to narrow it down` : '';
-  const hidden = thin ? ` · ${thin} with fewer than ${MARKET_MIN_LISTINGS} listings hidden (search shows them)` : '';
+  const hidden = (thin ? ` · ${thin} with fewer than ${MARKET_MIN_LISTINGS} listings hidden (search shows them)` : '') + (rare ? ` · ${rare} rarely traded hidden` : '');
   $('market-meta').textContent = `${market.league} · updated ${timeAgo(market.fetchedAt)} · ${all.length} items${everywhere ? ' in all categories' : ''}${more}${hidden}. Click an item to show it in the overlay.`;
   $('market-empty').hidden = all.length > 0;
   $('market-empty-text').textContent = marketQuery ? `Nothing found for "${marketQuery}".` : 'No prices in this category.';
@@ -796,6 +859,8 @@ function renderWatchlist() {
   const keys = watchlist();
   const items = market ? keys.map((k) => market!.items.find((it) => it.key === k)).filter((it): it is MarketItem => !!it) : [];
   $('watchlist').replaceChildren(...items.map((it) => marketRow(it)));
+  // Watchlist-Items (höchstens 40) werden einmal je poe.ninja-Stand über alle Handelspaare geprüft.
+  void verifyItems(items.filter((it) => it.ninjaRef).map((it) => it.key));
   $('watch-empty').hidden = keys.length > 0;
   $('watch-more').hidden = keys.length === 0;
 }
@@ -823,6 +888,10 @@ $<HTMLInputElement>('market-search').addEventListener('input', (e) => {
 });
 $<HTMLSelectElement>('market-signal').addEventListener('change', (e) => {
   marketSignal = ((e.target as HTMLSelectElement).value || undefined) as TrendSignal | undefined;
+  renderMarket();
+});
+$<HTMLSelectElement>('market-volume').addEventListener('change', (e) => {
+  marketTradedOnly = (e.target as HTMLSelectElement).value === 'traded';
   renderMarket();
 });
 $<HTMLSelectElement>('market-sort').addEventListener('change', (e) => {

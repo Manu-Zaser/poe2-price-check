@@ -8,10 +8,10 @@ import { focusWindowByTitle, foregroundWindowHandle, foregroundWindowTitle } fro
 import { cleanDangerList, CRAFT_OF_EXILE_URL, DEFAULT_DANGER_MODS, isCraftable, isMapItem, markDangerous, poe2dbUrl, wikiUrl } from '../shared/maps';
 import { applyWeights, cleanWeightList, DEFAULT_KEY_MODS, DEFAULT_LOW_MODS, LEGACY_DEFAULTS, upgradeDefaults } from '../shared/weights';
 import { buildSearchQuery, cleanSavedSearches, isNamedUnique, tradeSearchUrl, type StatIndex } from '../shared/stats';
-import { cleanWatchlist, type MarketData } from '../shared/market';
+import { cleanWatchlist, type MarketCheck, type MarketData } from '../shared/market';
 import type { AppState, AppStatus, HistoryEntry, HotkeySetting, ParsedItem, PriceMatch, PriceResult, SaveResult, Settings, TradeSelection } from '../shared/types';
 import { log, logFile } from './log';
-import { buildPriceIndex, CACHE_TTL_MS, checkPairs, fetchLeagues, fetchPairs, lookupPrice, makeFetchJson, type PairQuote, type PriceIndex } from './ninja';
+import { buildPriceIndex, CACHE_TTL_MS, checkPairs, fetchLeagues, fetchPairs, lookupPrice, makeFetchJson, mapLimit, type PairQuote, type PriceIndex } from './ninja';
 import { applySelection, idleRareResult, loadStatIndex, newRareRequest, runRareSearch, type RareRequest } from './rare';
 import { TradeClient } from '@poe2/core/trade';
 import { checkForUpdates, downloadUpdate, initUpdates, installUpdate, openReleasePage, updateState } from './updater';
@@ -824,7 +824,29 @@ async function marketData(): Promise<MarketData | null> {
   return { league: idx.league, fetchedAt: idx.fetchedAt, exaltedPerDivine: idx.exaltedPerDivine, items: idx.market };
 }
 
-/** Item aus der Marktübersicht im Overlay zeigen – wie ein Preischeck, ohne Anfrage. */
+/**
+ * Markt-Items über alle Handelspaare nachprüfen – nur die angefragten (Klick, Watchlist), nie die ganze Liste.
+ * Eine Anfrage je Börsen-Item, höchstens 4 gleichzeitig, 30 Minuten zwischengespeichert.
+ */
+async function verifyMarket(keys: string[]): Promise<MarketCheck[]> {
+  const idx = index ?? (await getIndex().catch(() => null));
+  if (!idx) return [];
+  const wanted = [...new Set(keys.map(String))].slice(0, MARKET_CHECK_MAX);
+  const items = wanted.map((k) => idx.market.find((it) => it.key === k)).filter((it) => !!it?.ninjaRef) as typeof idx.market;
+  return mapLimit(items, 4, async (it) => {
+    const checked = await verifyPrice(it);
+    const fresh = pairCache.get(`${idx.league}|${it.ninjaRef!.type}|${it.ninjaRef!.id}`);
+    return {
+      key: it.key,
+      checked: !!fresh && Date.now() - fresh.at <= PAIR_CACHE_MS,
+      divine: checked.divine,
+      exalted: checked.exalted,
+      ...(checked.warning ? { warning: checked.warning } : {}),
+    };
+  });
+}
+
+/** Item aus der Marktübersicht im Overlay zeigen – wie ein Preischeck; Börsen-Items werden danach nachgeprüft. */
 function openMarketItem(key: string) {
   const m = index?.market.find((it) => it.key === key);
   if (!index || !m) return;
@@ -839,7 +861,14 @@ function openMarketItem(key: string) {
     sections: [],
   };
   const { key: _key, tab: _tab, ...match } = m;
-  showOverlay({ kind: 'priced', item, source: 'poe.ninja', league: index.league, matches: [match] });
+  const league = index.league;
+  showOverlay({ kind: 'priced', item, source: 'poe.ninja', league, matches: [match] });
+  // Sofort zeigen, dann über die Handelspaare prüfen; nur bei Widerspruch wird das Overlay ersetzt.
+  if (match.ninjaRef) {
+    void verifyPrice(match).then((checked) => {
+      if (checked.warning && alive(overlayWin) && overlayWin.isVisible()) showOverlay({ kind: 'priced', item, source: 'poe.ninja', league, matches: [checked] });
+    });
+  }
 }
 
 /** Eintrag aus "Recent checks" im Overlay öffnen (ohne neue Anfrage). */
@@ -865,23 +894,33 @@ function updateHistory(result: PriceResult) {
 /** Geprüfte Börsen-Preise (poe.ninja rechnet stündlich neu; 30 Minuten reichen). */
 const pairCache = new Map<string, { at: number; quotes: PairQuote[] }>();
 const PAIR_CACHE_MS = 30 * 60_000;
+const pairPending = new Map<string, Promise<PairQuote[]>>();
+/** Höchstens so viele Items je Nachprüfung (Watchlist hat maximal 40). */
+const MARKET_CHECK_MAX = 40;
 
 /**
  * Börsen-Items (Währung, Runen …): Kurse aller Handelspaare holen und bei Widerspruch den niedrigeren Preis
  * mit Hinweis nehmen. Eine Anfrage an poe.ninja je Item, zwischengespeichert; schlägt sie fehl, bleibt der Preis.
  */
 async function verifyPrice(match: PriceMatch): Promise<PriceMatch> {
-  if (!match.ninjaRef) return match;
+  // Der Divine Orb ist die Bezugswährung von poe.ninja – für ihn gibt es keine Handelspaare.
+  if (!match.ninjaRef || match.ninjaRef.id === 'divine') return match;
   const idx = await getIndex();
   const key = `${idx.league}|${match.ninjaRef.type}|${match.ninjaRef.id}`;
   let cached = pairCache.get(key);
   if (!cached || Date.now() - cached.at > PAIR_CACHE_MS) {
-    try {
-      const quotes = await Promise.race([
-        fetchPairs(makeFetchJson(userAgent()), idx.league, match.ninjaRef),
+    // Läuft für dasselbe Item schon eine Anfrage (z. B. Klick im Markt öffnet Overlay und Zeile), mitwarten.
+    let pending = pairPending.get(key);
+    if (!pending) {
+      const ref = match.ninjaRef;
+      pending = Promise.race([
+        fetchPairs(makeFetchJson(userAgent()), idx.league, ref),
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500)),
-      ]);
-      cached = { at: Date.now(), quotes };
+      ]).finally(() => pairPending.delete(key));
+      pairPending.set(key, pending);
+    }
+    try {
+      cached = { at: Date.now(), quotes: await pending };
       pairCache.set(key, cached);
     } catch (e) {
       log('warn', `Pair rates for ${match.name} not available`, e);
@@ -1080,6 +1119,7 @@ app.whenReady().then(() => {
   }));
   ipcMain.handle('market:get', safe('market:get', () => marketData()));
   ipcMain.on('market:open', safe('market:open', (_e, key: string) => openMarketItem(String(key))));
+  ipcMain.handle('market:verify', safe('market:verify', (_e, keys: unknown) => verifyMarket(Array.isArray(keys) ? keys.map(String) : [])));
   ipcMain.on('history:open', safe('history:open', (_e, id: number) => openHistoryEntry(Number(id))));
   ipcMain.on('update:check', safe('update:check', () => void checkForUpdates()));
   ipcMain.on('update:download', safe('update:download', () => downloadUpdate()));

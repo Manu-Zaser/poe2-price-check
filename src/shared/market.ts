@@ -37,6 +37,12 @@ export interface MarketItem {
   icon?: string;
   /** Nur Uniques: Anzahl Angebote bei poe.ninja (wenige = unsicherer Preis). */
   listingCount?: number;
+  /** Nur Börsen-Items: gehandeltes Volumen laut poe.ninja in Divine. */
+  volumeDivine?: number;
+  /** Nur Börsen-Items: Währung des Paares, aus dem poe.ninja den Preis nimmt. */
+  pricedIn?: string;
+  /** Nur Börsen-Items: Kennung für die Nachprüfung über alle Handelspaare. */
+  ninjaRef?: { type: string; id: string };
 }
 
 export interface MarketData {
@@ -44,6 +50,17 @@ export interface MarketData {
   fetchedAt: number;
   exaltedPerDivine: number;
   items: MarketItem[];
+}
+
+/** Ergebnis der Nachprüfung eines Börsen-Items über alle Handelspaare (nur auf Klick bzw. für die Watchlist). */
+export interface MarketCheck {
+  key: string;
+  /** false = poe.ninja hat die Paare nicht geliefert, der Preis bleibt ungeprüft. */
+  checked: boolean;
+  divine: number;
+  exalted: number;
+  /** Gesetzt, wenn sich die Paare widersprechen – dann gilt der niedrigere Preis. */
+  warning?: string;
 }
 
 export function marketKey(name: string, baseType?: string): string {
@@ -63,7 +80,7 @@ export function dedupe(items: MarketItem[]): MarketItem[] {
   return [...best.values()];
 }
 
-export type MarketSort = 'price' | 'rising' | 'falling' | 'name';
+export type MarketSort = 'price' | 'rising' | 'falling' | 'volume' | 'name';
 
 /**
  * Uniques mit so wenigen Angeboten haben oft Fantasie- oder Troll-Preise (z. B. ein einziges Listing
@@ -75,20 +92,76 @@ export function isThin(it: MarketItem): boolean {
   return it.listingCount !== undefined && it.listingCount < MARKET_MIN_LISTINGS;
 }
 
+// ---------- Handelsvolumen ----------
+//
+// Steht schon in der stündlichen Übersicht von poe.ninja – keine Zusatzanfrage. Börsen-Items: gehandeltes
+// Volumen in Divine; geteilt durch den Preis ergibt das grob die Stückzahl. Uniques: Anzahl Angebote.
+
+export type Liquidity = 'low' | 'medium' | 'high';
+
+/** Unter so vielen gehandelten Stück reicht ein einzelner Ausreißer-Tausch für einen falschen Preis. */
+export const LOW_TRADED_UNITS = 3;
+export const HIGH_TRADED_UNITS = 20;
+export const LOW_LISTINGS = 10;
+export const HIGH_LISTINGS = 40;
+/** Ab diesem Wert lohnt die Warnung bei dünnem Handel (bei Kleinkram ist ein falscher Preis egal). */
+export const SUSPECT_MIN_EXALTED = 20;
+
+/** Grob gehandelte Stückzahl eines Börsen-Items (Volumen ÷ Preis). */
+export function tradedUnits(it: MarketItem): number | undefined {
+  if (it.volumeDivine === undefined || !(it.divine > 0)) return undefined;
+  return it.volumeDivine / it.divine;
+}
+
+export function liquidity(it: MarketItem): Liquidity | undefined {
+  const units = tradedUnits(it);
+  if (units !== undefined) return units < LOW_TRADED_UNITS ? 'low' : units < HIGH_TRADED_UNITS ? 'medium' : 'high';
+  if (it.listingCount !== undefined) return it.listingCount < LOW_LISTINGS ? 'low' : it.listingCount < HIGH_LISTINGS ? 'medium' : 'high';
+  return undefined;
+}
+
+/** Preis eines wertvollen Items, der auf ganz wenigen Tauschen beruht – kann deutlich daneben liegen. */
+export function isSuspect(it: MarketItem): boolean {
+  return liquidity(it) === 'low' && it.exalted >= SUSPECT_MIN_EXALTED && it.key !== 'divine orb';
+}
+
+/** Kurzer Text zum Volumen für Tooltips und die Unterzeile. */
+export function volumeText(it: MarketItem): string | undefined {
+  const units = tradedUnits(it);
+  if (units !== undefined) {
+    const n = units >= 10 ? Math.round(units).toLocaleString('en-US') : units >= 1 ? units.toFixed(1).replace(/\.0$/, '') : '<1';
+    return `≈ ${n} traded`;
+  }
+  if (it.listingCount !== undefined) return `${it.listingCount} listing${it.listingCount === 1 ? '' : 's'}`;
+  return undefined;
+}
+
+/** Zum Sortieren nach Volumen: Börsen-Items nach Volumen in Divine, Uniques nach Angeboten (dahinter). */
+function volumeRank(it: MarketItem): number {
+  if (it.volumeDivine !== undefined) return 1e6 + it.volumeDivine;
+  return it.listingCount ?? -1;
+}
+
 /** Liste eines Reiters, gefiltert nach Suchtext und sortiert. */
 export function filterMarket(
   items: MarketItem[],
-  opts: { tab: MarketTab | 'all'; query?: string; sort: MarketSort; includeThin?: boolean; signal?: TrendSignal },
+  opts: { tab: MarketTab | 'all'; query?: string; sort: MarketSort; includeThin?: boolean; signal?: TrendSignal; tradedOnly?: boolean },
 ): MarketItem[] {
   const words = (opts.query ?? '').toLowerCase().split(/\s+/).filter(Boolean);
   const list = items.filter(
-    (it) => (opts.tab === 'all' || it.tab === opts.tab) && words.every((w) => it.key.includes(w)) && (opts.includeThin || !isThin(it)) && (!opts.signal || itemSignal(it) === opts.signal),
+    (it) =>
+      (opts.tab === 'all' || it.tab === opts.tab) &&
+      words.every((w) => it.key.includes(w)) &&
+      (opts.includeThin || !isThin(it)) &&
+      (!opts.signal || itemSignal(it) === opts.signal) &&
+      (!opts.tradedOnly || liquidity(it) !== 'low'),
   );
   const change = (it: MarketItem) => it.change7d ?? 0;
   const cmp: Record<MarketSort, (a: MarketItem, b: MarketItem) => number> = {
     price: (a, b) => b.exalted - a.exalted,
     rising: (a, b) => change(b) - change(a),
     falling: (a, b) => change(a) - change(b),
+    volume: (a, b) => volumeRank(b) - volumeRank(a),
     name: (a, b) => a.name.localeCompare(b.name),
   };
   return list.sort((a, b) => cmp[opts.sort](a, b) || b.exalted - a.exalted);
@@ -101,8 +174,9 @@ export const MOVER_MIN_LISTINGS = 10;
 
 /** Größte Gewinner und Verlierer der Woche unter Items, deren Preis belastbar ist. */
 export function topMovers(items: MarketItem[], n = 5): { up: MarketItem[]; down: MarketItem[] } {
+  // Nur Items mit genug Handel: sonst erzeugt ein einzelner Ausreißer-Tausch "+900 %".
   const solid = items.filter(
-    (it) => it.change7d !== undefined && it.exalted >= MOVER_MIN_EXALTED && (it.listingCount === undefined || it.listingCount >= MOVER_MIN_LISTINGS),
+    (it) => it.change7d !== undefined && it.exalted >= MOVER_MIN_EXALTED && (it.listingCount === undefined || it.listingCount >= MOVER_MIN_LISTINGS) && liquidity(it) !== 'low',
   );
   const up = solid.filter((it) => it.change7d! > 0).sort((a, b) => b.change7d! - a.change7d!).slice(0, n);
   const down = solid.filter((it) => it.change7d! < 0).sort((a, b) => a.change7d! - b.change7d!).slice(0, n);
@@ -143,7 +217,7 @@ export const SIGNAL_MIN_EXALTED = 5;
 
 /** Signal eines Items – nur wenn der Preis belastbar ist (genug Wert, genug Angebote). */
 export function itemSignal(it: MarketItem): TrendSignal | undefined {
-  if (it.exalted < SIGNAL_MIN_EXALTED || isThin(it)) return undefined;
+  if (it.exalted < SIGNAL_MIN_EXALTED || isThin(it) || liquidity(it) === 'low') return undefined;
   return trendSignal(it.sparkline);
 }
 

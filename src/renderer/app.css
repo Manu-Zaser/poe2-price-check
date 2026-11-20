@@ -377,7 +377,7 @@ textarea:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 }
 .mk-tab:hover { color: var(--text); border-color: var(--gold-deep); }
 .mk-tab.active { color: #1a140a; background: linear-gradient(180deg, #d9b768, #b08f45); border-color: transparent; }
-.mk-tools { display: grid; grid-template-columns: 1fr 170px 160px; gap: 10px; margin-bottom: 8px; }
+.mk-tools { display: grid; grid-template-columns: 1fr 160px 150px 170px; gap: 10px; margin-bottom: 8px; }
 .mk-tools input[type="search"] {
   width: 100%; padding: 9px 12px; border-radius: 8px; color: var(--text); font: inherit;
   background: var(--surface-2); border: 1px solid var(--line-strong); outline: none;
@@ -412,6 +412,19 @@ textarea:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .watch-empty[hidden] { display: none; }
 .watch-empty .link { font-size: inherit; }
 .mk-sub.thin { color: #d9b44a; }
+/* Handelsvolumen: drei Balken (wenig / mittel / viel gehandelt) */
+.liq { display: inline-flex; align-items: flex-end; gap: 1.5px; height: 10px; margin-right: 6px; vertical-align: -1px; }
+.liq i { width: 3px; border-radius: 1px; background: var(--surface-3); }
+.liq i:nth-child(1) { height: 4px; } .liq i:nth-child(2) { height: 7px; } .liq i:nth-child(3) { height: 10px; }
+.liq-low i:nth-child(1) { background: var(--bad); }
+.liq-medium i:nth-child(-n+2) { background: var(--gold); }
+.liq-high i { background: var(--ok); }
+.mk-row.low-volume { opacity: .72; }
+.mk-row.low-volume:hover { opacity: 1; }
+.mk-warn { color: var(--gold-bright); }
+.mk-ok { color: var(--ok); }
+.mk-price .mk-flag { margin-right: 5px; font-size: 12px; color: var(--gold-bright); }
+.mk-row.checking .mk-price { opacity: .55; }
 
 /* Trend-Signale (beschreiben die letzten 7 Tage) */
 .sig {

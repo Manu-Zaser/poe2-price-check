@@ -16,6 +16,8 @@ const api = {
   getMarket: (): Promise<import('../shared/market').MarketData | null> => ipcRenderer.invoke('market:get'),
   /** Item der Marktübersicht im Overlay zeigen. */
   openMarketItem: (key: string) => ipcRenderer.send('market:open', key),
+  /** Börsen-Items über alle Handelspaare nachprüfen (nur einzelne: Klick, Watchlist). */
+  verifyMarket: (keys: string[]): Promise<import('../shared/market').MarketCheck[]> => ipcRenderer.invoke('market:verify', keys),
   checkUpdates: () => ipcRenderer.send('update:check'),
   /** Gefundenes Update herunterladen (erst nach Bestätigung). */
   downloadUpdate: () => ipcRenderer.send('update:download'),

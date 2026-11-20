@@ -171,7 +171,7 @@
             <ul class="mover-list" id="movers-down"></ul>
           </div>
         </div>
-        <p class="section-hint movers-note">Only items worth at least 20 Exalted (uniques: 10+ listings) – cheap items swing a lot in % without meaning much.</p>
+        <p class="section-hint movers-note">Only items worth at least 20 Exalted with enough trades (uniques: 10+ listings) – cheap or rarely traded items swing a lot in % without meaning much.</p>
 
         <div class="mk-tabs" id="market-tabs" role="tablist" aria-label="Category"></div>
         <div class="mk-tools">
@@ -180,6 +180,7 @@
             <option value="price">Most valuable</option>
             <option value="rising">Rising (7 days)</option>
             <option value="falling">Falling (7 days)</option>
+            <option value="volume">Most traded</option>
             <option value="name">Name</option>
           </select></div>
           <div class="select-wrap"><select id="market-signal" aria-label="Trend signal">
@@ -189,6 +190,10 @@
             <option value="recovering">Recovering</option>
             <option value="spike">Spike</option>
             <option value="sliding">Sliding</option>
+          </select></div>
+          <div class="select-wrap"><select id="market-volume" aria-label="Trade volume" title="Prices of items with very few trades on poe.ninja can be far off">
+            <option value="">All trade volumes</option>
+            <option value="traded">Well traded only</option>
           </select></div>
         </div>
         <p class="section-hint signal-note" id="signal-note" hidden></p>
